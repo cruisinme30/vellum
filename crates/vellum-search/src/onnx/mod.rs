@@ -9,16 +9,20 @@
 //! `token_type_ids`, and returns token states (mean-pooled here over the
 //! attention mask) or an already pooled sentence vector. The operator
 //! points the server at `model.onnx` and `vocab.txt`; nothing is
-//! downloaded. The model loads on first use and stays resident only while
-//! hybrid search is enabled (R-LT-2).
+//! downloaded. The model loads on first use and is dropped again by
+//! [`OnnxEmbedder::unload_if_idle`] once nobody has used it for a while
+//! (R-LT-2); the next use loads it again.
 
+#[cfg(any(test, feature = "test-support"))]
+pub mod testing;
 mod wordpiece;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
-use tokio::sync::OnceCell;
+use tokio::sync::Mutex;
 use tract_onnx::prelude::{
     Framework as _, InferenceModelExt as _, IntoRunnable, TValue, Tensor, TypedRunnableModel, tvec,
 };
@@ -59,19 +63,87 @@ enum Input {
     TypeIds,
 }
 
+/// The longest input most sentence-embedding models accept.
+const MAX_TOKENS: usize = 512;
+
+fn config_error(dir: &Path, what: &str) -> SearchError {
+    SearchError::Embedding(format!("{}: {what}", dir.display()))
+}
+
+impl OnnxConfig {
+    /// Reads a model folder as exported for sentence-transformers:
+    /// `model.onnx` (or `onnx/model.onnx`), `vocab.txt`, and `config.json`
+    /// for the vector size (`hidden_size`), the longest input
+    /// (`max_position_embeddings`, at most 512) and the model's name. E5
+    /// models get their `query: ` and `passage: ` prefixes.
+    ///
+    /// # Errors
+    /// A missing model, vocabulary or `config.json`, or one without
+    /// `hidden_size`.
+    pub fn from_dir(dir: &Path) -> Result<Self> {
+        let model = [dir.join("model.onnx"), dir.join("onnx").join("model.onnx")]
+            .into_iter()
+            .find(|p| p.is_file())
+            .ok_or_else(|| config_error(dir, "no model.onnx"))?;
+        let vocab = dir.join("vocab.txt");
+        if !vocab.is_file() {
+            return Err(config_error(dir, "no vocab.txt"));
+        }
+        let raw = std::fs::read_to_string(dir.join("config.json"))
+            .map_err(|_| config_error(dir, "no config.json"))?;
+        let json: serde_json::Value =
+            serde_json::from_str(&raw).map_err(|e| config_error(dir, &e.to_string()))?;
+        let number = |key: &str| {
+            json.get(key)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|n| usize::try_from(n).ok())
+        };
+        let dimensions = number("hidden_size")
+            .filter(|d| *d > 0)
+            .ok_or_else(|| config_error(dir, "config.json has no hidden_size"))?;
+        let max_tokens =
+            number("max_position_embeddings").map_or(MAX_TOKENS, |n| n.min(MAX_TOKENS));
+        let folder = dir
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let model_id = json
+            .get("_name_or_path")
+            .and_then(serde_json::Value::as_str)
+            .filter(|n| !n.trim().is_empty())
+            .map_or(folder, str::to_owned);
+        let e5 = model_id.to_lowercase().contains("e5");
+        Ok(Self {
+            model,
+            vocab,
+            model_id: format!("{model_id}@{dimensions}"),
+            dimensions,
+            max_tokens,
+            query_prefix: if e5 { "query: " } else { "" }.to_owned(),
+            passage_prefix: if e5 { "passage: " } else { "" }.to_owned(),
+        })
+    }
+}
+
+/// The model while it is resident, and when it was last used.
+#[derive(Default)]
+struct Slot {
+    loaded: Option<Arc<Loaded>>,
+    used: Option<Instant>,
+}
+
 /// An [`Embedder`] backed by a local ONNX model.
 #[derive(Clone)]
 pub struct OnnxEmbedder {
     config: Arc<OnnxConfig>,
-    loaded: Arc<OnceCell<Arc<Loaded>>>,
+    slot: Arc<Mutex<Slot>>,
 }
 
 impl std::fmt::Debug for OnnxEmbedder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("OnnxEmbedder")
             .field("config", &self.config)
-            .field("loaded", &self.loaded.initialized())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -85,20 +157,46 @@ impl OnnxEmbedder {
     pub fn new(config: OnnxConfig) -> Self {
         Self {
             config: Arc::new(config),
-            loaded: Arc::new(OnceCell::new()),
+            slot: Arc::default(),
         }
     }
 
+    /// Whether the model is in memory now.
+    pub async fn is_loaded(&self) -> bool {
+        self.slot.lock().await.loaded.is_some()
+    }
+
+    /// Drops the model when it has not been used for `idle`. Embeddings
+    /// already running keep their copy until they finish.
+    ///
+    /// Returns whether it was dropped.
+    pub async fn unload_if_idle(&self, idle: Duration) -> bool {
+        let dropped = {
+            let mut slot = self.slot.lock().await;
+            let stale = slot.used.is_some_and(|t| t.elapsed() >= idle);
+            stale && slot.loaded.take().is_some()
+        };
+        if dropped {
+            tracing::info!(model = %self.config.model_id, "unloaded the idle embedding model");
+        }
+        dropped
+    }
+
     async fn loaded(&self) -> Result<Arc<Loaded>> {
+        // Held while loading, so two first uses load the model once.
+        let mut slot = self.slot.lock().await;
+        slot.used = Some(Instant::now());
+        if let Some(loaded) = slot.loaded.clone() {
+            drop(slot);
+            return Ok(loaded);
+        }
         let config = Arc::clone(&self.config);
-        self.loaded
-            .get_or_try_init(|| async move {
-                tokio::task::spawn_blocking(move || load(&config).map(Arc::new))
-                    .await
-                    .map_err(model_error)?
-            })
+        let loaded = tokio::task::spawn_blocking(move || load(&config).map(Arc::new))
             .await
-            .cloned()
+            .map_err(model_error)??;
+        slot.loaded = Some(Arc::clone(&loaded));
+        drop(slot);
+        Ok(loaded)
     }
 
     async fn embed(&self, texts: Vec<String>) -> Result<Vec<Vec<f32>>> {

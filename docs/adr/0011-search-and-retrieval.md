@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: `2026-10-29`
 - Status: accepted
-- Decisions: `D61`, `D62`, `D63`
-- Issue: `#102`, also `#99`, `#100`, `#172` and `#403`
+- Decisions: `D61`, `D62`, `D63`, `D295`
+- Issue: `#102`, also `#99`, `#100`, `#172`, `#403` and `#526`
 - Pull requests: `#236`, and the page feed after it
 
 :::
@@ -72,12 +72,27 @@ runs the same checks against each engine.
   mismatch, or a key that cannot read the stamp, empties the index and
   asks for a rebuild instead of failing.
 
+### `D295`: serve turns on embeddings and Markdown for models
+
+- `VELLUM_EMBEDDINGS` names a local model folder (`model.onnx`,
+  `vocab.txt`, `config.json`); unset, search stays BM25-only and the
+  binary loads nothing. A bad folder stops the server at start.
+- The model loads on first use and is dropped after
+  `VELLUM_EMBEDDINGS_IDLE_MINUTES` (15) unused (R-LT-2). Vectors for older
+  documents are added in the background: tantivy rebuilds on a new model
+  (D63); Postgres embeds the documents that have none.
+- `/llms.txt`, `/sitemap.md` and `?format=md` on `/p/{id}` (ADR 0019)
+  are mounted over the `/mcp` workspace, so they list only the pages the
+  signed-in caller may view; anonymous visitors get an empty list.
+
 ## Alternatives
 
 - **ACLs in the index**: every grant change re-indexes blocks, missing the one-second target.
 - **Post-filter only**: ranks every space even when the caller reads one.
 - **External vector database**: ruled out by the brief.
 - **ONNX Runtime**: a native library per platform; tract is pure Rust.
+- **An admin toggle for embeddings**: the model is a file the operator
+  places, so an environment variable sits beside it; a toggle can follow.
 
 ## Consequences
 

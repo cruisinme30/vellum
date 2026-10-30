@@ -1029,6 +1029,7 @@ pub async fn open(
         space_of: Arc::clone(&workspace.space_of),
         row_changes,
         holder: me.clone(),
+        embeddings: crate::search::embeddings(&var)?,
     })
     .await?;
     workspace.services.push(Arc::new(search));
