@@ -10,6 +10,7 @@
 
 import type {
   AdminCreateSpace,
+  AdminTokenView,
   AdminSettings,
   AdminSpaceList,
   AdminSpaceView,
@@ -28,6 +29,7 @@ import type {
   UsageCounts,
   SettingsView,
   SpaceRoleView,
+  TokenPolicy,
   UserView,
   Versioned,
 } from "../../api/api.gen";
@@ -76,10 +78,23 @@ export interface AdminConsoleApi {
   /** Deletes a group; its members lose what it granted. */
   deleteGroup(id: string): Promise<void>;
   groupMembers(id: string): Promise<GroupMembersView>;
+  /** Everyone's personal API tokens (issue #523). */
+  readonly tokens?: AdminTokensApi;
   changeGroupMembers(
     id: string,
     change: { add?: readonly string[]; remove?: readonly string[] },
   ): Promise<GroupMembersView>;
+}
+
+/** Everyone's personal API tokens, for admins (issue #523, ADR 0069). */
+export interface AdminTokensApi {
+  /** Every token, newest first, with its owner; never the secrets. */
+  list(): Promise<AdminTokenView[]>;
+  revoke(id: string): Promise<void>;
+  /** The current cap on new tokens' expiry. */
+  policy(): Promise<TokenPolicy>;
+  /** Caps the expiry of new tokens; `undefined` lifts the cap. */
+  setPolicy(maxDays: number | undefined): Promise<TokenPolicy>;
 }
 
 /** What an admin changes about an account; unset fields stay as they are. */
@@ -164,6 +179,14 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
     },
     groupMembers: (id) =>
       http.get<GroupMembersView>(`${ADMIN}/groups/${encodeURIComponent(id)}/members`),
+    tokens: {
+      list: () => http.get<AdminTokenView[]>(`${ADMIN}/tokens`),
+      async revoke(id) {
+        await http.send("DELETE", `${ADMIN}/tokens/${encodeURIComponent(id)}`);
+      },
+      policy: () => http.get<TokenPolicy>("/api/v1/me/token-policy"),
+      setPolicy: (maxDays) => http.send<TokenPolicy>("PUT", `${ADMIN}/token-policy`, { maxDays }),
+    },
     changeGroupMembers: (id, change) =>
       http.send<GroupMembersView>(
         "POST",
@@ -185,6 +208,8 @@ export function isConflict(error: unknown): boolean {
 }
 
 export {
+  type AdminTokenView,
+  type TokenPolicy,
   type GroupMembersView,
   type GroupView,
   type AdminSpaceView,

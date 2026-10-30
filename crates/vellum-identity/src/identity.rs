@@ -26,6 +26,9 @@ use crate::store::{ApiToken, Session, SessionMethod, SsoLink, State, Store, User
 /// session does not rewrite the store on every request.
 const TOUCH_EVERY: Duration = Duration::from_mins(5);
 
+/// The longest expiry a personal API token can ask for: ten years.
+pub const MAX_TOKEN_DAYS: u32 = 3650;
+
 /// The email of the built-in account break-glass sessions act as.
 pub const BREAK_GLASS_EMAIL: &str = "break-glass";
 
@@ -955,6 +958,29 @@ impl Identity {
                 format!("you cannot grant the `{scope}` scope"),
             ));
         }
+        if expires_in_days.is_some_and(|d| d == 0 || d > MAX_TOKEN_DAYS) {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("a token lasts 1 to {MAX_TOKEN_DAYS} days, or never expires"),
+            ));
+        }
+        if let Some(max) = self.store.read(|s| s.sign_in.max_token_days) {
+            match expires_in_days {
+                None => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("choose an expiry of at most {max} days"),
+                    ));
+                }
+                Some(days) if days > max => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("a token lasts at most {max} days here"),
+                    ));
+                }
+                Some(_) => {}
+            }
+        }
         let secret = secret::generate(Kind::ApiToken)?;
         let hash = secret::hash(&secret);
         let now = Timestamp::now();
@@ -1004,6 +1030,67 @@ impl Identity {
             }
             _ => Err(Error::new(ErrorKind::NotFound, "token not found")),
         })?
+    }
+
+    /// Every personal API token, newest first, for administrators (D291).
+    #[must_use]
+    pub fn all_api_tokens(&self) -> Vec<(ApiToken, Option<UserView>)> {
+        let mut tokens: Vec<(ApiToken, Option<UserView>)> = self.store.read(|s| {
+            s.api_tokens
+                .values()
+                .map(|t| (t.clone(), s.users.get(&t.user).map(UserView::from)))
+                .collect()
+        });
+        tokens.sort_by_key(|(t, _)| std::cmp::Reverse(t.created_at));
+        tokens
+    }
+
+    /// Revokes anyone's API token, for administrators (D291).
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::NotFound`] for an unknown token.
+    pub fn admin_revoke_api_token(&self, id: &str) -> Result<ApiToken, Error> {
+        let removed = self.store.write(|s| s.api_tokens.remove(id))?;
+        let token = removed.ok_or_else(|| Error::new(ErrorKind::NotFound, "token not found"))?;
+        tracing::info!(event = "identity.api_token_revoked", token = %token.id, user = %token.user, "API token revoked by an administrator");
+        Ok(token)
+    }
+
+    /// The scopes `user` may put on a token: their own ceiling.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::NotFound`] for an unknown user.
+    pub fn token_scopes(&self, user: UserId) -> Result<Vec<Scope>, Error> {
+        self.store
+            .read(|s| s.users.get(&user).map(|u| user_scopes(u).iter().collect()))
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))
+    }
+
+    /// The longest expiry, in days, a new personal API token may have.
+    #[must_use]
+    pub fn max_token_days(&self) -> Option<u32> {
+        self.store.read(|s| s.sign_in.max_token_days)
+    }
+
+    /// Caps the expiry of new personal API tokens; `None` lifts the cap.
+    /// Existing tokens keep their expiry; administrators revoke them.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::InvalidInput`] for a cap outside 1 to 3650 days.
+    pub fn set_max_token_days(&self, days: Option<u32>) -> Result<Option<u32>, Error> {
+        if days.is_some_and(|d| d == 0 || d > MAX_TOKEN_DAYS) {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("the cap is 1 to {MAX_TOKEN_DAYS} days"),
+            ));
+        }
+        self.store.write(|s| {
+            s.sign_in.max_token_days = days;
+            days
+        })
     }
 
     /// Verifies a bearer token: a personal API token (`vlm_`) or an

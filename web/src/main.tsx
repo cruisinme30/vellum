@@ -15,6 +15,7 @@ import "./styles/render.css";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
+import { createHttpAccountApi } from "./account/api";
 import { createHttpAdminConsoleApi } from "./admin/console/api";
 import { createAuthApi } from "./api/auth";
 import { createHttp } from "./api/http";
@@ -119,6 +120,7 @@ root.render(
       sharing={status === undefined ? undefined : createHttpSharingApi(http)}
       privateSpaces={status === undefined ? undefined : createHttpPrivateSpacesApi(http)}
       render={status === undefined ? undefined : createHttpRenderApi(http)}
+      account={status === undefined ? undefined : createHttpAccountApi(http)}
       collections={
         status === undefined ? createMockCollectionsStore() : createHttpCollectionsStore(http)
       }

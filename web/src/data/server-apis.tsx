@@ -3,6 +3,7 @@
 
 import { createContext, use, type ReactNode } from "react";
 
+import type { AccountApi } from "../account/api";
 import type { AttachmentsApi } from "../attachments/api";
 import type { BooksApi } from "../books/api";
 import type { DriveApi } from "../drive/api";
@@ -31,6 +32,8 @@ export interface ServerApis {
   readonly render?: RenderApi | undefined;
   /** Who has access to an item, and share links. */
   readonly sharing?: SharingApi | undefined;
+  /** The signed-in person's API tokens and sign-in factors. */
+  readonly account?: AccountApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});
