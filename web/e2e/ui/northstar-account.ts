@@ -46,6 +46,11 @@ export const SIGN_IN: SignInView = {
   breakGlassAdmins: 1,
   maxTokenDays: 90,
   oidcCallbackUrl: "https://vellum.northstar.dev/api/v1/auth/oidc/callback",
+  saml: {
+    entityId: "https://vellum.northstar.dev/saml/metadata",
+    acsUrl: "https://vellum.northstar.dev/saml/acs",
+  },
+  scim: { enabled: false, baseUrl: "https://vellum.northstar.dev/scim/v2" },
   requireSso: false,
   secondFactor: "admins",
   providers: [
@@ -59,6 +64,7 @@ export const SIGN_IN: SignInView = {
       enabled: true,
       autoCreate: true,
       allowedDomains: ["northstar.dev"],
+      certificateFingerprints: [],
       readOnly: false,
       startUrl: "/api/v1/auth/oidc/google/start",
     },

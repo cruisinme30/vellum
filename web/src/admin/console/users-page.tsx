@@ -247,6 +247,24 @@ function UserRow(properties: RowProperties) {
   );
 }
 
+/** What the last change did: a status line, or an alert when it failed. */
+function ChangeNotice({
+  notice,
+}: {
+  readonly notice: { readonly ok: boolean; readonly message: string } | undefined;
+}) {
+  return (
+    <>
+      <div role="status">{notice?.ok === true && <p>{notice.message}</p>}</div>
+      {notice?.ok === false && (
+        <p className="vl-field-error" role="alert">
+          {notice.message}
+        </p>
+      )}
+    </>
+  );
+}
+
 function Users({ api }: { readonly api: AdminConsoleApi }) {
   const t = useT();
   const session = useSession();
@@ -309,12 +327,7 @@ function Users({ api }: { readonly api: AdminConsoleApi }) {
 
   return (
     <>
-      <div role="status">{notice?.ok === true && <p>{notice.message}</p>}</div>
-      {notice?.ok === false && (
-        <p className="vl-field-error" role="alert">
-          {notice.message}
-        </p>
-      )}
+      <ChangeNotice notice={notice} />
       {loaded.state === "loading" && <p className="vl-muted">{t("admin-loading")}</p>}
       {loaded.state === "failed" && (
         <p className="vl-field-error" role="alert">

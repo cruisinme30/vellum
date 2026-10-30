@@ -40,6 +40,7 @@ export const TEAM = {
   members: ["priya", "sam", "lee"],
   templates: [],
   timezone: "America/Los_Angeles",
+  archived: false,
   statuses: [
     { key: "backlog", name: "Backlog", category: "backlog" },
     { key: "todo", name: "Todo", category: "unstarted" },
