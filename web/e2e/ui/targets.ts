@@ -109,6 +109,10 @@ function serverScreens(): Target[] {
     screen("admin users", "/admin/users"),
     screen("admin spaces", "/admin/spaces"),
     screen("admin groups", "/admin/groups"),
+    screen("admin tokens", "/admin/tokens"),
+    screen("admin sign-in", "/admin/sign-in"),
+    screen("api tokens", "/settings/api-tokens"),
+    screen("security settings", "/settings/security"),
     screen("help", "/help"),
     screen("collections (server)", "/data"),
   ];

@@ -13,6 +13,7 @@ import type {
 import type { PreferencesWire } from "../../src/notifications/preferences";
 
 import { driveAnswer } from "./drive-fixture";
+import { ADMIN_TOKENS, FACTORS, MY_TOKENS, SIGN_IN, TOKEN_POLICY } from "./northstar-account";
 import {
   ADMIN_SETTINGS,
   ADMIN_SPACES,
@@ -150,6 +151,11 @@ const READS: readonly (readonly [RegExp, unknown])[] = [
   [/^\/work\/issues$/, { groups: [{ issues: ISSUES }] } satisfies IssueGroups],
   [/^\/work\/comments$/, THREADS],
   [/^\/work\/views$/, { views: [] }],
+  [/^\/me\/tokens$/, MY_TOKENS],
+  [/^\/me\/token-policy$/, TOKEN_POLICY],
+  [/^\/me\/second-factors$/, FACTORS],
+  [/^\/admin\/tokens$/, ADMIN_TOKENS],
+  [/^\/admin\/sign-in$/, SIGN_IN],
   [
     /^\/books$/,
     { books: [{ id: HANDBOOK, path: "handbook", title: BOOK.title }] } satisfies BookList,

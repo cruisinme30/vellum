@@ -34,11 +34,14 @@ function watchErrors(page: Page): Problem[] {
   });
   page.on("requestfailed", (request) => {
     // Browsers cancel a video source they won't play (WebKit and WebM) or
-    // no longer need; that is not a failed load.
+    // no longer need, WebKit cancels font subsets (symbols, math) once the
+    // text turns out not to need them, and a screen cancels its own fetch
+    // when it unmounts (D285). None of these is a failed load.
     const error = request.failure()?.errorText ?? "";
-    const media =
-      request.resourceType() === "media" || /\.(?:webm|mp4|ogg|mp3)$/.test(request.url());
-    if (media && /abort|cancel/i.test(error)) return;
+    const cancellable =
+      ["media", "font", "fetch", "xhr"].includes(request.resourceType()) ||
+      /\.(?:webm|mp4|ogg|mp3|woff2?)$/.test(request.url());
+    if (cancellable && /abort|cancel/i.test(error)) return;
     problems.push({
       rule: "request-failed",
       target: request.url(),
