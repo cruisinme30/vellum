@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D267, D268, D269, D270, D299
-- Issue: #191, #74, #528
+- Decisions: D267, D268, D269, D270, D299, D304
+- Issue: #191, #74, #528, #539
 - Pull requests: to be linked when merged
 
 :::
@@ -82,6 +82,19 @@ re-homing under load had no test, and every page read rendered again.
   update every 200 ms, the other times its arrival (p95 200 ms).
 - A nightly job runs the 30-page PDF test with `--release` (p95 3 s).
 - The new numbers join the summary, so the 10 % gate covers them (#528).
+
+### D304: the load suite exports PDFs beside the reads
+
+- `pdf_export` asks for one 50-block Northstar page as PDF per second
+  (times `SCALE`) through `GET /api/v1/export/pages/{id}?format=pdf`,
+  while the read, write and editing scenarios run
+  ([#539](https://github.com/cruisinme30/vellum/issues/539)).
+- Its p95 must stay under the 3 s PDF budget, every answer must be a PDF,
+  and no export may be refused because both typesetting slots stayed busy
+  (`pdf_export_busy`). The read thresholds now hold under export load.
+- `pdf_export` joins the summary and `baseline.json`, so the 10 % gate
+  covers it. Export routes are plain HTTP, outside the OpenAPI document;
+  the route check reads them from `vellum-cli`'s exports module.
 
 ## Alternatives
 

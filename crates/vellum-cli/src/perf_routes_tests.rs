@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use crate::services;
+use crate::{exports, services};
 
 /// Each `/api/v1/…` path in `routes.js`, with `${…}` as `{}` and any
 /// query string dropped.
@@ -35,14 +35,24 @@ fn normalise(path: &str) -> String {
 fn every_load_test_route_is_served() {
     let gateway = services::contract_gateway().unwrap();
     let document = gateway.openapi();
-    let served: Vec<String> = document["paths"]
+    let mut served: Vec<String> = document["paths"]
         .as_object()
         .unwrap()
         .keys()
         .map(|p| normalise(&format!("/api{p}")))
         .collect();
+    // Exports are plain HTTP routes, outside the OpenAPI document (D304).
+    served.extend(
+        exports::EXPORT_ROUTES
+            .iter()
+            .map(|route| normalise(&format!("{}{route}", exports::EXPORT_PREFIX))),
+    );
     let paths = load_test_paths();
     assert!(paths.len() >= 5, "found {paths:?}");
+    assert!(
+        paths.contains(&"/api/v1/export/pages/{}".to_owned()),
+        "the suite drives the PDF export (#539): {paths:?}"
+    );
     for path in paths {
         assert!(
             served.contains(&path),

@@ -11,16 +11,18 @@
 //
 // Scenarios mirror the brief's targets (#528, ADR 0022 D299): 2,000 reads/s
 // of rendered 50-block pages, split between a hot set and the rest; cold
-// renders right after a save; writes; and 50 editing sessions in pairs on
+// renders right after a save; writes; 50 editing sessions in pairs on
 // different replicas, timing each keystroke until the other editor sees
-// it. The thresholds are the SLOs, and k6 may drop no more than 1 % of the
+// it; and a steady trickle of PDF exports of the same pages (#539, D304),
+// the heaviest request a reader can make, which must neither miss the
+// 3 s PDF budget nor slow the reads running beside it. The thresholds are the SLOs, and k6 may drop no more than 1 % of the
 // reads it was asked to send; `cargo xtask perf-gate` separately fails the
 // run when any p95 grows 10 % or more over recent nights.
 
 import http from 'k6/http';
 import { check, fail } from 'k6';
 import { WebSocket } from 'k6/websockets';
-import { Trend } from 'k6/metrics';
+import { Counter, Trend } from 'k6/metrics';
 import { clearInterval, setInterval, setTimeout } from 'k6/timers';
 import { insertUpdate, stamp, stampsIn, updateFrame } from './keystroke.js';
 import { northstarPage } from './pages.js';
@@ -35,6 +37,9 @@ const DURATION = __ENV.DURATION || '5m';
 const collabSync = new Trend('collab_sync', true);
 const keystroke = new Trend('keystroke', true);
 const renderCold = new Trend('render_cold', true);
+const pdfExport = new Trend('pdf_export', true);
+// Exports refused because both typesetting slots stayed busy (D231).
+const pdfBusy = new Counter('pdf_export_busy');
 
 // Pairs of editors (two sessions each), pages kept for cold renders, and
 // the reads k6 may fail to send before the 2,000 reads/s claim is false.
@@ -91,6 +96,16 @@ export const options = {
       vus: PAIRS,
       duration: DURATION,
     },
+    // Two typesetting slots per replica (D231): one export a second keeps
+    // them busy part of the time without queueing for the 30 s slot wait.
+    pdf_export: {
+      executor: 'constant-arrival-rate',
+      exec: 'exportPdf',
+      rate: Math.max(1, Math.round(SCALE)),
+      timeUnit: '1s',
+      duration: DURATION,
+      preAllocatedVUs: 10,
+    },
   },
   thresholds: {
     'http_req_duration{scenario:read_cached}': ['p(95)<50', 'p(99)<120'],
@@ -99,6 +114,9 @@ export const options = {
     render_cold: ['p(95)<300'],
     collab_sync: ['p(95)<200'],
     keystroke: ['p(95)<200'],
+    pdf_export: ['p(95)<3000'],
+    pdf_export_busy: ['count<1'],
+    'checks{scenario:pdf_export}': ['rate>0.999'],
     'dropped_iterations{scenario:read_cached}': [`count<${MAX_DROPPED}`],
     'dropped_iterations{scenario:read_uncached}': [`count<${MAX_DROPPED}`],
     http_req_failed: ['rate<0.001'],
@@ -169,6 +187,30 @@ export function renderAfterSave(data) {
   });
   if (check(res, { 'cold render 200': (r) => r.status === 200 })) {
     renderCold.add(res.timings.duration);
+  }
+}
+
+// A 50-block Northstar page as PDF, read as the caller. Only the PDF's
+// arrival is timed; a refusal because the slots were busy is counted.
+export function exportPdf(data) {
+  const res = http.get(`${server()}${routes.exportPage(pick(data.ids), 'pdf')}`, {
+    headers: data.headers,
+    responseType: 'binary',
+    tags: { name: 'export-pdf' },
+  });
+  if (res.status === 503) {
+    pdfBusy.add(1);
+    return;
+  }
+  const pdf = check(res, {
+    'pdf export 200': (r) => r.status === 200,
+    'pdf export is a PDF': (r) =>
+      String(r.headers['Content-Type']).startsWith('application/pdf') &&
+      r.body.byteLength >= 4 &&
+      String.fromCharCode(...new Uint8Array(r.body, 0, 4)) === '%PDF',
+  });
+  if (pdf) {
+    pdfExport.add(res.timings.duration);
   }
 }
 
