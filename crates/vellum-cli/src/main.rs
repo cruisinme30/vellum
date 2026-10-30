@@ -16,22 +16,33 @@
 //! to another shard.
 
 mod admin;
+mod assist;
+mod at_rest;
 mod backup_cli;
 mod cluster;
 mod collab;
 #[cfg(test)]
+mod collections_tests;
+#[cfg(test)]
 mod delivery_tests;
 mod docs;
 mod e2e;
+mod exports;
+#[cfg(test)]
+mod exports_tests;
 mod feed;
 mod google_http;
 #[cfg(test)]
 mod google_http_tests;
+mod groups;
 mod help_http;
 mod identity;
 #[cfg(test)]
 mod identity_tests;
 mod integrations;
+mod issue_import;
+#[cfg(test)]
+mod issue_import_tests;
 mod keys;
 mod limits;
 mod mail;
@@ -57,9 +68,17 @@ mod published;
 mod reindex;
 mod reminders;
 mod search;
+mod search_admin;
+mod secrets;
+#[cfg(test)]
+mod secrets_tests;
 mod serve;
 mod services;
 mod shards_cli;
+mod sharing;
+mod site_http;
+#[cfg(test)]
+mod site_tests;
 #[cfg(test)]
 mod sso_tests;
 mod task_prefs;
@@ -69,6 +88,9 @@ mod tasks_http;
 mod tasks_tests;
 #[cfg(test)]
 mod typescript_tests;
+mod uploads;
+#[cfg(test)]
+mod uploads_tests;
 mod watcher;
 mod web;
 #[cfg(test)]

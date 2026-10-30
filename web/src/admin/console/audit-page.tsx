@@ -6,9 +6,11 @@ import { useState, type ComponentProps } from "react";
 import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import { formText, type AdminConsoleApi, type AuditRecord, type ChainReport } from "./api";
 import { AdminScreen } from "./context";
+import { ScrollRegion } from "./scroll-region";
 
 /** Records per page. */
 const PAGE = 50;
@@ -51,7 +53,7 @@ function AuditTable({ records }: { readonly records: readonly AuditRecord[] }) {
     return <p>{t("admin-audit-empty")}</p>;
   }
   return (
-    <div className="vl-admin-scroll">
+    <ScrollRegion label={t("admin-audit-caption")}>
       <table className="vl-admin-table">
         <caption>{t("admin-audit-caption")}</caption>
         <thead>
@@ -71,7 +73,7 @@ function AuditTable({ records }: { readonly records: readonly AuditRecord[] }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }
 
@@ -143,6 +145,7 @@ function ChainTools({ api }: { readonly api: AdminConsoleApi }) {
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
     </div>
@@ -178,6 +181,7 @@ function AuditRecords({
     return (
       <p className="vl-field-error" role="alert">
         {loaded.message}
+        <CopyDiagnostic message={loaded.message} />
       </p>
     );
   }

@@ -11,8 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D233, D234
-- Issues: #93 (chips), #98 (presence and the two-browser test)
+- Decisions: D233, D234, D276
+- Issues: #93 (chips), #98 (presence and the two-browser test), #95
+  (sharing)
 - Pull requests: none yet
 
 :::
@@ -59,6 +60,25 @@ record holds the other collaboration surfaces of the editor.
 - The Playwright test joins two browser contexts to one faked room that
   relays edits and presence, and checks text, avatars and carets.
 
+### `D276`: sharing is grants in the engine, links are viewer grants
+
+- `drive.sharing`, `drive.share` and `drive.unshare` list and change the
+  role grants made on an item (viewer to manager, optionally until a
+  date). Only people who may share the item see or change them, and
+  nobody changes their own access or grants ownership this way.
+- A share link opens one page, read-only, at `/s/<token>` on the public
+  origin. The token is 22 base62 characters from the CSPRNG; only its
+  SHA-256 hash is stored (`share_links`, migration 0011). The link's
+  access is a `viewer` grant to `share_link:<id>` with the same expiry,
+  so the engine enforces expiry and revocation; the record adds an
+  optional Argon2id password and who made it.
+- An unknown, expired or revoked link, or one whose page is gone,
+  answers the same 404; a wrong password asks again. The page is the
+  rendered, sanitised HTML with internal links left as text and diagrams
+  from the cache only, so a visitor never makes the server fetch anything.
+- The share dialog uses the shared people picker (ADR 0055) and shows a
+  new link's URL once; the token cannot be shown again.
+
 ## Alternatives
 
 - **A server search for people and pages on each keystroke**: rejected;
@@ -68,6 +88,8 @@ record holds the other collaboration surfaces of the editor.
 - **`#` as the issue trigger**: rejected; it collides with heading input.
 - **Trusting awareness names alone**: rejected; any browser could claim
   to be anyone in the avatar row.
+- **Share links as their own access check**: rejected; a second check
+  path could drift from the engine's expiry and revocation rules (D276).
 
 ## Consequences
 
@@ -75,3 +97,5 @@ record holds the other collaboration surfaces of the editor.
   the menus stay off and typed tokens still become chips.
 - Issue chips cost one request per distinct issue a minute while a page
   is open.
+- Share links need `VELLUM_PUBLIC_PAGES_URL`; without it the dialog
+  offers people grants only.

@@ -21,7 +21,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use vellum_crypto::KeyProvider;
 use vellum_db::sqlx::{self, Row as _};
-use vellum_db::{Index, IndexPool, traced};
+use vellum_db::{BeginWrite as _, Index, IndexPool, traced};
 use vellum_kernel::{Error, ErrorKind, Result};
 
 use crate::hub::RoomKey;
@@ -343,7 +343,7 @@ impl UpdateStore for SqlUpdateStore {
         let through = from_seq(through)?;
         let payload = self.seal(room, merged).await?;
         with_pool!(self, room, |pool, space, doc, sql| {
-            let mut tx = pool.begin().await.map_err(db_error)?;
+            let mut tx = pool.begin_write().await.map_err(db_error)?;
             let prune = sqlx::query(sql.prune)
                 .bind(space.clone())
                 .bind(doc.clone())

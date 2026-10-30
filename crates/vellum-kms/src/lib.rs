@@ -7,7 +7,9 @@
 //! service to wrap and unwrap data-encryption keys, so the KEK never leaves
 //! that service:
 //!
-//! - [`AwsKms`]: AWS KMS `Encrypt`/`Decrypt`, signed with `SigV4`.
+//! - [`AwsKms`]: AWS KMS `Encrypt`/`Decrypt`, signed with `SigV4`, with
+//!   credentials from [`AwsCredentialProvider`]: role credentials (EKS IRSA,
+//!   EKS Pod Identity, ECS task roles, EC2 instance roles) or static keys.
 //! - [`GcpKms`]: Google Cloud KMS `encrypt`/`decrypt` with an `OAuth` token.
 //! - [`VaultTransit`]: `HashiCorp` Vault's transit secrets engine.
 //!
@@ -20,11 +22,15 @@
 //! a wrapped key only opens under the KEK id its envelope names.
 
 pub mod aws;
+pub mod aws_credentials;
 pub mod gcp;
 mod http;
+mod remote;
 mod sigv4;
 pub mod vault;
 
 pub use aws::{AwsCredentials, AwsKms};
+pub use aws_credentials::AwsCredentialProvider;
 pub use gcp::{GcpKms, MetadataServerToken, StaticToken, TokenSource};
+pub use remote::RemoteKeys;
 pub use vault::VaultTransit;

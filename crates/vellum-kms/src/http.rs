@@ -95,6 +95,27 @@ pub async fn send_json(
         .map_err(|_| CryptoError::Provider(format!("{backend}: response is not JSON")))
 }
 
+/// Sends a request and returns a short text body (instance metadata).
+/// Non-2xx statuses become [`CryptoError::Provider`] without the body.
+pub async fn send_text(
+    backend: &str,
+    request: reqwest::RequestBuilder,
+) -> Result<String, CryptoError> {
+    let response = request.send().await.map_err(|e| {
+        CryptoError::Provider(format!("{backend}: request failed: {}", without_url(&e)))
+    })?;
+    let status = response.status();
+    if !status.is_success() {
+        return Err(CryptoError::Provider(format!("{backend}: HTTP {status}")));
+    }
+    response.text().await.map_err(|e| {
+        CryptoError::Provider(format!(
+            "{backend}: reading response failed: {}",
+            without_url(&e)
+        ))
+    })
+}
+
 /// Error text without the request URL, which can name keys and accounts.
 fn without_url(error: &reqwest::Error) -> String {
     let mut text = error.to_string();

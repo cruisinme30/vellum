@@ -25,7 +25,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use serde_json::{Map, Value, json};
 use vellum_contracts::{CredentialKind, Operation, RequestContext, ScopeSet, Service};
-use vellum_drive::{Drive, DriveIndex, NodeKind, Saved, Space};
+use vellum_drive::{Drive, DriveIndex, Filter, NodeKind, Saved, Space};
 use vellum_kernel::{
     Actor as Who, Error, ErrorKind, ObjectId, RequestId, SpaceId, Timestamp, UserId,
 };
@@ -34,7 +34,7 @@ use vellum_mcp::ports::{
     Actor, Attribution, Block, BlockSelector, Change, ChangePage, CollectionQuery, Document,
     EditProposal, ExportArtifact, ExportRequest, Issue, IssueUpdate, Listing, ListingPage,
     NewComment, NewIssue, NewPage, NewTask, OutlineNode, RowPage, RowUpsert, SearchHit,
-    SearchQuery, SiteInfo, Workspace, WorkspaceError, WriteMode, WriteReceipt,
+    SearchQuery, SiteInfo, Template, Workspace, WorkspaceError, WriteMode, WriteReceipt,
 };
 use vellum_private::PrivateDoc;
 use vellum_store::Base;
@@ -59,8 +59,27 @@ const OPS: [&str; 14] = [
     "collections.get",
 ];
 
+/// The folder name that holds page templates.
+const TEMPLATES: &str = "Templates";
+
+/// Most template folders, and templates per folder, looked at.
+const MAX_TEMPLATES: usize = 200;
+
+/// A template's name: its title in lowercase, words joined by hyphens.
+fn template_name(title: &str) -> String {
+    title
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|w| !w.is_empty())
+        .map(str::to_lowercase)
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
 /// How long one service call may take.
 const BUDGET: Duration = Duration::from_secs(30);
+
+/// Most pages listed in `llms.txt` and the sitemap.
+const LISTED_PAGES: usize = 5_000;
 
 /// Most activity entries read per space for `list_changes`.
 const ACTIVITY_PER_SPACE: usize = 500;
@@ -271,7 +290,49 @@ pub struct ServeWorkspace {
     index: Arc<dyn DriveIndex>,
     ops: HashMap<&'static str, Operation>,
     base_url: String,
+    exporter: std::sync::OnceLock<Exporter>,
 }
+
+/// What an MCP export asks for (D265).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ExportWhat {
+    /// One page.
+    Page(ObjectId),
+    /// A book, or the subtree under one of its sections.
+    Book {
+        /// The book.
+        id: String,
+        /// The section whose subtree to export; the whole book when `None`.
+        section: Option<String>,
+    },
+}
+
+/// One exported file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExportFile {
+    /// `<title>.<ext>`.
+    pub file_name: String,
+    /// The media type.
+    pub mime: String,
+    /// The file.
+    pub bytes: Vec<u8>,
+}
+
+/// The server's exporter: runs one export (`pdf`, `docx` or `md`) as the
+/// principal, through the same code as the export routes.
+pub type Exporter = Arc<
+    dyn Fn(
+            vellum_contracts::Principal,
+            ExportWhat,
+            String,
+        ) -> vellum_contracts::BoxFuture<'static, Result<ExportFile, Error>>
+        + Send
+        + Sync,
+>;
+
+/// Largest export handed to the client inline; bigger files are fetched
+/// from the export route with the same token.
+const INLINE_EXPORT: usize = 4 * 1024 * 1024;
 
 impl std::fmt::Debug for ServeWorkspace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -303,6 +364,31 @@ impl ServeWorkspace {
             index,
             ops,
             base_url: base_url.trim_end_matches('/').to_owned(),
+            exporter: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// Serves `export` through `exporter` (the server's export routes).
+    pub fn set_exporter(&self, exporter: Exporter) {
+        let _ = self.exporter.set(exporter);
+    }
+
+    /// The route the same file downloads from, with the caller's token.
+    fn export_url(&self, what: &ExportWhat, format: &str) -> String {
+        match what {
+            ExportWhat::Page(id) => {
+                format!("{}/api/v1/export/pages/{id}?format={format}", self.base_url)
+            }
+            ExportWhat::Book { id, section: None } => {
+                format!("{}/api/v1/export/books/{id}?format={format}", self.base_url)
+            }
+            ExportWhat::Book {
+                id,
+                section: Some(section),
+            } => format!(
+                "{}/api/v1/export/books/{id}?format={format}&scope=subtree&section={section}",
+                self.base_url
+            ),
         }
     }
 
@@ -501,6 +587,51 @@ impl ServeWorkspace {
         self.call(caller, "books.get", json!({ "book_id": id }))
             .await
             .map_err(read_err(id))
+    }
+
+    /// Page templates (D264): pages in a folder named `Templates` in any
+    /// space the caller can open, by name, first title wins.
+    async fn templates(
+        &self,
+        caller: &Caller,
+    ) -> Result<Vec<(String, vellum_drive::Node)>, WorkspaceError> {
+        let who = caller.model();
+        let folders = self
+            .drive
+            .find(
+                &who,
+                &Filter {
+                    title: Some(TEMPLATES.to_owned()),
+                    kinds: vec![NodeKind::Folder],
+                    ..Filter::default()
+                },
+                MAX_TEMPLATES,
+            )
+            .await
+            .map_err(write_err)?;
+        let mut out: Vec<(String, vellum_drive::Node)> = Vec::new();
+        for folder in folders
+            .iter()
+            .filter(|f| f.title.eq_ignore_ascii_case(TEMPLATES))
+        {
+            let pages = self
+                .drive
+                .find(
+                    &who,
+                    &Filter {
+                        kinds: vec![NodeKind::Page],
+                        location: Some(folder.id),
+                        ..Filter::default()
+                    },
+                    MAX_TEMPLATES,
+                )
+                .await
+                .map_err(write_err)?;
+            out.extend(pages.into_iter().map(|p| (template_name(&p.title), p)));
+        }
+        out.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.title.cmp(&b.1.title)));
+        out.dedup_by(|a, b| a.0 == b.0);
+        Ok(out)
     }
 
     /// The caller's activity since `from`, oldest first.
@@ -775,6 +906,14 @@ impl Workspace for ServeWorkspace {
     async fn get_doc_by_path(&self, actor: &Actor, path: &str) -> Result<Document, WorkspaceError> {
         let caller = Caller::of(actor)?;
         let not_found = || WorkspaceError::NotFound(path.to_owned());
+        // The app's own page URL, `/p/{id}`.
+        if let Some(id) = path
+            .strip_prefix("/p/")
+            .map(|rest| rest.trim_end_matches('/'))
+            .filter(|id| !id.is_empty() && !id.contains('/'))
+        {
+            return self.get_doc(actor, id).await;
+        }
         let (slug, rest) = path
             .trim_start_matches('/')
             .split_once('/')
@@ -1257,11 +1396,53 @@ impl Workspace for ServeWorkspace {
         actor: &Actor,
         request: ExportRequest,
     ) -> Result<ExportArtifact, WorkspaceError> {
-        let _ = Caller::of(actor)?;
-        Err(WorkspaceError::Unavailable(format!(
-            "exporting {} as {} is not offered over MCP on this server yet; read it with get_doc instead",
-            request.target, request.format
-        )))
+        let caller = Caller::of(actor)?;
+        let Some(exporter) = self.exporter.get() else {
+            return Err(WorkspaceError::Unavailable(
+                "export is not offered over MCP on this server yet; read the page with get_doc instead".into(),
+            ));
+        };
+        if !matches!(request.format.as_str(), "pdf" | "docx" | "md") {
+            return Err(WorkspaceError::Invalid(
+                "format must be pdf, docx or md".into(),
+            ));
+        }
+        let page = match request.target.parse::<ObjectId>() {
+            Ok(id) => self
+                .drive
+                .get(&caller.model(), id)
+                .await
+                .ok()
+                .filter(|n| n.kind == NodeKind::Page)
+                .map(|n| n.id),
+            Err(_) => None,
+        };
+        let what = page.map_or_else(
+            || ExportWhat::Book {
+                id: request.target.clone(),
+                section: request.section.clone(),
+            },
+            ExportWhat::Page,
+        );
+        let file = exporter(
+            caller.principal.clone(),
+            what.clone(),
+            request.format.clone(),
+        )
+        .await
+        .map_err(read_err(&request.target))?;
+        let size = u64::try_from(file.bytes.len()).unwrap_or(u64::MAX);
+        let data = (file.bytes.len() <= INLINE_EXPORT).then(|| {
+            use base64::Engine as _;
+            base64::engine::general_purpose::STANDARD.encode(&file.bytes)
+        });
+        Ok(ExportArtifact {
+            url: self.export_url(&what, &request.format),
+            name: file.file_name,
+            mime_type: file.mime,
+            size,
+            data,
+        })
     }
 
     async fn list_changes(
@@ -1290,9 +1471,10 @@ impl Workspace for ServeWorkspace {
             // Nothing is public through MCP: public pages have their own site.
             return Ok(ListingPage::default());
         };
-        let mut items: Vec<Listing> = self
-            .spaces(&caller)
-            .await?
+        let spaces = self.spaces(&caller).await?;
+        let slugs: HashMap<SpaceId, String> =
+            spaces.iter().map(|s| (s.id, s.slug.clone())).collect();
+        let mut items: Vec<Listing> = spaces
             .into_iter()
             .map(|s| Listing {
                 uri: format!("vellum://space/{}/tree", s.slug),
@@ -1302,6 +1484,26 @@ impl Workspace for ServeWorkspace {
                 space: s.slug,
             })
             .collect();
+        // Every page the caller may view, newest first (D295).
+        let pages = self
+            .drive
+            .find(
+                &caller.model(),
+                &vellum_drive::Filter {
+                    kinds: vec![NodeKind::Page],
+                    ..vellum_drive::Filter::default()
+                },
+                LISTED_PAGES,
+            )
+            .await
+            .map_err(write_err)?;
+        items.extend(pages.into_iter().map(|node| Listing {
+            uri: format!("vellum://doc/{}", node.id),
+            title: node.title.clone(),
+            description: None,
+            url: self.page_url(node.id),
+            space: slugs.get(&node.space).cloned().unwrap_or_default(),
+        }));
         if let Ok(books) = self.call(&caller, "books.list", json!({})).await {
             for b in books
                 .get("books")
@@ -1340,9 +1542,33 @@ impl Workspace for ServeWorkspace {
         Ok(ListingPage { items, next_cursor })
     }
 
-    async fn get_template(&self, _actor: &Actor, name: &str) -> Result<String, WorkspaceError> {
-        // No template store yet; prompts fall back to their own outline.
-        Err(WorkspaceError::NotFound(name.to_owned()))
+    async fn list_templates(&self, actor: &Actor) -> Result<Vec<Template>, WorkspaceError> {
+        let Ok(caller) = Caller::of(actor) else {
+            return Ok(Vec::new());
+        };
+        Ok(self
+            .templates(&caller)
+            .await?
+            .into_iter()
+            .map(|(name, node)| Template {
+                uri: format!("vellum://template/{name}"),
+                name,
+                title: node.title,
+            })
+            .collect())
+    }
+
+    async fn get_template(&self, actor: &Actor, name: &str) -> Result<String, WorkspaceError> {
+        let caller = Caller::of(actor)?;
+        let wanted = template_name(name);
+        let (_, node) = self
+            .templates(&caller)
+            .await?
+            .into_iter()
+            .find(|(n, _)| *n == wanted)
+            .ok_or_else(|| WorkspaceError::NotFound(name.to_owned()))?;
+        let (doc, _) = self.read_page(&caller, &node.id.to_string()).await?;
+        Ok(body_of(&doc.markdown))
     }
 
     async fn site_info(&self) -> Result<SiteInfo, WorkspaceError> {
@@ -1395,6 +1621,13 @@ mod tests {
             sort_text(&json!({ "property": "Due", "direction": "DESC" })),
             "\"Due\" desc"
         );
+    }
+
+    #[test]
+    fn templates_are_named_from_their_titles() {
+        assert_eq!(template_name("PRD"), "prd");
+        assert_eq!(template_name("Weekly status: team"), "weekly-status-team");
+        assert_eq!(template_name("  Post-mortem  "), "post-mortem");
     }
 
     #[test]

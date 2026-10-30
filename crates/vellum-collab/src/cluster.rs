@@ -61,8 +61,12 @@ impl Membership for vellum_db::cluster::Nodes {
     async fn beat(&self, me: &Node) -> Result<()> {
         Self::beat(self, me).await.map_err(db_error)
     }
+    /// Replicas that gave no address cannot be reached, so they own no
+    /// rooms (D278).
     async fn live(&self, window: Duration) -> Result<Vec<Node>> {
-        Self::live(self, window).await.map_err(db_error)
+        let mut nodes = Self::live(self, window).await.map_err(db_error)?;
+        nodes.retain(|node| !node.address.trim().is_empty());
+        Ok(nodes)
     }
     async fn leave(&self, me: &Node) -> Result<()> {
         Self::leave(self, me).await.map_err(db_error)

@@ -8,7 +8,9 @@ import { useId, useState, type ComponentProps } from "react";
 import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
+import { ScrollRegion } from "./scroll-region";
 import type { DeliveryView, HookInput, HookView, WebhooksApi } from "./webhooks-api";
 
 const TIME = new Intl.DateTimeFormat("en", {
@@ -177,6 +179,7 @@ export function HookForm({
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
     </form>
@@ -240,13 +243,14 @@ export function Deliveries({ api, hook }: { readonly api: WebhooksApi; readonly 
     return (
       <p className="vl-field-error" role="alert">
         {loaded.message}
+        <CopyDiagnostic message={loaded.message} />
       </p>
     );
   }
   if (loaded.value.length === 0)
     return <p className="vl-muted">{t("admin-webhooks-no-deliveries")}</p>;
   return (
-    <div className="vl-admin-scroll">
+    <ScrollRegion label={t("admin-webhooks-deliveries")}>
       {notice !== undefined && (
         <p className={notice.ok ? "" : "vl-field-error"} role={notice.ok ? "status" : "alert"}>
           {notice.message}
@@ -307,7 +311,7 @@ export function Deliveries({ api, hook }: { readonly api: WebhooksApi; readonly 
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }
 

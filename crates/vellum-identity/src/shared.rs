@@ -28,7 +28,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use tokio::sync::{mpsc as tmpsc, oneshot};
 use vellum_db::sqlx;
-use vellum_db::{Index, IndexConfig, IndexPool};
+use vellum_db::{BeginWrite as _, Index, IndexConfig, IndexPool};
 use vellum_kernel::{Error, ErrorKind};
 
 use crate::store::State;
@@ -354,7 +354,7 @@ async fn write(
 ) {
     let result: Result<(), Error> = on_pool!(index, |pool, _postgres| {
         let opened = async {
-            let mut tx = pool.begin().await.map_err(db)?;
+            let mut tx = pool.begin_write().await.map_err(db)?;
             // Bumping the version takes the row lock that serialises
             // writers on every replica.
             let (version, horizon): (i64, i64) = sqlx::query_as(
@@ -550,6 +550,35 @@ pub fn diff(old: &State, new: &State) -> Result<Vec<Row>, Error> {
         Clone::clone,
         &mut rows,
     )?;
+    diff_map("group", &old.groups, &new.groups, Clone::clone, &mut rows)?;
+    diff_map(
+        "mfa_challenge",
+        &old.mfa_challenges,
+        &new.mfa_challenges,
+        Clone::clone,
+        &mut rows,
+    )?;
+    diff_map(
+        "saml_request",
+        &old.saml_requests,
+        &new.saml_requests,
+        Clone::clone,
+        &mut rows,
+    )?;
+    diff_map(
+        "saml_seen",
+        &old.saml_seen,
+        &new.saml_seen,
+        Clone::clone,
+        &mut rows,
+    )?;
+    if old.sign_in != new.sign_in {
+        rows.push(Row {
+            kind: "sign_in".to_owned(),
+            id: "settings".to_owned(),
+            record: Some(encode(&new.sign_in)?),
+        });
+    }
     Ok(rows)
 }
 
@@ -596,6 +625,16 @@ fn apply(state: &mut State, delta: &Delta) -> Result<(), Error> {
             "lockout" => put(&mut state.lockouts, row)?,
             "oauth_consent" => put(&mut state.oauth_consents, row)?,
             "oauth_code" => put(&mut state.oauth_codes, row)?,
+            "group" => put(&mut state.groups, row)?,
+            "mfa_challenge" => put(&mut state.mfa_challenges, row)?,
+            "saml_request" => put(&mut state.saml_requests, row)?,
+            "saml_seen" => put(&mut state.saml_seen, row)?,
+            "sign_in" => {
+                state.sign_in = match &row.record {
+                    Some(json) => decode(&row.kind, &row.id, json)?,
+                    None => crate::store::SignInSettings::default(),
+                };
+            }
             other => tracing::debug!(kind = other, "skipping an unknown identity record"),
         }
     }
@@ -624,6 +663,9 @@ mod tests {
                 disabled: false,
                 created_at: Timestamp::now(),
                 sso: Vec::new(),
+                factors: crate::store::SecondFactors::default(),
+                break_glass: false,
+                external_id: None,
             },
         );
         let _ = state.sessions.insert(
@@ -688,6 +730,11 @@ mod tests {
             "lockouts",
             "oauth_consents",
             "oauth_codes",
+            "groups",
+            "sign_in",
+            "mfa_challenges",
+            "saml_requests",
+            "saml_seen",
         ];
         maps.sort_unstable();
         assert_eq!(fields, maps);

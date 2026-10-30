@@ -145,10 +145,12 @@ impl View {
     ///
     /// Returns [`WorkError::Invalid`] naming the problem.
     pub fn check(&self) -> Result<(), WorkError> {
-        let invalid = |reason: String| WorkError::Invalid {
-            what: "view",
-            value: self.name.clone(),
-            reason: Box::leak(reason.into_boxed_str()),
+        // Never leak the reason to get a `&'static str`: it can quote the
+        // caller's filter values, so every refused view would keep its
+        // text in memory for good (RT-040).
+        let invalid = |reason: String| WorkError::InvalidView {
+            name: self.name.clone(),
+            reason,
         };
         if self.visibility == Visibility::Team && self.team.is_none() {
             return Err(invalid("a team-visible view needs a team".to_owned()));
@@ -165,6 +167,39 @@ impl View {
             Visibility::Workspace => true,
             Visibility::Team => &self.owner == user || self.team.as_ref().is_some_and(member_of),
         }
+    }
+
+    /// Where the view is stored: `views/<id>.yaml`.
+    #[must_use]
+    pub fn path(&self) -> String {
+        format!("views/{}.yaml", self.id)
+    }
+
+    /// Parses a stored view and checks it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkError::File`] for bad YAML, or what [`View::check`]
+    /// finds.
+    pub fn from_yaml(path: &str, text: &str) -> Result<Self, WorkError> {
+        let view: Self = serde_saphyr::from_str(text).map_err(|e| WorkError::File {
+            path: path.to_owned(),
+            reason: e.to_string(),
+        })?;
+        view.check()?;
+        Ok(view)
+    }
+
+    /// Serialises the view to its file's text.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkError::File`] if the view cannot be written as YAML.
+    pub fn to_yaml(&self) -> Result<String, WorkError> {
+        serde_saphyr::to_string(self).map_err(|e| WorkError::File {
+            path: self.path(),
+            reason: e.to_string(),
+        })
     }
 }
 
@@ -321,4 +356,49 @@ pub fn sort(issues: &mut [&Issue], order: OrderBy) {
 #[must_use]
 pub fn is_blocked(issue: &Issue, graph: &WorkGraph) -> bool {
     issue.blockers().any(|b| graph.is_open(b))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_saved_view_round_trips_through_its_file() {
+        let filter: Filter = serde_json::from_str(
+            r#"{"and":[{"field":"priority","op":"is","values":["urgent","high"]},
+                {"or":[{"field":"assignee","op":"is","values":["@me"]},
+                       {"field":"label","op":"includes_all","values":["gateway"]}]}]}"#,
+        )
+        .unwrap_or_else(|e| panic!("{e}"));
+        let view = View {
+            id: ViewId::generate(),
+            name: "Urgent gateway".to_owned(),
+            owner: UserRef::parse("dev").unwrap_or_else(|e| panic!("{e}")),
+            team: Some(TeamKey::parse("ENG").unwrap_or_else(|e| panic!("{e}"))),
+            visibility: Visibility::Team,
+            layout: Layout::Board,
+            filter,
+            group_by: GroupBy::Assignee,
+            order_by: OrderBy::Due,
+            show_closed: ShowClosed::None,
+            show_sub_issues: false,
+        };
+        let text = view.to_yaml().unwrap_or_else(|e| panic!("{e}"));
+        let back = View::from_yaml(&view.path(), &text).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(back, view);
+        let path = view.path();
+        assert!(path.starts_with("views/"));
+        assert_eq!(
+            std::path::Path::new(&path)
+                .extension()
+                .and_then(|e| e.to_str()),
+            Some("yaml")
+        );
+    }
+
+    #[test]
+    fn a_team_view_without_a_team_is_refused() {
+        let text = "id: 01JBV0000000000000000000AA\nname: x\nowner: dev\nvisibility: team\n";
+        assert!(View::from_yaml("views/x.yaml", text).is_err());
+    }
 }

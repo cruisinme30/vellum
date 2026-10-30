@@ -75,7 +75,7 @@ fn obj(properties: Value, required: &[&str]) -> Value {
 const DIRECT: &str = "Apply directly instead of creating a draft. Needs the write:direct scope; without it the call fails with an insufficient_scope challenge.";
 
 /// Every tool, in the fixed `tools/list` order.
-pub const TOOLS: [ToolDef; 14] = [
+pub const TOOLS: [ToolDef; 15] = [
     ToolDef {
         name: "search",
         title: "Search the workspace",
@@ -136,6 +136,15 @@ pub const TOOLS: [ToolDef; 14] = [
         read_only: true,
         idempotent: true,
         input_schema: || obj(json!({ "id": s("Document or book id.") }), &["id"]),
+    },
+    ToolDef {
+        name: "get_template",
+        title: "Page templates",
+        description: "Without a name, lists the workspace's page templates. With a name, returns that template's Vellum Markdown, to follow section by section before create_draft (pass the name as its template).",
+        scope: Scope::Read,
+        read_only: true,
+        idempotent: true,
+        input_schema: || obj(json!({ "name": s("Template name from the list.") }), &[]),
     },
     ToolDef {
         name: "create_draft",
@@ -518,6 +527,7 @@ pub async fn call(
             },
             Err(e) => e,
         },
+        "get_template" => get_template(ws, &actor, args).await,
         "create_draft" => {
             let mode = write_mode(p, args)?;
             match parse::<NewPage>(&without(args, "direct")) {
@@ -623,12 +633,19 @@ pub async fn call(
             Ok(req) => {
                 let target = req.target.clone();
                 match ws.export(&actor, req).await {
-                    Ok(a) => {
+                    Ok(mut a) => {
+                        let mut content = vec![
+                            json!({ "type": "text", "text": format!("Exported {} ({} bytes).", a.name, a.size) }),
+                            json!({ "type": "resource_link", "uri": a.url, "name": a.name, "mimeType": a.mime_type, "size": a.size }),
+                        ];
+                        // The file itself, when the workspace handed it over.
+                        if let Some(blob) = a.data.take() {
+                            content.push(json!({ "type": "resource", "resource": {
+                                "uri": a.url, "mimeType": a.mime_type, "blob": blob
+                            } }));
+                        }
                         let mut result = Map::new();
-                        let _ = result.insert("content".into(), json!([
-                            { "type": "text", "text": format!("Exported {} ({} bytes). The link expires soon.", a.name, a.size) },
-                            { "type": "resource_link", "uri": a.url, "name": a.name, "mimeType": a.mime_type, "size": a.size }
-                        ]));
+                        let _ = result.insert("content".into(), Value::Array(content));
                         let _ = result.insert("structuredContent".into(), json!(a));
                         ToolOutcome {
                             result,
@@ -814,6 +831,36 @@ async fn search(ws: &dyn Workspace, actor: &Actor, args: &Map<String, Value>) ->
             ok(text, json!({ "hits": hits, "warnings": warnings }), touched)
         }
         Err(e) => from_workspace(&e),
+    }
+}
+
+async fn get_template(ws: &dyn Workspace, actor: &Actor, args: &Map<String, Value>) -> ToolOutcome {
+    match args.get("name").and_then(Value::as_str) {
+        Some(name) => match ws.get_template(actor, name).await {
+            Ok(markdown) => {
+                let (text, warnings) = guarded(&markdown);
+                ok(
+                    text.clone(),
+                    json!({ "name": name, "markdown": text, "warnings": warnings }),
+                    vec![format!("vellum://template/{name}")],
+                )
+            }
+            Err(e) => from_workspace(&e),
+        },
+        None => match ws.list_templates(actor).await {
+            Ok(list) => {
+                let text = if list.is_empty() {
+                    "No page templates yet: a workspace keeps them as pages in a folder named Templates.".to_owned()
+                } else {
+                    list.iter()
+                        .map(|t| format!("- {} ({})", t.name, t.title))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
+                ok(text, json!({ "templates": list }), Vec::new())
+            }
+            Err(e) => from_workspace(&e),
+        },
     }
 }
 

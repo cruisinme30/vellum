@@ -1,0 +1,133 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/* Team settings (issue 524). */
+
+.vl-settings-section {
+  margin: 24px 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--md-outline-variant);
+}
+
+.vl-settings-section h2 {
+  font-size: 1.125rem;
+}
+
+.vl-settings-field {
+  display: grid;
+  gap: 4px;
+  max-width: 420px;
+  margin: 0 0 12px;
+  font-size: 0.875rem;
+}
+
+.vl-settings-field input,
+.vl-settings-field select,
+.vl-settings-status input[aria-label],
+.vl-settings-add input,
+.vl-settings-removal select {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: 4px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font: inherit;
+}
+
+.vl-settings-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin-right: 16px;
+}
+
+.vl-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(220px, 100%), 1fr));
+  gap: 0 16px;
+}
+
+.vl-settings-category {
+  min-width: 0;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 8px;
+}
+
+.vl-settings-category legend {
+  font-weight: 600;
+}
+
+.vl-settings-category ul,
+.vl-settings-rules {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-settings-status,
+.vl-settings-add,
+.vl-settings-removal,
+.vl-settings-rule-head,
+.vl-settings-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.vl-settings-status input[aria-label] {
+  flex: 1 1 180px;
+}
+
+.vl-settings-add {
+  margin-top: 8px;
+}
+
+.vl-settings-removal {
+  flex-basis: 100%;
+  padding: 8px;
+  border-radius: 8px;
+  background: var(--md-surface-container);
+}
+
+.vl-settings-rules {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.vl-settings-rule {
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 8px;
+}
+
+.vl-settings-rule-head .vl-settings-field {
+  flex: 1 1 220px;
+  margin: 0;
+}
+
+.vl-settings-rule .vl-filter,
+.vl-settings-rule .vl-filter-group legend {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.vl-settings-save {
+  padding: 12px 0;
+}
+
+.vl-settings-save p {
+  margin: 0;
+}

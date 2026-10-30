@@ -3,8 +3,9 @@
 
 import type { JSONContent } from "@tiptap/core";
 
+import { filterHits } from "./search";
 import { descendants, movePage } from "./tree";
-import type { MoveTarget, PageMeta, Person, SearchHit, Space } from "./types";
+import type { MoveTarget, PageMeta, Person, SearchFilters, SearchHit, Space } from "./types";
 
 /** Everything the shell renders, as one immutable snapshot. */
 export interface WorkspaceSnapshot {
@@ -60,7 +61,8 @@ export interface WorkspaceStore {
   trashPage(id: string): void;
   /** The body a page's collab document starts from, if it has never been opened. */
   seedFor(id: string): JSONContent | undefined;
-  search(query: string): Promise<SearchHit[]>;
+  /** Pages whose title or body match, best first, narrowed by `filters`. */
+  search(query: string, filters?: SearchFilters): Promise<SearchHit[]>;
   /** Pages that mention a handle, newest first: the inbox. */
   mentions(handle: string): Promise<SearchHit[]>;
   /** Clears the snapshot's `problem`. */
@@ -70,6 +72,8 @@ export interface WorkspaceStore {
    * it loads that person's spaces, or empties when nobody is.
    */
   setUser?(user: SignedInUser | undefined): void;
+  /** Loads the spaces and pages again, after a change made elsewhere (an import). */
+  refresh?(): void;
 }
 
 /** Seed data for an in-memory store. */
@@ -198,7 +202,7 @@ export function createMemoryStore(seed: WorkspaceSeed, clock: () => Date = () =>
       setPages(snapshot.pages.filter((p) => !gone.has(p.id)));
     },
     seedFor: (id) => bodies.get(id),
-    search: (raw) => Promise.resolve(search(raw)),
+    search: (raw, filters) => Promise.resolve(filterHits(search(raw), filters, snapshot.me.handle)),
     mentions: (handle) => Promise.resolve(mentions(handle)),
     dismissProblem() {
       // The memory store never fails.

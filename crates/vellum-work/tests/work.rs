@@ -15,8 +15,8 @@ use vellum_work::triage::{RuleActions, TriageRule};
 use vellum_work::view::{GroupBy, Layout, OrderBy, ShowClosed, View, Visibility, run};
 use vellum_work::{
     Category, Ctx, Cycle, Issue, IssueId, IssueKey, IssuePatch, NewIssue, Priority, Relation,
-    RelationKind, StatusKey, Team, TeamId, TeamKey, TriageAction, UserRef, ViewId, WorkEvent,
-    WorkGraph,
+    RelationKind, StatusKey, Team, TeamId, TeamKey, TriageAction, UserRef, ViewId, WorkError,
+    WorkEvent, WorkGraph,
 };
 
 fn user(h: &str) -> UserRef {
@@ -208,6 +208,53 @@ fn moving_keeps_the_old_identifier_as_an_alias() {
     // ENG never reuses number 1.
     let next = create(&mut g, 2, "Next", |_| {}, &c);
     assert_eq!(g.issue(&next).unwrap().key().to_string(), "ENG-2");
+}
+
+#[test]
+fn archived_teams_keep_their_issues_but_take_no_new_ones() {
+    let mut g = northstar();
+    let c = ctx(datetime!(2026-10-29 09:00 UTC), Some("dev"));
+    let kept = create(&mut g, 1, "Rotate certificates", |_| {}, &c);
+    let changes = g.set_team_archived(&tk("OPS"), true).unwrap();
+    assert!(changes.teams.contains(&tk("OPS")));
+    assert!(g.team(&tk("OPS")).unwrap().archived);
+    // Archiving twice changes nothing.
+    assert!(
+        g.set_team_archived(&tk("OPS"), true)
+            .unwrap()
+            .teams
+            .is_empty()
+    );
+
+    // No moves into it, no new issues, and no triage rule routes there.
+    let err = g.move_issue(&kept, &tk("OPS"), &c).unwrap_err();
+    assert!(matches!(&err, WorkError::ArchivedTeam(t) if t == &tk("OPS")));
+    assert_eq!(err.kind(), vellum_kernel::ErrorKind::Conflict);
+    assert!(
+        g.create_issue(NewIssue::new(id(2), tk("OPS"), "New"), &c)
+            .is_err()
+    );
+    let outsider = ctx(datetime!(2026-10-29 09:00 UTC), Some("outsider"));
+    let routed = g.create_issue(NewIssue::new(id(3), tk("ENG"), "pager fires"), &outsider);
+    assert!(matches!(routed, Err(WorkError::ArchivedTeam(_))));
+    assert!(
+        g.issue(&id(3)).is_none(),
+        "a refused issue leaves nothing behind"
+    );
+    assert_eq!(g.team(&tk("ENG")).unwrap().last_number, 1);
+
+    // Archiving ENG keeps its issue readable and editable where it is.
+    let _ = g.set_team_archived(&tk("ENG"), true).unwrap();
+    assert_eq!(g.resolve("ENG-1").unwrap().id, kept);
+
+    // Restored, it takes issues again.
+    let _ = g.set_team_archived(&tk("OPS"), false).unwrap();
+    let _ = g.move_issue(&kept, &tk("OPS"), &c).unwrap();
+    assert_eq!(g.issue(&kept).unwrap().key().to_string(), "OPS-1");
+    assert!(matches!(
+        g.set_team_archived(&tk("NOPE"), true),
+        Err(WorkError::UnknownTeam(_))
+    ));
 }
 
 #[test]
@@ -761,5 +808,61 @@ fn projects_report_progress_and_changes() {
     assert!(
         g.create_issue(wrong, &c).is_err(),
         "a milestone needs its project"
+    );
+}
+
+#[test]
+fn a_repeating_issue_files_the_next_one_after_its_due_date() {
+    let mut g = northstar();
+    let at = datetime!(2026-10-01 09:00 UTC);
+    let mut draft = NewIssue::new(id(900), tk("ENG"), "Rotate the signing keys");
+    draft.assignee = Some(user("dev"));
+    draft.labels = vec!["gateway".into()];
+    draft.priority = Some(Priority::High);
+    draft.due = Some(date!(2026 - 10 - 05));
+    let _ = g.create_issue(draft, &ctx(at, Some("dev"))).unwrap();
+    let repeat = "1w".parse().unwrap();
+    let _ = g.set_repeat(&id(900), Some(repeat), at).unwrap();
+
+    // Not yet: the due date has not passed.
+    let early = datetime!(2026-10-05 00:01 UTC);
+    assert!(
+        g.recur(early, |_| early.date(), || id(901))
+            .unwrap()
+            .issues
+            .is_empty()
+    );
+
+    // Two weeks late: one new issue, due on the next date not in the past.
+    let late = datetime!(2026-10-20 00:01 UTC);
+    let changes = g.recur(late, |_| late.date(), || id(901)).unwrap();
+    assert_eq!(changes.issues.len(), 2);
+    let next = g.issue(&id(901)).unwrap();
+    assert_eq!(next.due, Some(date!(2026 - 10 - 26)));
+    assert_eq!(next.repeat, Some(repeat));
+    assert_eq!(next.assignee, Some(user("dev")));
+    assert_eq!(next.labels, vec!["gateway".to_owned()]);
+    assert_eq!(next.priority, Priority::High);
+    assert_ne!(g.category_of(next), Some(Category::Triage));
+    assert_eq!(g.issue(&id(900)).unwrap().repeat, None);
+
+    // The old issue never fires twice.
+    assert!(
+        g.recur(late, |_| late.date(), || id(902))
+            .unwrap()
+            .issues
+            .is_empty()
+    );
+}
+
+#[test]
+fn a_repeat_needs_a_due_date() {
+    let mut g = northstar();
+    let at = datetime!(2026-10-01 09:00 UTC);
+    let draft = NewIssue::new(id(910), tk("ENG"), "Weekly report");
+    let _ = g.create_issue(draft, &ctx(at, Some("dev"))).unwrap();
+    assert!(
+        g.set_repeat(&id(910), Some("1w".parse().unwrap()), at)
+            .is_err()
     );
 }

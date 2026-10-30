@@ -8,6 +8,8 @@ import { failureText } from "../data/failure";
 import { Ready, ServerScreen } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
+import { ExportButton } from "../transfer/export-button";
 
 import { AccessPanel } from "./access-panel";
 import type { BookInfo, BooksApi, BookSummary, Place, TocLine } from "./api";
@@ -162,6 +164,16 @@ function SectionView({
               {found.number == undefined ? found.title : `${found.number} ${found.title}`}
               {found.restricted && <span className="vl-book-badge">{t("books-restricted")}</span>}
             </h2>
+            <ExportButton
+              label={t("export-section")}
+              target={{
+                kind: "book",
+                id: info.id,
+                title: found.title,
+                scope: "subtree",
+                section: found.id,
+              }}
+            />
             <MarkdownReader markdown={found.markdown} title={found.title} />
           </article>
         </>
@@ -309,9 +321,14 @@ function Book({
           }}
         />
       </div>
+      <ExportButton
+        label={t("export-book")}
+        target={{ kind: "book", id: info.id, title: info.title, scope: "whole" }}
+      />
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
       <div className="vl-book">

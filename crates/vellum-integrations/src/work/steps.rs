@@ -60,6 +60,29 @@ pub fn states(graph: &WorkGraph, team: &str) -> Result<Vec<WorkflowState>, WorkE
     Ok(team.workflow.statuses.iter().map(state).collect())
 }
 
+/// The Git mapping the team set in its settings, if any (R-WK-10).
+///
+/// # Errors
+///
+/// [`WorkError::NotFound`] for an unknown team.
+pub fn git_mapping(
+    graph: &WorkGraph,
+    team: &str,
+) -> Result<Option<crate::git::Mapping>, WorkError> {
+    let key = team_key(team)?;
+    let team = graph
+        .team(&key)
+        .ok_or_else(|| WorkError::NotFound(key.to_string()))?;
+    let name = |s: &Option<StatusKey>| s.as_ref().map(ToString::to_string);
+    Ok(team.git.as_ref().map(|g| crate::git::Mapping {
+        branch_pushed: name(&g.branch_pushed),
+        pr_opened: name(&g.pr_opened),
+        pr_approved: name(&g.pr_approved),
+        pr_merged: name(&g.pr_merged),
+        pr_closed_unmerged: name(&g.pr_closed_unmerged),
+    }))
+}
+
 /// The team an issue belongs to, for picking its time zone.
 ///
 /// # Errors
@@ -318,4 +341,93 @@ pub(super) fn to_date(date: jiff::civil::Date) -> Result<time::Date, WorkError> 
         .and_then(|m| time::Month::try_from(m).map_err(bad))?;
     let day = u8::try_from(date.day()).map_err(|_| WorkError::Refused("bad day".to_owned()))?;
     time::Date::from_calendar_date(i32::from(date.year()), month, day).map_err(bad)
+}
+
+/// The issues an earlier import from `tracker` created, by source ID.
+#[must_use]
+pub fn imported(graph: &WorkGraph, tracker: &str) -> std::collections::BTreeMap<String, IssueKey> {
+    let prefix = format!("import:{tracker}/");
+    graph
+        .issues()
+        .flat_map(|issue| {
+            issue.links.iter().filter_map(|link| {
+                link.url
+                    .strip_prefix(&prefix)
+                    .map(|external| (external.to_owned(), our_key(&issue.team, issue.number)))
+            })
+        })
+        .collect()
+}
+
+/// Creates every issue of `plan`, oldest first, as `ctx`'s actor, and
+/// returns each one's key by source ID with what changed. An issue whose
+/// source was imported before is not created again.
+///
+/// # Errors
+///
+/// The first issue the engine refuses; nothing is kept then.
+pub fn import_plan(
+    graph: &mut WorkGraph,
+    plan: &crate::import::Plan,
+    ctx: &Ctx,
+) -> Result<(std::collections::BTreeMap<String, IssueKey>, Changes), WorkError> {
+    let mut keys = std::collections::BTreeMap::new();
+    let mut all = Changes::default();
+    for planned in &plan.create {
+        let (key, changes) = create_issue(graph, planned.draft.clone(), ctx)?;
+        if let Some(changes) = changes {
+            all.merge(changes);
+        }
+        let _ = keys.insert(planned.external_id.clone(), key);
+    }
+    Ok((keys, all))
+}
+
+/// Sets the parents and relations an import found, once every issue
+/// exists.
+///
+/// # Errors
+///
+/// An issue that vanished, or a link the engine refuses (a parent cycle).
+pub fn apply_links(
+    graph: &mut WorkGraph,
+    links: &[crate::import::Link],
+    ctx: &Ctx,
+) -> Result<Changes, WorkError> {
+    use crate::import::{Link, Relation};
+    use vellum_work::issue::{Relation as EngineRelation, RelationKind};
+    let mut all = Changes::default();
+    for link in links {
+        let (from, patch) = match link {
+            Link::Parent { child, parent } => {
+                let (parent, _) = find(graph, parent)?;
+                (
+                    child,
+                    vellum_work::IssuePatch {
+                        parent: Some(Some(parent)),
+                        ..vellum_work::IssuePatch::default()
+                    },
+                )
+            }
+            Link::Relation { from, relation, to } => {
+                let (to, _) = find(graph, to)?;
+                let kind = match relation {
+                    Relation::Blocks => RelationKind::Blocks,
+                    Relation::BlockedBy => RelationKind::BlockedBy,
+                    Relation::Related => RelationKind::Related,
+                    Relation::DuplicateOf => RelationKind::DuplicateOf,
+                };
+                (
+                    from,
+                    vellum_work::IssuePatch {
+                        add_relations: vec![EngineRelation { kind, issue: to }],
+                        ..vellum_work::IssuePatch::default()
+                    },
+                )
+            }
+        };
+        let (id, _) = find(graph, from)?;
+        all.merge(graph.update_issue(&id, patch, ctx).map_err(engine)?);
+    }
+    Ok(all)
 }

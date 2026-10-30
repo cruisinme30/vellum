@@ -1,0 +1,139 @@
+/* SPDX-FileCopyrightText: 2026 The Vellum contributors */
+/* SPDX-License-Identifier: AGPL-3.0-only */
+
+/* Export: a side panel like version history. */
+.vl-transfer-panel {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  width: min(480px, 100vw);
+  padding: 16px 24px 32px;
+  overflow-y: auto;
+  background: var(--md-surface-container-low);
+  color: var(--md-on-surface);
+  box-shadow: -2px 0 12px rgb(0 0 0 / 20%);
+}
+
+.vl-transfer-panel > .vl-muted {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.vl-transfer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vl-transfer-head h2 {
+  margin: 6px 0 4px;
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+.vl-transfer-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vl-transfer-choice legend {
+  margin-bottom: 4px;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.vl-transfer-choice label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+}
+
+.vl-transfer-panel .vl-filled-button {
+  align-self: flex-start;
+}
+
+.vl-transfer-preview h3 {
+  margin: 8px 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.vl-transfer-pages {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Paper is white whatever the app theme, like the PDF itself. */
+.vl-transfer-pages img {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 2px;
+  background: #fff; /* fixed: paper is white in every theme, like the PDF */
+}
+
+.vl-transfer-warnings ul {
+  margin: 4px 0 0;
+  padding-inline-start: 20px;
+  overflow-wrap: anywhere;
+}
+
+/* Import. */
+.vl-import-form {
+  display: grid;
+  gap: 8px;
+  max-width: 480px;
+}
+
+.vl-import-form label {
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+.vl-import-form select,
+.vl-import-form input[type="file"] {
+  min-height: 40px;
+  max-width: 100%;
+  font: inherit;
+}
+
+.vl-import-done p {
+  margin: 8px 0 0;
+}
+
+.vl-import-form + .vl-import-form {
+  margin-top: 32px;
+}
+
+.vl-import-form h2 {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 400;
+}
+
+.vl-import-form input:not([type="file"]) {
+  min-height: 40px;
+  font: inherit;
+}
+
+.vl-import-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

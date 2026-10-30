@@ -14,7 +14,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use async_trait::async_trait;
-use vellum_kernel::{ObjectId, SpaceId, Timestamp, UserId, VersionId};
+use vellum_kernel::{Actor, ObjectId, SpaceId, Timestamp, UserId, VersionId};
 use vellum_store::BlobPath;
 
 use crate::error::DriveResult;
@@ -96,6 +96,39 @@ pub enum Permission {
     Manage,
 }
 
+/// A role on a whole space, as an administrator sees and sets it
+/// (ADR 0021, D242). Each role includes the ones before it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SpaceRole {
+    /// May view.
+    Viewer,
+    /// May view and comment.
+    Commenter,
+    /// May view, comment and edit.
+    Editor,
+    /// May also share, trash, purge and change settings.
+    Manager,
+    /// May also transfer ownership.
+    Owner,
+}
+
+impl SpaceRole {
+    /// Whether the role may manage the space.
+    #[must_use]
+    pub const fn manages(self) -> bool {
+        matches!(self, Self::Manager | Self::Owner)
+    }
+}
+
+/// A person's role on a whole space.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Member {
+    /// The person.
+    pub user: UserId,
+    /// Their strongest live role granted on the space itself.
+    pub role: SpaceRole,
+}
+
 /// The authorization service, as the drive sees it.
 ///
 /// Inheritance lives behind this port: a node's access is its own grants
@@ -125,6 +158,38 @@ pub trait Access: Send + Sync + fmt::Debug {
     /// Every group `user` belongs to right now, nested groups included,
     /// by group ID. Book sections restricted to `group:<ID>` use it.
     async fn groups_of(&self, user: UserId) -> DriveResult<BTreeSet<ObjectId>>;
+    /// The people granted a role on the space itself (not on a folder or
+    /// page in it), by user ID.
+    async fn members(&self, space: SpaceId) -> DriveResult<Vec<Member>>;
+    /// Gives `user` exactly `role` on the space, replacing the roles they
+    /// held on it; `None` removes them. Vellum makes the change as itself:
+    /// the caller has already decided it is allowed.
+    async fn set_member(
+        &self,
+        space: SpaceId,
+        user: UserId,
+        role: Option<SpaceRole>,
+    ) -> DriveResult<()>;
+}
+
+/// A check on page text before it is written, such as secret scanning
+/// (R-SE-6).
+///
+/// It sees every page the drive creates or saves, whoever writes it: the
+/// REST API, live editing, models and imports, and every UTF-8 text file
+/// attached to a page (D301).
+#[async_trait]
+pub trait ContentCheck: Send + Sync + fmt::Debug {
+    /// Checks `text`, about to be written by `actor` to the page at `path`
+    /// in `space`. An error refuses the write and is returned to the
+    /// writer, so it must not quote the text.
+    async fn check(
+        &self,
+        actor: &Actor,
+        space: SpaceId,
+        path: &BlobPath,
+        text: &str,
+    ) -> DriveResult<()>;
 }
 
 /// The source of the current time, replaceable in tests.

@@ -76,7 +76,7 @@ const zoom = (percent: number): Mode => ({
 const STRESS =
   " Ünïcödé façade 中文字符测试 العربية עברית 🧑🏽‍💻👩‍👩‍👧 Donaudampfschifffahrtsgesellschaftskapitän https://northstar.dev/a/very/long/path/without/any/break/points/at/all";
 
-export const MODES: readonly Mode[] = [
+const ALL_MODES: readonly Mode[] = [
   { name: "light", apply: (page) => page.emulateMedia({ colorScheme: "light" }) },
   { name: "dark", apply: (page) => page.emulateMedia({ colorScheme: "dark" }) },
   theme("light", "light"),
@@ -145,3 +145,11 @@ export const MODES: readonly Mode[] = [
       ),
   },
 ];
+
+/**
+ * The modes in scope: all of them, or the comma-separated names in
+ * UI_MODES (for example the five themes, for a theme sweep).
+ */
+const wanted = process.env["UI_MODES"]?.split(",").map((name) => name.trim());
+export const MODES: readonly Mode[] =
+  wanted === undefined ? ALL_MODES : ALL_MODES.filter((mode) => wanted.includes(mode.name));

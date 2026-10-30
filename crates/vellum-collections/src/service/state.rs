@@ -383,6 +383,25 @@ impl State {
         Ok(())
     }
 
+    /// The Markdown of each row `changes` writes, with its file (or, for
+    /// a new row, its collection's folder).
+    pub fn row_texts(&self, changes: &Changeset) -> Vec<(BlobPath, String)> {
+        changes
+            .written
+            .iter()
+            .filter_map(|r| {
+                let c = self.ws.collection(r.collection)?;
+                let row = c.row(r.row)?;
+                let folder = self.folders.get(&r.collection)?;
+                let path = folder
+                    .rows
+                    .get(&r.row)
+                    .map_or_else(|| folder.path.clone(), |(path, _)| path.clone());
+                Some((path, row.to_markdown(c.schema())))
+            })
+            .collect()
+    }
+
     async fn write_row(&mut self, store: &dyn BlobStore, r: RowRef) -> Result<(), Error> {
         let (text, title) = {
             let c = self.ws.collection(r.collection).ok_or_else(|| {

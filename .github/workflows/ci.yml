@@ -23,6 +23,20 @@ on:
         type: boolean
         default: false
 
+# A newer run on the same pull request into develop cancels the older one
+# (Gourav, 2026-10-29), so a batch pull request has one live run. Edits to
+# the title or description wait instead, then check only the description.
+# Pushes to develop, release pull requests into main, the merge queue and
+# the full suite never cancel: each gets a group of its own.
+concurrency:
+  group: >-
+    ${{ github.event_name == 'pull_request' && github.base_ref == 'develop'
+    && format('fast-suite-pr-{0}', github.event.pull_request.number)
+    || format('fast-suite-{0}', github.run_id) }}
+  cancel-in-progress: >-
+    ${{ github.event_name == 'pull_request' && github.base_ref == 'develop'
+    && github.event.action != 'edited' }}
+
 permissions:
   contents: read
 
@@ -227,9 +241,10 @@ jobs:
         run: pnpm audit
 
   ui:
-    # Two shards of four workers each: 334 tests took 7.3 minutes on one
-    # runner's default two workers (ADR 0049, D214).
-    name: UI layout (quick ${{ matrix.shard }}/2)
+    # Four shards of four workers each (ADR 0049, D214). 334 tests took
+    # 7.3 minutes on one runner; by 5:50 PM PT on 2026-10-29 there were
+    # 962, and two shards took 8 to 9 minutes each.
+    name: UI layout (quick ${{ matrix.shard }}/4)
     needs: changes
     if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-24.04
@@ -237,7 +252,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     env:
       # Keep in step with site.yml.
       MDBOOK_VERSION: 0.5.4
@@ -273,7 +288,7 @@ jobs:
           UI_BROWSERS: chromium
           UI_VIEWPORTS: phone,laptop
           UI_SITE_DIR: ../_site
-        run: pnpm exec playwright test e2e/ui --shard=${{ matrix.shard }}/2 --workers=4
+        run: pnpm exec playwright test e2e/ui --shard=${{ matrix.shard }}/4 --workers=4
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -342,7 +357,8 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install linters
-        run: pip install yamllint==1.37.1 sqlfluff==3.4.2 zizmor==1.31.1
+        # Every package pinned by hash (Scorecard "Pinned-Dependencies").
+        run: pip install --require-hashes --no-deps -r .github/requirements/hygiene.txt
       - name: YAML
         run: yamllint --strict .
       - name: Shell

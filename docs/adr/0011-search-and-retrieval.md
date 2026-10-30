@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: `2026-10-29`
 - Status: accepted
-- Decisions: `D61`, `D62`, `D63`
-- Issue: `#102`, also `#99`, `#100`, `#172` and `#403`
+- Decisions: `D61`, `D62`, `D63`, `D295`, `D300`
+- Issue: `#102`, also `#99`, `#100`, `#172`, `#403` and `#526`
 - Pull requests: `#236`, and the page feed after it
 
 :::
@@ -72,12 +72,41 @@ runs the same checks against each engine.
   mismatch, or a key that cannot read the stamp, empties the index and
   asks for a rebuild instead of failing.
 
+### `D295`: serve turns on embeddings and Markdown for models
+
+- `VELLUM_EMBEDDINGS` names a local model folder (`model.onnx`,
+  `vocab.txt`, `config.json`); unset, search stays BM25-only and the
+  binary loads nothing. A bad folder stops the server at start.
+- The model loads on first use and is dropped after
+  `VELLUM_EMBEDDINGS_IDLE_MINUTES` (15) unused (R-LT-2). Vectors for older
+  documents are added in the background: tantivy rebuilds on a new model
+  (D63); Postgres embeds the documents that have none.
+- `/llms.txt`, `/sitemap.md` and `?format=md` on `/p/{id}` (ADR 0019)
+  are mounted over the `/mcp` workspace, so they list only the pages the
+  signed-in caller may view; anonymous visitors get an empty list.
+
+### `D300`: Admin turns hybrid ranking on or off and sees its progress
+
+- Admin → Settings → Search has `search.hybrid` (on by default). Off,
+  queries skip the model and rank by BM25 alone; documents keep getting
+  vectors, so turning it on again needs no backfill. Serve reads the
+  setting every 5 s and on each status read, so no restart is needed.
+- `admin_search.status` (`GET /v1/admin/search`) reports the engine, the
+  model, whether it is in memory, and the rebuild or backfill job with
+  done and total counts. The panel polls it every 3 s while a job runs.
+- The model stays a folder named by `VELLUM_EMBEDDINGS`; the release
+  binary builds tract in (the `onnx` feature of `vellum-search`).
+
 ## Alternatives
 
 - **ACLs in the index**: every grant change re-indexes blocks, missing the one-second target.
 - **Post-filter only**: ranks every space even when the caller reads one.
 - **External vector database**: ruled out by the brief.
 - **ONNX Runtime**: a native library per platform; tract is pure Rust.
+- **Uploading the model through Admin**: models are hundreds of
+  megabytes, beyond the upload limit, so the folder stays the operator's.
+- **Skipping vectors on write while hybrid is off**: saves CPU, but
+  turning it on again would need a backfill on every engine.
 
 ## Consequences
 

@@ -10,6 +10,7 @@ version = 1
 [[annotations]]
 path = [
   "Cargo.lock",
+  ".github/requirements/*.txt",
   "fuzz/Cargo.lock",
   "web/pnpm-lock.yaml",
   "web/package.json",
@@ -20,6 +21,9 @@ path = [
   "web/public/manifest.webmanifest",
   "web/public/icons/**",
   "web/e2e/__screenshots__/**",
+  "web/e2e/support/*.gen.json",
+  "crates/vellum-identity/tests/fixtures/saml/*.xml",
+  "crates/vellum-identity/tests/fixtures/saml/*.pem",
   "desktop/pnpm-lock.yaml",
   "desktop/package.json",
   "desktop/tsconfig.json",

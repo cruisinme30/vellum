@@ -882,6 +882,10 @@ impl<S: AuthzStore + 'static> Workspace for DriveTasks<S> {
         })
     }
 
+    fn slack_linked(&self, handle: String) -> BoxFuture<'_, Result<bool, Error>> {
+        Box::pin(async move { Ok(self.slack.lock().values().any(|linked| *linked == handle)) })
+    }
+
     fn slack_user(
         &self,
         team: String,

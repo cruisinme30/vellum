@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D70, D71, D72
-- Requirements: R-EX, R-IM, NFR
-- Issue: #119, #120, #121, #122, #123, #124
+- Decisions: D70, D71, D72, D229, D230, D231
+- Requirements: R-EX, R-IM, R-BK-5, NFR
+- Issue: #119, #120, #121, #122, #123, #124, #506, #78, #151
 - Pull requests: #286
 
 :::
@@ -79,6 +79,41 @@ cross-references.
 - Book export maps a section's depth to its heading level, rebuilds the
   contents and prints references as "§2.1 Services, p. 5".
 
+### D229: export routes read as the caller and preview as SVG
+
+- `vellum serve` exports at `/api/v1/export`: a page as PDF, Word, HTML or
+  Markdown, a book (whole, one section or a subtree), and a page to the
+  caller's Google Drive with their own token.
+- A page is read through the drive and a book through the books service,
+  as the caller: view rights and the `read` scope, and a book export
+  leaves out the sections the caller may not see.
+- Figures come from the render engine's `Figures::render` (#78). Images
+  are the page's own files, read as the caller; outside URLs are never
+  fetched and export as alt text.
+- The app's CSP allows no frames, so the PDF preview is the first pages
+  as SVG from the same Typst layout, shown as images.
+- Downloads go out as attachments with `nosniff` and a sandboxing CSP.
+
+### D230: imports are scanned first and land in a new folder
+
+- `/api/v1/import` takes a zip export or a Word file; a Google Doc is
+  fetched by file ID with the caller's token. Edit rights on the target
+  and `write:direct` are checked before the body is read.
+- Every file, uploaded or fetched, goes through `upload::check` (size,
+  sniffing, zip-bomb limits, ClamAV failing closed) before an importer
+  parses it; then the importer's own archive limits apply.
+- `Drive::import` writes the files into a new folder, refusing paths that
+  leave it or name Vellum's own files, and indexes them like a copy.
+- Issues from Linear, Jira and GitHub (#151) come in at
+  `/api/v1/issue-import`, admins only, with a dry run first. They are
+  created in one Work transaction as the caller; re-imports skip them.
+
+### D231: export and import run on blocking threads behind two slots
+
+- Typesetting and parsing are CPU-bound. They run on blocking threads,
+  at most two at a time per replica; a request that waits 30 s for a
+  slot gets 503 and retries.
+
 ## Alternatives
 
 - **Headless Chromium for every PDF**: slower, a large attack surface,
@@ -87,6 +122,10 @@ cross-references.
   middle format; it does not know callouts, collections or live blocks.
 - **Keep source IDs on import**: they collide across workspaces and
   across repeated imports of the same space.
+- **Export as a background job with a download link**: the slowest
+  export we measured takes seconds, so a direct answer is simpler.
+- **pdf.js for the preview**: a large script, and the PDF would still
+  need a frame or a blob the CSP refuses.
 
 ## Consequences
 
@@ -96,3 +135,7 @@ cross-references.
 - Golden text fixtures in `corpus/export` show any change in PDF or Word
   output; rewrite them with `VELLUM_BLESS=1` and review the diff.
 - Revisit Word import of equations and footnotes, which become warnings.
+- Imported attachments stay beside their pages as plain files; moving
+  them under `.attachments` is a follow-up.
+- Live blocks (issue chips, collection views) export with a note until
+  Work and collections answer the `LiveData` port in serve.

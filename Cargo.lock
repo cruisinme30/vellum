@@ -5540,6 +5540,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
 
 [[package]]
+name = "qrcodegen"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4339fc7a1021c9c1621d87f5e3505f2805c8c105420ba2f2a4df86814590c142"
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8927,6 +8933,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "vellum-assist"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "url",
+ "vellum-contracts",
+ "vellum-kernel",
+ "vellum-security",
+]
+
+[[package]]
 name = "vellum-authz"
 version = "0.0.0"
 dependencies = [
@@ -9010,6 +9033,7 @@ dependencies = [
  "uuid",
  "vellum-admin",
  "vellum-api",
+ "vellum-assist",
  "vellum-authz",
  "vellum-books",
  "vellum-books-service",
@@ -9020,22 +9044,28 @@ dependencies = [
  "vellum-db",
  "vellum-drive",
  "vellum-e2e",
+ "vellum-export",
  "vellum-format",
  "vellum-help",
  "vellum-identity",
  "vellum-integrations",
+ "vellum-jobs",
  "vellum-kernel",
+ "vellum-kms",
  "vellum-mcp",
  "vellum-notify",
  "vellum-observe",
  "vellum-private",
  "vellum-render",
+ "vellum-sealed-store",
  "vellum-search",
  "vellum-security",
  "vellum-store",
  "vellum-tasks",
  "vellum-work",
  "vellum-work-service",
+ "zeroize",
+ "zip",
 ]
 
 [[package]]
@@ -9253,9 +9283,15 @@ dependencies = [
  "aws-lc-rs",
  "axum",
  "base64 0.23.1",
+ "ciborium",
+ "data-encoding",
+ "flate2",
  "getrandom 0.4.3",
  "http",
  "http-body-util",
+ "qrcodegen",
+ "rcgen",
+ "roxmltree 0.21.2",
  "schemars 1.2.3",
  "serde",
  "serde_json",
@@ -9272,6 +9308,7 @@ dependencies = [
  "vellum-db",
  "vellum-kernel",
  "vellum-security",
+ "x509-parser",
 ]
 
 [[package]]
@@ -9515,6 +9552,7 @@ dependencies = [
  "vellum-db",
  "vellum-format",
  "vellum-kernel",
+ "vellum-search",
  "vellum-store",
  "zeroize",
 ]
@@ -9624,6 +9662,7 @@ version = "0.0.0"
 dependencies = [
  "bytes",
  "futures",
+ "jiff",
  "schemars 1.2.3",
  "serde",
  "serde_json",

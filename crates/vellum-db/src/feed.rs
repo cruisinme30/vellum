@@ -17,6 +17,7 @@
 use crate::error::Result;
 use crate::index::{Index, IndexPool};
 use crate::telemetry::traced;
+use crate::tx::BeginWrite as _;
 
 /// Topic of a changed file; the subject is its path.
 pub const PATH: &str = "path";
@@ -80,7 +81,7 @@ impl Feed {
         let system = self.index.backend().otel_system();
         match self.index.pool() {
             IndexPool::Sqlite(pool) => {
-                let mut tx = pool.begin().await?;
+                let mut tx = pool.begin_write().await?;
                 let (head,): (i64,) = traced(
                     system,
                     "feed.bump",
@@ -110,7 +111,7 @@ impl Feed {
                 Ok(head)
             }
             IndexPool::Postgres(pool) => {
-                let mut tx = pool.begin().await?;
+                let mut tx = pool.begin_write().await?;
                 let (head,): (i64,) = traced(
                     system,
                     "feed.bump",
@@ -247,7 +248,7 @@ impl Feed {
         let system = self.index.backend().otel_system();
         match self.index.pool() {
             IndexPool::Sqlite(pool) => {
-                let mut tx = pool.begin().await?;
+                let mut tx = pool.begin_write().await?;
                 let (horizon,): (i64,) = traced(
                     system,
                     "feed.horizon",
@@ -271,7 +272,7 @@ impl Feed {
                 Ok(gone)
             }
             IndexPool::Postgres(pool) => {
-                let mut tx = pool.begin().await?;
+                let mut tx = pool.begin_write().await?;
                 let (horizon,): (i64,) = traced(
                     system,
                     "feed.horizon",

@@ -14,7 +14,7 @@ const proxy =
   server === undefined
     ? undefined
     : Object.fromEntries(
-        ["/api", "/auth", "/oauth", "/.well-known", "/collab"].map((path) => [
+        ["/api", "/auth", "/oauth", "/saml", "/.well-known", "/collab"].map((path) => [
           path,
           { target: server, changeOrigin: false, ws: path === "/collab" },
         ]),

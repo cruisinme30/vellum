@@ -108,12 +108,43 @@ pub(crate) fn all(s: &Arc<WorkService>) -> Vec<Operation> {
         .summary("Replaces a team's configuration (team.yaml)")
         .description("Statuses, estimates, cycles, triage rules, SLAs, labels and templates. The file is validated before anything changes.")
         .fresh_auth(FRESH),
+        mutation(s, "work.archive_team", Post, "/v1/work/teams/{team}/archive", Admin, |s, c, i| async move {
+            s.set_team_archived(c, i, true).await
+        })
+        .summary("Archives a team")
+        .description("The team keeps its issues, keys and history, readable as before, but takes no new issues, moves or triage routes, and leaves team lists unless they ask for archived teams.")
+        .fresh_auth(FRESH),
+        mutation(s, "work.restore_team", Post, "/v1/work/teams/{team}/restore", Admin, |s, c, i| async move {
+            s.set_team_archived(c, i, false).await
+        })
+        .summary("Restores an archived team")
+        .fresh_auth(FRESH),
+        query(s, "work.get_team_settings", "/v1/work/teams/{team}/settings", |s, c, i| async move {
+            s.get_team_settings(c, i).await
+        })
+        .summary("Reads a team's whole settings file (team.yaml) as JSON and YAML"),
         query(s, "work.inbox", "/v1/work/teams/{team}/inbox", |s, c, i| async move { s.inbox(c, i).await })
             .summary("Lists a team's triage inbox"),
         query(s, "work.list_cycles", "/v1/work/teams/{team}/cycles", |s, c, i| async move {
             s.list_cycles(c, i).await
         })
         .summary("Lists a team's cycles with burn-up and velocity"),
+        // Saved views.
+        query(s, "work.list_views", "/v1/work/views", |s, c, i| async move { s.list_views(c, i).await })
+            .summary("Lists the saved views the caller can open"),
+        mutation(s, "work.create_view", Post, "/v1/work/views", Work, |s, c, i| async move {
+            s.create_view(c, i).await
+        })
+        .summary("Saves a view")
+        .description("Private views are the owner's; team views show to the team's members; workspace views to everyone."),
+        mutation(s, "work.put_view", Put, "/v1/work/views/{view_id}", Work, |s, c, i| async move {
+            s.put_view(c, i).await
+        })
+        .summary("Replaces a saved view the caller owns"),
+        mutation(s, "work.delete_view", Delete, "/v1/work/views/{view_id}", Work, |s, c, i| async move {
+            s.delete_view(c, i).await
+        })
+        .summary("Deletes a saved view the caller owns"),
         query(s, "work.insights", "/v1/work/insights", |s, c, i| async move { s.insights(c, i).await })
             .summary("Measures lead, cycle and triage time, throughput and intake")
             .description("Percentiles (p50, p85, p95) and means in hours over a date range, for all issues or a filter, optionally broken down by team, assignee, priority, label, project, cycle or estimate and split into weeks or months."),
@@ -182,6 +213,40 @@ pub(crate) fn all(s: &Arc<WorkService>) -> Vec<Operation> {
             s.put_project(c, i).await
         })
         .summary("Creates or replaces a project page"),
+        // Planning: projects from fields, milestones, updates, initiatives,
+        // templates (D223).
+        mutation(s, "work.create_project", Post, "/v1/work/projects", Work, |s, c, i| async move {
+            s.create_project(c, i).await
+        })
+        .summary("Creates a project from fields"),
+        mutation(s, "work.add_milestone", Post, "/v1/work/projects/{project_id}/milestones", Work, |s, c, i| async move {
+            s.add_milestone(c, i).await
+        })
+        .summary("Adds a milestone to a project"),
+        query(s, "work.list_updates", "/v1/work/projects/{project_id}/updates", |s, c, i| async move {
+            s.list_updates(c, i).await
+        })
+        .summary("Lists a project's health updates, newest first"),
+        mutation(s, "work.post_update", Post, "/v1/work/projects/{project_id}/updates", Work, |s, c, i| async move {
+            s.post_update(c, i).await
+        })
+        .summary("Posts a health update: on track, at risk or off track"),
+        query(s, "work.list_initiatives", "/v1/work/initiatives", |s, c, i| async move {
+            s.list_initiatives(c, i).await
+        })
+        .summary("Lists initiatives with their projects' rolled-up health and progress"),
+        mutation(s, "work.create_initiative", Post, "/v1/work/initiatives", Work, |s, c, i| async move {
+            s.create_initiative(c, i).await
+        })
+        .summary("Creates an initiative"),
+        mutation(s, "work.put_initiative", Put, "/v1/work/initiatives/{initiative_id}", Work, |s, c, i| async move {
+            s.put_initiative(c, i).await
+        })
+        .summary("Replaces an initiative page"),
+        query(s, "work.list_templates", "/v1/work/teams/{team}/templates", |s, c, i| async move {
+            s.list_templates(c, i).await
+        })
+        .summary("Lists a team's issue templates in full"),
         // Comments.
         query(s, "work.list_comments", "/v1/work/comments", |s, c, i| async move { s.list_comments(c, i).await })
             .summary("Lists comment threads on an issue, page or block"),

@@ -46,9 +46,16 @@ log:
 # OTLP/HTTP collector base URL; empty means no export.
 otlpEndpoint: ""
 
-# The passphrase that wraps the key-encryption key. Create the secret before
-# installing: kubectl create secret generic vellum-kek --from-literal=passphrase=...
+# Encryption at rest (ADR 0025, D260). Workspace files are sealed under a
+# key-encryption key. Prefer a key service: set kms to its KEK id, for
+# example aws-kms:eu-west-1:arn:aws:kms:eu-west-1:111122223333:key/<id>,
+# gcp-kms:projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k> or
+# vault:transit/<key>, and give the pod a role (EKS IRSA or Pod Identity,
+# GKE workload identity) through serviceAccount annotations. With kms empty,
+# the KEK comes from a passphrase. Create its secret before installing:
+#   kubectl create secret generic vellum-kek --from-literal=passphrase=...
 encryption:
+  kms: ""
   kekSecret:
     name: vellum-kek
     key: passphrase

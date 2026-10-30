@@ -108,3 +108,94 @@ test("signing in returns to the page asked for, and says why it failed", async (
   await expect(page).toHaveURL(/\/data$/);
   await expect(page.getByText("There are no collections yet.")).toBeVisible();
 });
+
+test("a second step asks for the authenticator code", async ({ page }) => {
+  await fakeServer(page, "signed-out");
+  let signedIn = false;
+  await page.route("**/api/v1/auth/status", (route) =>
+    route.fulfill({
+      json: signedIn
+        ? { needsSetup: false, credential: "session", scopes: ["read"], user: USER }
+        : { needsSetup: false, credential: "anonymous", scopes: [] },
+    }),
+  );
+  await page.route("**/auth/sign-in", (route) =>
+    route.fulfill({ json: { secondFactor: { ticket: "vmt_e2e", methods: ["totp", "recovery"] } } }),
+  );
+  await page.route("**/auth/sign-in/verify", async (route) => {
+    const body = route.request().postDataJSON() as { code?: string };
+    if (body.code !== "123456") {
+      await route.fulfill({
+        status: 401,
+        json: { code: "unauthenticated", message: "the code is wrong", retryable: false },
+      });
+      return;
+    }
+    signedIn = true;
+    await route.fulfill({ json: { user: USER, sessionId: "s1" } });
+  });
+  await page.goto("/sign-in?next=%2Fdata");
+  await page.getByLabel("Email").fill("priya@northstar.dev");
+  await page.getByLabel("Password").fill("a long enough password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByRole("heading", { name: "Two-step verification" })).toBeVisible();
+  await expectNoViolations(page);
+  await page.getByLabel("Code from your authenticator app").fill("000000");
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page.getByRole("alert")).toContainText("the code is wrong");
+  await page.getByLabel("Code from your authenticator app").fill("123456");
+  await page.getByRole("button", { name: "Verify" }).click();
+  await expect(page).toHaveURL(/\/data$/);
+});
+
+test("single sign-on goes to the SAML provider and back", async ({ page }) => {
+  await fakeServer(page, "signed-out");
+  let signedIn = false;
+  const entra = { id: "entra", name: "Entra ID", startUrl: "/auth/sso/start?provider=entra" };
+  await page.route("**/api/v1/auth/status", (route) =>
+    route.fulfill({
+      json: signedIn
+        ? { needsSetup: false, credential: "session", scopes: ["read"], user: USER }
+        : {
+            needsSetup: false,
+            credential: "anonymous",
+            scopes: [],
+            sso: entra,
+            providers: [entra],
+          },
+    }),
+  );
+  await page.goto("/sign-in?next=%2Fdata");
+  const app = new URL(page.url()).origin;
+  // The server sends the browser to the provider with a request...
+  await page.route("**/auth/sso/start?**", (route) =>
+    route.fulfill({
+      status: 302,
+      headers: { location: "https://idp.northstar.test/sso?SAMLRequest=x&RelayState=r" },
+    }),
+  );
+  // ...the provider signs the person in and posts the response back...
+  await page.route("https://idp.northstar.test/**", (route) =>
+    route.fulfill({
+      contentType: "text/html",
+      body: `<!doctype html><html lang="en"><title>Northstar IdP</title><main><h1>Northstar sign-in</h1>
+        <form method="post" action="${app}/saml/acs">
+          <input type="hidden" name="SAMLResponse" value="PHNhbWxwOlJlc3BvbnNlLz4=">
+          <input type="hidden" name="RelayState" value="r">
+          <button>Continue</button>
+        </form></main></html>`,
+    }),
+  );
+  // ...and the server checks it, opens a session and goes on.
+  await page.route("**/saml/acs", async (route) => {
+    expect(route.request().method()).toBe("POST");
+    expect(route.request().postData()).toContain("RelayState=r");
+    signedIn = true;
+    await route.fulfill({ status: 303, headers: { location: `${app}/data` } });
+  });
+  await page.getByRole("link", { name: "Sign in with Entra ID" }).click();
+  await expect(page.getByRole("heading", { name: "Northstar sign-in" })).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page).toHaveURL(/\/data$/);
+  await expect(page.getByText("There are no collections yet.")).toBeVisible();
+});

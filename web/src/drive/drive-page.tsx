@@ -8,6 +8,7 @@ import { failureText } from "../data/failure";
 import { Ready, ServerScreen } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import type { DriveApi, NodeView, SpaceView } from "./api";
 import { ActivityFeed } from "./details-panel";
@@ -112,6 +113,7 @@ function NewFolder({
       {problem !== undefined && (
         <span className="vl-field-error" role="alert">
           {problem}
+          <CopyDiagnostic message={problem} />
         </span>
       )}
     </form>

@@ -109,4 +109,20 @@ describe("Toolbar", () => {
     expect(editor.state.doc.textContent).toBe("/");
     expect(await screen.findByRole("listbox", { name: "Blocks" })).toBeDefined();
   });
+
+  it("makes a task from the selection, and only with something selected", async () => {
+    const user = userEvent.setup();
+    const { editor } = await renderEditor(body(p("Hello world")));
+    const onSelectionTask = vi.fn();
+    render(<Toolbar editor={editor} onSelectionTask={onSelectionTask} />);
+    const button = screen.getByRole("button", { name: "Make a task from the selection" });
+    expect(button.getAttribute("aria-keyshortcuts")).toBe("Control+Alt+Enter");
+    expect(button).toHaveProperty("disabled", true);
+    act(() => {
+      editor.commands.setTextSelection({ from: 1, to: 6 });
+    });
+    expect(button).toHaveProperty("disabled", false);
+    await user.click(button);
+    expect(onSelectionTask).toHaveBeenCalledOnce();
+  });
 });

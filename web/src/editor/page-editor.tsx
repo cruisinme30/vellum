@@ -9,6 +9,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -35,6 +36,13 @@ import { CommentsPanel } from "./comments/comments-panel";
 import { FileIssue } from "./comments/file-issue";
 import { vellumExtensions } from "./extensions";
 import type { ResolvePage } from "./nodes/inline";
+import { SecretsBanner, type ScanSecrets } from "./secrets-banner";
+import {
+  isSelectionTaskKey,
+  selectionTaskText,
+  toolbarTask,
+  useReadOnlyTaskKey,
+} from "./selection-task";
 import { Toolbar } from "./toolbar";
 
 /** Props of {@link PageEditor}. */
@@ -66,6 +74,16 @@ export interface PageEditorProperties {
    * chips. Read when the page opens: pass one object for the page's life.
    */
   readonly chips?: ChipSources | undefined;
+  /**
+   * Asks the server about secrets in the page, for the warning banner;
+   * without it (demo mode) there is no banner.
+   */
+  readonly scanSecrets?: ScanSecrets | undefined;
+  /**
+   * Turns the selected text into a task (R-MW-3): Ctrl/Cmd+Alt+Enter or the
+   * toolbar button while editing, a bare `T` on a read-only page.
+   */
+  readonly onSelectionTask?: ((text: string) => void) | undefined;
 }
 
 /** What the page around the editor may do with it. */
@@ -260,8 +278,15 @@ function BoundEditor({
   work,
   me,
   chips,
+  scanSecrets,
+  onSelectionTask,
 }: BoundProperties) {
   const t = useT();
+  // The editor is built once per session; the ref sees the latest callback.
+  const selectionTask = useRef(onSelectionTask);
+  useEffect(() => {
+    selectionTask.current = onSelectionTask;
+  }, [onSelectionTask]);
   const live = useLive(session.live);
   const [saver] = useState(() =>
     createSaver(session.doc, session.live ?? LOCAL_LIVE(), {
@@ -326,7 +351,15 @@ function BoundEditor({
           }
           return true;
         },
-        handleKeyDown: (_view, event) => {
+        handleKeyDown: (view, event) => {
+          const toTask = selectionTask.current;
+          if (toTask !== undefined && isSelectionTaskKey(event)) {
+            const selected = selectionTaskText(view.state);
+            if (selected === undefined) return false;
+            event.preventDefault();
+            toTask(selected);
+            return true;
+          }
           if (!isSaveKey(event)) {
             return false;
           }
@@ -347,6 +380,7 @@ function BoundEditor({
     },
     [session, seeded],
   );
+  useReadOnlyTaskKey(editor, editable, onSelectionTask);
   useEffect(() => {
     // Tiptap would emit an update for the change; leave the document alone.
     if (editor.isEditable !== editable) {
@@ -376,7 +410,7 @@ function BoundEditor({
   return (
     <div className="vl-editor">
       <div className="vl-editor-bar">
-        <Toolbar editor={editor} />
+        <Toolbar editor={editor} onSelectionTask={toolbarTask(editor, editable, onSelectionTask)} />
         <SaveControls saver={saver} canSave={editable && live.status === "online"}>
           {workActions}
           <PresenceBar awareness={session.awareness} live={session.live ? live : undefined} />
@@ -384,6 +418,7 @@ function BoundEditor({
         </SaveControls>
       </div>
       <LiveNotice state={live} />
+      {scanSecrets && <SecretsBanner editor={editor} scan={scanSecrets} />}
       <EditorContent editor={editor} />
       {work && side?.kind === "comments" && (
         <CommentsPanel

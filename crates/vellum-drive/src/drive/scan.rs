@@ -26,6 +26,14 @@ use crate::model::{Node, NodeKind, ScanReport, Space, TrashState, VersionRecord}
 /// Blob paths and sizes, sorted by path.
 type Blobs = BTreeMap<BlobPath, u64>;
 
+/// The IDs a scan has handed out. With `fresh` (a copy or an import,
+/// whose files carry IDs someone else chose), an ID the index already
+/// holds anywhere counts as taken too (RT-037).
+struct Taken<'a> {
+    ids: &'a mut HashSet<ObjectId>,
+    fresh: bool,
+}
+
 impl Drive {
     /// Rebuilds the drive's part of the index from the store: spaces,
     /// nodes, trash, versions and links. Per-user state and activity, which
@@ -62,8 +70,10 @@ impl Drive {
         .await
     }
 
-    /// Indexes the nodes found at and beneath `dir` in `space` (a copy just
-    /// written, say), returning them.
+    /// Indexes the nodes found at and beneath `dir` in `space` (a copy or
+    /// an import just written), returning them. Every ID the index already
+    /// holds is re-identified, so new files never take over existing
+    /// nodes (RT-037).
     pub(super) async fn index_tree(
         &self,
         space: &Space,
@@ -86,7 +96,7 @@ impl Drive {
         let mut seen: HashSet<ObjectId> = HashSet::new();
         let mut report = ScanReport::default();
         let mut found = self
-            .discover(space, &blobs, &HashSet::new(), &mut seen, &mut report)
+            .discover(space, &blobs, &HashSet::new(), &mut seen, true, &mut report)
             .await?;
         let mut holders = self.container_paths(space.id).await?;
         holders.extend(containers(found.iter().map(|(n, _)| n)));
@@ -206,7 +216,9 @@ impl Drive {
         for node in existing.values().filter(|n| n.is_live()) {
             let _ = known.insert(layout::id_file(node.kind, &node.path)?);
         }
-        let mut found = self.discover(space, &blobs, &known, seen, report).await?;
+        let mut found = self
+            .discover(space, &blobs, &known, seen, false, report)
+            .await?;
         let holders = containers(found.iter().map(|(n, _)| n));
         for (node, _) in &mut found {
             node.parent = parent_of(&node.path, &holders);
@@ -299,8 +311,10 @@ impl Drive {
         blobs: &Blobs,
         known: &HashSet<BlobPath>,
         seen: &mut HashSet<ObjectId>,
+        fresh: bool,
         report: &mut ScanReport,
     ) -> DriveResult<Vec<(Node, Option<String>)>> {
+        let mut taken = Taken { ids: seen, fresh };
         let mut out = Vec::new();
         let now = self.clock.now();
         // Files already indexed at their path go first, so when two files
@@ -320,7 +334,7 @@ impl Drive {
                 continue;
             };
             let read = self
-                .read_node(space, kind, path, &node_path, seen, report)
+                .read_node(space, kind, path, &node_path, &mut taken, report)
                 .await;
             let (id, title, target, text) = match read {
                 Ok(read) => read,
@@ -369,7 +383,7 @@ impl Drive {
         kind: NodeKind,
         file: &BlobPath,
         node_path: &BlobPath,
-        seen: &mut HashSet<ObjectId>,
+        seen: &mut Taken<'_>,
         report: &mut ScanReport,
     ) -> DriveResult<(ObjectId, String, Option<ObjectId>, Option<String>)> {
         let _ = space;
@@ -431,23 +445,35 @@ impl Drive {
         }
     }
 
+    /// Whether `id` is still free for a file being indexed, taking it if
+    /// so. With `fresh` (a copy or an import, whose files arrive with IDs
+    /// someone else chose), an ID the index already holds anywhere is
+    /// taken too: an imported file naming another person's page must not
+    /// move that page's entry into the import (RT-037).
+    async fn free(&self, id: ObjectId, seen: &mut Taken<'_>) -> DriveResult<bool> {
+        if seen.fresh && self.index.node(id).await?.is_some() {
+            return Ok(false);
+        }
+        Ok(seen.ids.insert(id))
+    }
+
     /// Takes `id` for this file, or rewrites the file with a fresh ID if
     /// another file already holds it.
     async fn claim(
         &self,
         id: ObjectId,
-        seen: &mut HashSet<ObjectId>,
+        seen: &mut Taken<'_>,
         file: &BlobPath,
         report: &mut ScanReport,
         rewrite: impl FnOnce(&str, ObjectId) -> DriveResult<String> + Send,
     ) -> DriveResult<ObjectId> {
-        if seen.insert(id) {
+        if self.free(id, seen).await? {
             return Ok(id);
         }
         let fresh = ObjectId::generate();
         let text = rewrite("", fresh)?;
         let _ = self.put_file(file, text).await?;
-        let _ = seen.insert(fresh);
+        let _ = seen.ids.insert(fresh);
         report.reidentified += 1;
         Ok(fresh)
     }
@@ -457,14 +483,14 @@ impl Drive {
     async fn claim_or_new(
         &self,
         id: Option<ObjectId>,
-        seen: &mut HashSet<ObjectId>,
+        seen: &mut Taken<'_>,
         file: &BlobPath,
         report: &mut ScanReport,
         text: &str,
         rewrite: impl FnOnce(&str, ObjectId) -> DriveResult<String> + Send,
     ) -> DriveResult<ObjectId> {
         if let Some(id) = id
-            && seen.insert(id)
+            && self.free(id, seen).await?
         {
             return Ok(id);
         }
@@ -475,7 +501,7 @@ impl Drive {
             .store
             .put(file, Bytes::from(new), Precondition::IfMatch(blob.etag))
             .await?;
-        let _ = seen.insert(fresh);
+        let _ = seen.ids.insert(fresh);
         report.reidentified += 1;
         Ok(fresh)
     }

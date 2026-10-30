@@ -16,15 +16,24 @@ use vellum_contracts::{CredentialKind, Principal, Scope, ScopeSet};
 use vellum_kernel::{Error, ErrorKind, Timestamp, UserId};
 
 use crate::lockout::{Key, Lockouts};
+use crate::mfa::{Proof, SignIn};
 use crate::oauth::{ClientMetadataFetcher, NoMetadataFetch, OAuthState};
 use crate::password;
+use crate::providers::{SsoCache, SsoHttpFactory};
+use crate::seal::Sealer;
 use crate::secret::{self, Kind, SecretHash};
 use crate::sso::{Sso, SsoIdentity};
-use crate::store::{ApiToken, Session, SessionMethod, SsoLink, State, Store, User, hash_key};
+use crate::store::{
+    ApiToken, SecondFactorPolicy, SecondFactors, Session, SessionMethod, SsoLink, State, Store,
+    User, hash_key,
+};
 
 /// How often `last_seen_at` and `last_used_at` are written back, so a busy
 /// session does not rewrite the store on every request.
 const TOUCH_EVERY: Duration = Duration::from_mins(5);
+
+/// The longest expiry a personal API token can ask for: ten years.
+pub const MAX_TOKEN_DAYS: u32 = 3650;
 
 /// The email of the built-in account break-glass sessions act as.
 pub const BREAK_GLASS_EMAIL: &str = "break-glass";
@@ -137,6 +146,10 @@ pub struct TokenInfo {
 /// A user as the API shows it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each flag is a separate fact the admin screens show"
+)]
 pub struct UserView {
     /// The user's ID.
     pub id: UserId,
@@ -152,6 +165,13 @@ pub struct UserView {
     pub disabled: bool,
     /// Whether the account has a password (otherwise SSO only).
     pub has_password: bool,
+    /// Whether the account has an authenticator app or passkey.
+    #[serde(default)]
+    pub second_factor: bool,
+    /// Whether this admin may use a password when single sign-on is
+    /// required.
+    #[serde(default)]
+    pub break_glass: bool,
     /// When the account was created.
     pub created_at: Timestamp,
 }
@@ -166,6 +186,8 @@ impl From<&User> for UserView {
             admin: user.admin,
             disabled: user.disabled,
             has_password: user.password_hash.is_some(),
+            second_factor: user.factors.any(),
+            break_glass: user.break_glass,
             created_at: user.created_at,
         }
     }
@@ -196,11 +218,14 @@ pub struct PeopleCounts {
 pub struct Identity {
     config: IdentityConfig,
     store: Store,
-    lockouts: Lockouts,
+    pub(crate) lockouts: Lockouts,
+    sealer: Option<Sealer>,
     hashing: password::Gate,
     pub(crate) oauth: OAuthState,
     pub(crate) fetcher: Arc<dyn ClientMetadataFetcher>,
     sso: Option<Arc<Sso>>,
+    sso_http: Option<SsoHttpFactory>,
+    sso_cache: SsoCache,
 }
 
 impl std::fmt::Debug for Identity {
@@ -224,7 +249,7 @@ fn elapsed(since: Timestamp, now: Timestamp) -> Duration {
     Duration::from_millis(u64::try_from(now.unix_ms() - since.unix_ms()).unwrap_or(0))
 }
 
-fn normalise_email(email: &str) -> Result<String, Error> {
+pub(crate) fn normalise_email(email: &str) -> Result<String, Error> {
     let email = email.trim().to_lowercase();
     let valid = email.len() <= 254
         && email
@@ -241,7 +266,7 @@ fn normalise_email(email: &str) -> Result<String, Error> {
     }
 }
 
-fn check_name(name: &str) -> Result<String, Error> {
+pub(crate) fn check_name(name: &str) -> Result<String, Error> {
     let name = name.trim();
     if name.is_empty() || name.chars().count() > 120 {
         return Err(Error::new(
@@ -256,7 +281,7 @@ fn wrong_credentials() -> Error {
     Error::new(ErrorKind::Unauthenticated, "the email or password is wrong")
 }
 
-fn locked(retry_after: Duration) -> Error {
+pub(crate) fn locked(retry_after: Duration) -> Error {
     Error::new(
         ErrorKind::RateLimited,
         format!(
@@ -285,11 +310,34 @@ impl Identity {
             config,
             store,
             lockouts: Lockouts::new(),
+            sealer: Sealer::ephemeral().ok(),
             hashing: password::Gate::default(),
             oauth: OAuthState::default(),
             fetcher: Arc::new(NoMetadataFetch),
             sso: None,
+            sso_http: None,
+            sso_cache: SsoCache::default(),
         }
+    }
+
+    /// Seals secrets identity reads back (authenticator apps, provider
+    /// client secrets) with `key`, which must stay the same across
+    /// restarts and replicas. Without it, a random key is used, and what
+    /// it sealed is lost on restart.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::Internal`] if the key is refused.
+    pub fn with_sealing_key(mut self, key: &[u8; 32]) -> Result<Self, Error> {
+        self.sealer = Some(Sealer::new(key)?);
+        Ok(self)
+    }
+
+    /// The sealer for secrets identity reads back.
+    pub(crate) fn sealer(&self) -> Result<&Sealer, Error> {
+        self.sealer
+            .as_ref()
+            .ok_or_else(|| Error::new(ErrorKind::Internal, "no identity key"))
     }
 
     /// Turns on single sign-on with one `OpenID Connect` provider.
@@ -299,7 +347,22 @@ impl Identity {
         self
     }
 
-    /// The single sign-on provider, when one is configured.
+    /// Lets providers added in Admin → Sign-in call out, through `factory`.
+    #[must_use]
+    pub fn with_sso_http(mut self, factory: SsoHttpFactory) -> Self {
+        self.sso_http = Some(factory);
+        self
+    }
+
+    pub(crate) fn sso_http_factory(&self) -> Option<&SsoHttpFactory> {
+        self.sso_http.as_ref()
+    }
+
+    pub(crate) const fn sso_cache(&self) -> &SsoCache {
+        &self.sso_cache
+    }
+
+    /// The provider set by `VELLUM_OIDC_*`, when one is configured.
     #[must_use]
     pub const fn sso(&self) -> Option<&Arc<Sso>> {
         self.sso.as_ref()
@@ -325,6 +388,32 @@ impl Identity {
         let sso = self.sso.as_ref().ok_or_else(|| {
             Error::new(ErrorKind::Unavailable, "single sign-on is not configured")
         })?;
+        self.sso_sign_in_with(sso, found, user_agent)
+    }
+
+    /// [`Identity::sso_sign_in`] for a sign-in through `sso`, whose
+    /// settings decide who gets a new account.
+    ///
+    /// # Errors
+    ///
+    /// As [`Identity::sso_sign_in`].
+    pub fn sso_sign_in_with(
+        &self,
+        sso: &Sso,
+        found: &SsoIdentity,
+        user_agent: Option<&str>,
+    ) -> Result<NewSession, Error> {
+        self.federated_sign_in(found, &|email| sso.config().may_create(email), user_agent)
+    }
+
+    /// Signs in someone a provider vouched for; `may_create` says whether
+    /// an address with no account gets one.
+    pub(crate) fn federated_sign_in(
+        &self,
+        found: &SsoIdentity,
+        may_create: &dyn Fn(&str) -> bool,
+        user_agent: Option<&str>,
+    ) -> Result<NewSession, Error> {
         if self.needs_setup() {
             return Err(Error::new(
                 ErrorKind::Conflict,
@@ -354,7 +443,7 @@ impl Identity {
                     .map(str::to_owned)
             })
             .unwrap_or_else(|| "Member".to_owned());
-        let may_create = email.as_deref().is_some_and(|e| sso.config().may_create(e));
+        let may_create = email.as_deref().is_some_and(may_create);
         let (user, created) = self.store.write(|s| {
             if let Some(user) = s.users.values().find(|u| u.sso.contains(&link)) {
                 return Ok((user.clone(), false));
@@ -391,6 +480,9 @@ impl Identity {
                 disabled: false,
                 created_at: Timestamp::now(),
                 sso: vec![link.clone()],
+                factors: SecondFactors::default(),
+                break_glass: false,
+                external_id: None,
             };
             let _ = s.users.insert(user.id, user.clone());
             Ok((user, true))
@@ -492,6 +584,9 @@ impl Identity {
             disabled: false,
             created_at: Timestamp::now(),
             sso: Vec::new(),
+            factors: SecondFactors::default(),
+            break_glass: false,
+            external_id: None,
         };
         self.store.write(|s| {
             if s.user_by_email(&user.email).is_some() {
@@ -563,6 +658,35 @@ impl Identity {
         })
     }
 
+    /// Up to `limit` active people whose name, handle or email contains
+    /// `query` (case-insensitive), names starting with it first (D272).
+    /// Queries shorter than two characters find nobody, so the directory
+    /// cannot be listed one letter at a time.
+    #[must_use]
+    pub fn search_people(&self, query: &str, limit: usize) -> Vec<UserView> {
+        let query = query.trim().to_lowercase();
+        if query.chars().count() < 2 {
+            return Vec::new();
+        }
+        let mut found: Vec<(bool, UserView)> = self.store.read(|s| {
+            s.users
+                .values()
+                .filter(|u| u.email != BREAK_GLASS_EMAIL)
+                .map(UserView::from)
+                .filter(|u| !u.disabled)
+                .filter_map(|u| {
+                    let name = u.name.to_lowercase();
+                    let hit = name.contains(&query)
+                        || u.handle.to_lowercase().contains(&query)
+                        || u.email.to_lowercase().contains(&query);
+                    hit.then(|| (!name.starts_with(&query), u))
+                })
+                .collect()
+        });
+        found.sort_by(|(a, x), (b, y)| a.cmp(b).then_with(|| x.name.cmp(&y.name)));
+        found.into_iter().take(limit).map(|(_, u)| u).collect()
+    }
+
     /// A user by ID.
     ///
     /// # Errors
@@ -610,6 +734,7 @@ impl Identity {
             }
             if let Some(admin) = admin {
                 user.admin = admin;
+                user.break_glass &= admin;
             }
             if let Some(disabled) = disabled {
                 user.disabled = disabled;
@@ -622,7 +747,58 @@ impl Identity {
         })?
     }
 
-    /// Signs in with email and password and opens a session.
+    /// Makes an admin a break-glass admin, or not: one who may still sign
+    /// in with a password and a second factor when single sign-on is
+    /// required (D292).
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::NotFound`] for an unknown user, and
+    /// [`ErrorKind::InvalidInput`] for someone who is not an admin.
+    pub fn set_break_glass(&self, id: UserId, on: bool) -> Result<UserView, Error> {
+        self.store.write(|s| {
+            let user = s
+                .users
+                .get_mut(&id)
+                .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+            if on && !user.admin {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "only admins can be break-glass admins",
+                ));
+            }
+            user.break_glass = on;
+            Ok(UserView::from(&*user))
+        })?
+    }
+
+    /// Signs in with email and password and opens a session. Accounts
+    /// with a second factor, or that the workspace requires one of, are
+    /// refused: they sign in with [`Identity::sign_in_password`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Identity::sign_in_password`], plus
+    /// [`ErrorKind::PermissionDenied`] when a second step is needed.
+    pub fn sign_in(
+        &self,
+        email: &str,
+        password: &str,
+        ip: Option<IpAddr>,
+        user_agent: Option<&str>,
+    ) -> Result<NewSession, Error> {
+        match self.sign_in_password(email, password, ip, user_agent)? {
+            SignIn::Session(session) => Ok(session),
+            SignIn::Verify(_) | SignIn::Enrol(_) => Err(Error::new(
+                ErrorKind::PermissionDenied,
+                "this account needs two-step verification; sign in from the web app",
+            )),
+        }
+    }
+
+    /// Checks an email and password. The answer is a session, or a ticket
+    /// for the second step when the account has a second factor or the
+    /// workspace requires one (D290).
     ///
     /// Failed attempts lock out the address and the client IP with
     /// exponential back-off (after 5 and 20 free failures).
@@ -632,13 +808,25 @@ impl Identity {
     /// [`ErrorKind::RateLimited`] while locked out,
     /// [`ErrorKind::Unauthenticated`] for a wrong address or password, and
     /// [`ErrorKind::PermissionDenied`] for a disabled account.
-    pub fn sign_in(
+    pub fn sign_in_password(
         &self,
         email: &str,
         password: &str,
         ip: Option<IpAddr>,
         user_agent: Option<&str>,
-    ) -> Result<NewSession, Error> {
+    ) -> Result<SignIn, Error> {
+        let user = self.check_password(email, password, ip)?;
+        self.after_password(&user, user_agent)
+    }
+
+    /// Checks an email and password against the lockout and the stored
+    /// hash, and returns the account.
+    fn check_password(
+        &self,
+        email: &str,
+        password: &str,
+        ip: Option<IpAddr>,
+    ) -> Result<User, Error> {
         let now = Instant::now();
         let email = email.trim().to_lowercase();
         if let Some(ip) = ip {
@@ -673,11 +861,20 @@ impl Identity {
             tracing::info!(event = "identity.sign_in_failed", "sign-in failed");
             return Err(wrong_credentials());
         };
-        self.lockouts.succeed(&self.store, Key::Email(&email));
+        // With a second factor, the lockout resets only after it.
+        if !user.factors.any() {
+            self.lockouts.succeed(&self.store, Key::Email(&email));
+        }
         if user.disabled {
             return Err(Error::new(
                 ErrorKind::PermissionDenied,
                 "this account is disabled; ask an administrator",
+            ));
+        }
+        if self.store.read(|s| s.sign_in.require_sso) && !(user.admin && user.break_glass) {
+            return Err(Error::new(
+                ErrorKind::PermissionDenied,
+                "this workspace signs in with single sign-on; use the sign-in button",
             ));
         }
         if user
@@ -693,13 +890,8 @@ impl Identity {
                 }
             })?;
         }
-        tracing::info!(event = "identity.signed_in", user = %user.id, "signed in");
-        self.open_session(
-            user.id,
-            SessionMethod::Password,
-            self.config.session_lifetime,
-            user_agent,
-        )
+        tracing::info!(event = "identity.password_checked", user = %user.id, "password accepted");
+        Ok(user)
     }
 
     /// Opens a session for a user who has just proved their identity
@@ -787,16 +979,21 @@ impl Identity {
     }
 
     /// Proves the user's identity again, so admin actions that need a
-    /// recent sign-in are allowed.
+    /// recent sign-in are allowed. People with a second factor prove it
+    /// too: a code, or a passkey answering the ceremony of `ticket`
+    /// ([`Identity::reauth_passkey_options`]).
     ///
     /// # Errors
     ///
     /// As [`Identity::sign_in`], plus [`ErrorKind::Unauthenticated`] for an
-    /// unknown session.
+    /// unknown session, and `second factor required` when a factor is
+    /// needed and none was given.
     pub fn reauthenticate(
         &self,
         cookie: &str,
         password: &str,
+        proof: &Proof,
+        ticket: Option<&str>,
         ip: Option<IpAddr>,
     ) -> Result<(), Error> {
         let hash = secret::hash(cookie);
@@ -812,11 +1009,11 @@ impl Identity {
                 "sign in to continue",
             ));
         };
-        // The same checks and lockout as signing in; the new session is
-        // discarded and the existing one refreshed instead.
-        let fresh = self.sign_in(&email, password, ip, None)?;
+        // The same checks and lockout as signing in, without a new session.
+        let user = self.check_password(&email, password, ip)?;
+        self.reauth_factor(&user, &session_id, proof, ticket, ip)?;
+        self.lockouts.succeed(&self.store, Key::Email(&email));
         self.store.write(|s| {
-            let _ = s.sessions.remove(&fresh.session.id);
             if let Some(session) = s.sessions.get_mut(&session_id) {
                 session.authenticated_at = Timestamp::now();
             }
@@ -863,6 +1060,49 @@ impl Identity {
             s.grants.retain(|_, g| g.user != user);
             let grants = &s.grants;
             s.access_tokens.retain(|_, t| grants.contains_key(&t.grant));
+        })
+    }
+
+    /// Ends every session of a user ("sign out everywhere"). Tokens and
+    /// connected apps keep working; blocking the account ends those too.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::NotFound`] for an unknown user.
+    pub fn sign_out_everywhere(&self, user: UserId) -> Result<usize, Error> {
+        let ended = self.store.write(|s| {
+            if !s.users.contains_key(&user) {
+                return None;
+            }
+            let before = s.sessions.len();
+            s.sessions.retain(|_, x| x.user != user);
+            s.mfa_challenges.retain(|_, c| c.user != user);
+            Some(before - s.sessions.len())
+        })?;
+        let ended = ended.ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+        tracing::info!(event = "identity.signed_out_everywhere", user = %user, sessions = ended, "every session ended");
+        Ok(ended)
+    }
+
+    /// The workspace's second-factor policy.
+    #[must_use]
+    pub fn second_factor_policy(&self) -> SecondFactorPolicy {
+        self.store.read(|s| s.sign_in.second_factor)
+    }
+
+    /// Sets who must use a second factor with a password. People it newly
+    /// covers add one at their next sign-in; their sessions keep working.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::Unavailable`] if the store cannot be written.
+    pub fn set_second_factor_policy(
+        &self,
+        policy: SecondFactorPolicy,
+    ) -> Result<SecondFactorPolicy, Error> {
+        self.store.write(|s| {
+            s.sign_in.second_factor = policy;
+            policy
         })
     }
 
@@ -926,6 +1166,29 @@ impl Identity {
                 format!("you cannot grant the `{scope}` scope"),
             ));
         }
+        if expires_in_days.is_some_and(|d| d == 0 || d > MAX_TOKEN_DAYS) {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("a token lasts 1 to {MAX_TOKEN_DAYS} days, or never expires"),
+            ));
+        }
+        if let Some(max) = self.store.read(|s| s.sign_in.max_token_days) {
+            match expires_in_days {
+                None => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("choose an expiry of at most {max} days"),
+                    ));
+                }
+                Some(days) if days > max => {
+                    return Err(Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("a token lasts at most {max} days here"),
+                    ));
+                }
+                Some(_) => {}
+            }
+        }
         let secret = secret::generate(Kind::ApiToken)?;
         let hash = secret::hash(&secret);
         let now = Timestamp::now();
@@ -975,6 +1238,67 @@ impl Identity {
             }
             _ => Err(Error::new(ErrorKind::NotFound, "token not found")),
         })?
+    }
+
+    /// Every personal API token, newest first, for administrators (D291).
+    #[must_use]
+    pub fn all_api_tokens(&self) -> Vec<(ApiToken, Option<UserView>)> {
+        let mut tokens: Vec<(ApiToken, Option<UserView>)> = self.store.read(|s| {
+            s.api_tokens
+                .values()
+                .map(|t| (t.clone(), s.users.get(&t.user).map(UserView::from)))
+                .collect()
+        });
+        tokens.sort_by_key(|(t, _)| std::cmp::Reverse(t.created_at));
+        tokens
+    }
+
+    /// Revokes anyone's API token, for administrators (D291).
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::NotFound`] for an unknown token.
+    pub fn admin_revoke_api_token(&self, id: &str) -> Result<ApiToken, Error> {
+        let removed = self.store.write(|s| s.api_tokens.remove(id))?;
+        let token = removed.ok_or_else(|| Error::new(ErrorKind::NotFound, "token not found"))?;
+        tracing::info!(event = "identity.api_token_revoked", token = %token.id, user = %token.user, "API token revoked by an administrator");
+        Ok(token)
+    }
+
+    /// The scopes `user` may put on a token: their own ceiling.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::NotFound`] for an unknown user.
+    pub fn token_scopes(&self, user: UserId) -> Result<Vec<Scope>, Error> {
+        self.store
+            .read(|s| s.users.get(&user).map(|u| user_scopes(u).iter().collect()))
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))
+    }
+
+    /// The longest expiry, in days, a new personal API token may have.
+    #[must_use]
+    pub fn max_token_days(&self) -> Option<u32> {
+        self.store.read(|s| s.sign_in.max_token_days)
+    }
+
+    /// Caps the expiry of new personal API tokens; `None` lifts the cap.
+    /// Existing tokens keep their expiry; administrators revoke them.
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::InvalidInput`] for a cap outside 1 to 3650 days.
+    pub fn set_max_token_days(&self, days: Option<u32>) -> Result<Option<u32>, Error> {
+        if days.is_some_and(|d| d == 0 || d > MAX_TOKEN_DAYS) {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("the cap is 1 to {MAX_TOKEN_DAYS} days"),
+            ));
+        }
+        self.store.write(|s| {
+            s.sign_in.max_token_days = days;
+            days
+        })
     }
 
     /// Verifies a bearer token: a personal API token (`vlm_`) or an
@@ -1041,7 +1365,7 @@ impl Identity {
                                 .intersect(user_scopes(user)),
                             audience: access.audience.clone(),
                             expires_at: Some(access.expires_at),
-                            issued_at: grant.created_at,
+                            issued_at: grant.auth_time.unwrap_or(grant.created_at),
                         })
                     })
                     .ok_or_else(invalid)
@@ -1050,8 +1374,10 @@ impl Identity {
         }
     }
 
-    /// Resolves a bearer token for the gateway. Tokens carry the time they
-    /// were issued as their authentication time, so they never satisfy a
+    /// Resolves a bearer token for the gateway. A personal token carries
+    /// the time it was created (which took a recent sign-in) as its
+    /// authentication time, and an `OAuth` token the sign-in time of the
+    /// session that approved its grant (RT-039), so neither satisfies a
     /// recent-sign-in check for long.
     ///
     /// # Errors
@@ -1168,6 +1494,9 @@ impl Identity {
                 disabled: false,
                 created_at: Timestamp::now(),
                 sso: Vec::new(),
+                factors: SecondFactors::default(),
+                break_glass: false,
+                external_id: None,
             };
             let id = user.id;
             let _ = s.users.insert(id, user);

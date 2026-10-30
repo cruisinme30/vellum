@@ -6,6 +6,7 @@ import { useState, type ComponentProps, type ReactNode } from "react";
 import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import {
   formText,
@@ -15,17 +16,29 @@ import {
   type Versioned,
 } from "./api";
 import { AdminScreen } from "./context";
+import { SearchStatusPanel } from "./search-status";
 
 /** One editable setting: where it lives, and how the form shows it. */
 interface Field {
-  readonly group: "telemetry" | "observability" | "backups" | "security" | "appearance";
+  readonly group: "telemetry" | "observability" | "backups" | "security" | "search" | "appearance";
   readonly key: string;
-  readonly kind: "number" | "text" | "toggle" | "color" | "select";
+  readonly kind: "number" | "text" | "toggle" | "color" | "select" | "lines";
   /** Smallest allowed number. */
   readonly min?: number;
   /** A select's values. */
   readonly options?: readonly string[];
+  /** Which labels a select's options use; theme names by default. */
+  readonly optionLabels?: "theme" | "secret-scanning";
 }
+
+/** The secret-scanning policies the server accepts (vellum-admin `SecretScanning`). */
+const SECRET_SCANNING = ["off", "warn", "block"] as const;
+
+/** The label id of one option of a select. */
+const optionLabel = (field: Field, option: string) =>
+  field.optionLabels === "secret-scanning"
+    ? `admin-secret-scanning-${option}`
+    : `admin-theme-${option}`;
 
 /** The theme ids the server accepts (vellum-admin `EXPORT_THEMES`, `SITE_THEMES`). */
 export const EXPORT_THEMES = ["light", "high-contrast", "sepia"] as const;
@@ -42,6 +55,15 @@ const FIELDS: readonly Field[] = [
   { group: "backups", key: "drill_interval_days", kind: "number", min: 1 },
   { group: "security", key: "fresh_auth_minutes", kind: "number", min: 1 },
   { group: "security", key: "session_hours", kind: "number", min: 1 },
+  {
+    group: "security",
+    key: "secret_scanning",
+    kind: "select",
+    options: SECRET_SCANNING,
+    optionLabels: "secret-scanning",
+  },
+  { group: "security", key: "secret_allow", kind: "lines" },
+  { group: "search", key: "hybrid", kind: "toggle" },
   { group: "observability", key: "slow_request_ms", kind: "number", min: 1 },
   { group: "observability", key: "trace_buffer_capacity", kind: "number", min: 1 },
   { group: "observability", key: "trace_buffer_mib", kind: "number", min: 1 },
@@ -50,7 +72,14 @@ const FIELDS: readonly Field[] = [
   { group: "telemetry", key: "interval_hours", kind: "number", min: 1 },
 ];
 
-const GROUPS = ["appearance", "backups", "security", "observability", "telemetry"] as const;
+const GROUPS = [
+  "appearance",
+  "backups",
+  "security",
+  "search",
+  "observability",
+  "telemetry",
+] as const;
 
 type Group = Readonly<Record<string, unknown>>;
 
@@ -60,6 +89,7 @@ const groupOf = (settings: AdminSettings, group: Field["group"]): Group =>
 /** The form's text for one field. */
 function shownText(settings: AdminSettings, field: Field): string {
   const value = groupOf(settings, field.group)[field.key];
+  if (Array.isArray(value)) return value.filter((v) => typeof v === "string").join("\n");
   return typeof value === "number" || typeof value === "string" ? String(value) : "";
 }
 
@@ -79,6 +109,12 @@ function fieldValue(field: Field, data: FormData, name: string): unknown {
     }
     case "text": {
       return field.key === "endpoint" && text === "" ? undefined : text;
+    }
+    case "lines": {
+      return text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== "");
     }
     case "color":
     case "select": {
@@ -137,10 +173,18 @@ function FieldInput({
         <select name={name} defaultValue={shownText(settings, field)}>
           {(field.options ?? []).map((option) => (
             <option key={option} value={option}>
-              {t(`admin-theme-${option}`)}
+              {t(optionLabel(field, option))}
             </option>
           ))}
         </select>
+      </label>
+    );
+  }
+  if (field.kind === "lines") {
+    return (
+      <label>
+        {label}
+        <textarea name={name} rows={3} defaultValue={shownText(settings, field)} />
       </label>
     );
   }
@@ -225,6 +269,9 @@ function SettingsForm({
           {FIELDS.filter((field) => field.group === group).map((field) => (
             <FieldInput key={field.key} settings={current.settings} field={field} />
           ))}
+          {group === "search" && api.searchStatus && (
+            <SearchStatusPanel load={api.searchStatus} refreshKey={current.version} />
+          )}
         </Fieldset>
       ))}
       <div className="vl-admin-actions">
@@ -236,6 +283,7 @@ function SettingsForm({
       {result?.ok === false && (
         <div className="vl-field-error" role="alert">
           <p>{result.message}</p>
+          <CopyDiagnostic message={result.message} />
           {result.conflict === true && (
             <button type="button" className="vl-text-button" onClick={onReload}>
               {t("admin-reload")}
@@ -258,6 +306,7 @@ function SettingsLoader({ api }: { readonly api: AdminConsoleApi }) {
     return (
       <p className="vl-field-error" role="alert">
         {loaded.message}
+        <CopyDiagnostic message={loaded.message} />
       </p>
     );
   }
@@ -273,7 +322,7 @@ function SettingsLoader({ api }: { readonly api: AdminConsoleApi }) {
   );
 }
 
-/** Admin → Settings: appearance, backups, sessions, observability and telemetry. */
+/** Admin → Settings: appearance, backups, sessions, search, observability and telemetry. */
 export function SettingsPage() {
   const t = useT();
   return (

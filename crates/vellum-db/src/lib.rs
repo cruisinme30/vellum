@@ -31,6 +31,7 @@ mod reindex;
 mod router;
 mod shard;
 mod telemetry;
+mod tx;
 
 pub use config::{IndexConfig, IndexKey};
 pub use error::{Error, Result};
@@ -39,6 +40,7 @@ pub use reindex::{FileReader, Listing, PlainFiles, Problem, ProblemKind, Reindex
 pub use router::ShardRouter;
 pub use shard::{MAIN_URL_VAR, SHARDS_VAR, Shard, ShardedIndex, ShardsConfig, shard_url_var};
 pub use telemetry::{RowCount, traced};
+pub use tx::BeginWrite;
 
 /// The sqlx version this crate is built on, so dependants share one copy.
 pub use sqlx;

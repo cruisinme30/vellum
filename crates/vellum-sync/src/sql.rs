@@ -14,7 +14,7 @@ use vellum_db::sqlx::postgres::PgRow;
 use vellum_db::sqlx::sqlite::SqliteRow;
 use vellum_db::sqlx::types::Uuid;
 use vellum_db::sqlx::{self, Row as _};
-use vellum_db::{Index, IndexPool, traced};
+use vellum_db::{BeginWrite as _, Index, IndexPool, traced};
 use vellum_kernel::{Error, ErrorKind, ObjectId, SpaceId, Timestamp, UserId};
 
 use crate::domain::{Change, ClientId, Record};
@@ -46,7 +46,7 @@ impl SqlStore {
         let seq = to_i64(seq)?;
         match self.index.pool() {
             IndexPool::Sqlite(pool) => {
-                let mut tx = pool.begin().await.map_err(db_error)?;
+                let mut tx = pool.begin_write().await.map_err(db_error)?;
                 let _ = traced(
                     SQLITE,
                     "sync.raise_horizon",
@@ -68,7 +68,7 @@ impl SqlStore {
                 tx.commit().await.map_err(db_error)
             }
             IndexPool::Postgres(pool) => {
-                let mut tx = pool.begin().await.map_err(db_error)?;
+                let mut tx = pool.begin_write().await.map_err(db_error)?;
                 let _ = traced(
                     POSTGRES,
                     "sync.raise_horizon",
@@ -208,7 +208,7 @@ impl SyncStore for SqlStore {
             .collect::<Vec<_>>();
         match self.index.pool() {
             IndexPool::Sqlite(pool) => {
-                let mut tx = pool.begin().await.map_err(db_error)?;
+                let mut tx = pool.begin_write().await.map_err(db_error)?;
                 let head: i64 = traced(
                     SQLITE,
                     "sync.reserve",
@@ -246,7 +246,7 @@ impl SyncStore for SqlStore {
                 tx.commit().await.map_err(db_error)
             }
             IndexPool::Postgres(pool) => {
-                let mut tx = pool.begin().await.map_err(db_error)?;
+                let mut tx = pool.begin_write().await.map_err(db_error)?;
                 let head: i64 = traced(
                     POSTGRES,
                     "sync.reserve",

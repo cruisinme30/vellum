@@ -22,14 +22,18 @@
 //! | `VELLUM_MAX_CONNECTIONS_PER_IP` | Connections one client address may hold; default 256 with TLS on, no cap with it off |
 //! | `VELLUM_INDEX_KEY` | 64 hex characters: the key of the SQLite index |
 //! | `VELLUM_INDEX_PLAINTEXT` | `1` opens the SQLite index without encryption |
+//! | `VELLUM_KMS_KEY` | The files' KEK in a key service: `aws-kms:…`, `gcp-kms:…` or `vault:…` |
+//! | `VELLUM_KEK_PASSPHRASE`, `VELLUM_KEK_PASSPHRASE_FILE` | Derive the files' KEK from a passphrase |
+//! | `VELLUM_FILES_PLAINTEXT` | `1` stores the workspace files without encryption |
 //! | `VELLUM_OIDC_ISSUER`, `VELLUM_OIDC_CLIENT_ID` | Turn on single sign-on with this `OpenID Connect` provider |
 //! | `VELLUM_OIDC_CLIENT_SECRET` | The client secret, for a confidential client |
 //! | `VELLUM_OIDC_NAME` | The provider's name on the sign-in button |
 //! | `VELLUM_OIDC_ALLOWED_DOMAINS` | Comma-separated email domains that get an account on first sign-in |
 //! | `VELLUM_OIDC_AUTO_CREATE` | `false` to sign in existing accounts only |
 //!
-//! With none of these, the SQLite index key is made on the first start and
-//! kept in `.vellum/keys/index.key`, so `vellum serve` needs no settings.
+//! With none of these, the SQLite index key and the files' key are made on
+//! the first start and kept in `.vellum/keys`, so `vellum serve` needs no
+//! settings (see [`crate::at_rest`]).
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -202,6 +206,12 @@ fn connection_limits(
             })
             .transpose()?
             .unwrap_or(per_ip_default),
+        // Large files on slow links get time for their size (D213).
+        upload_prefixes: &[
+            crate::uploads::PREFIX,
+            crate::exports::IMPORT_PREFIX,
+            crate::issue_import::PREFIX,
+        ],
         ..vellum_api::server::ConnectionLimits::default()
     })
 }
@@ -265,11 +275,14 @@ pub fn app_gateway(services: &services::Services, config: GatewayConfig) -> Resu
     if let Some(exempt) = crate::limits::forwarded_joins(|k| std::env::var(k).ok()) {
         builder = builder.rate_exempt(exempt);
     }
+    if let Some(site) = services.public_site() {
+        builder = builder.public_site(site);
+    }
     services
         .mount(builder)
         // Live editing is mounted at `/collab` with the services (#415);
         // the web app's fallback never answers there.
-        .web_app(web::router(web::embedded()))
+        .web_app(services.web_app(web::router(web::embedded())))
         .build()
 }
 
@@ -352,8 +365,10 @@ pub fn run(config_path: Option<&Path>, observability: Observability) -> Result<(
             services::Services::open_with_store(&app_origin, Some(&config.data_dir), store, sso)?
             .with_workspace(&config, |k| std::env::var(k).ok())
             .await?
+            .with_scanner(scanner)
             .with_admin(&config, observability, |k| std::env::var(k).ok())
-            .await?;
+            .await?
+            .with_assist(|k| std::env::var(k).ok())?;
         tracing::info!(services = ?services, "services ready");
         if !web::BUILT {
             tracing::warn!("this binary was built without the web app; `/` shows a placeholder");

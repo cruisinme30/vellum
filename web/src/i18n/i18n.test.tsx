@@ -13,6 +13,7 @@ import { CHANNELS, KINDS } from "../notifications/preferences";
 import { DESTINATIONS } from "../shell/destinations";
 import { DENSITIES, FONTS, MOTIONS } from "../theme/appearance";
 import { THEMES } from "../theme/themes";
+import planning from "../work/planning/planning.ftl?raw";
 
 import en from "./en.ftl?raw";
 import { createTranslator, I18nProvider, useT } from "./i18n";
@@ -20,7 +21,9 @@ import { createTranslator, I18nProvider, useT } from "./i18n";
 const SOURCE_ROOT = path.resolve(import.meta.dirname, "..");
 
 /** Message ids defined in the English bundle. */
-const DEFINED = new Set([...en.matchAll(/^([a-z][\w-]*)\s*=/gm)].map((match) => match[1]));
+const DEFINED = new Set(
+  [...`${en}\n${planning}`.matchAll(/^([a-z][\w-]*)\s*=/gm)].map((match) => match[1]),
+);
 
 /** Every non-test source file, with its text. */
 function sources(): [file: string, text: string][] {
@@ -58,6 +61,18 @@ function familyIds(): string[] {
     ),
     ...["draft", "in-review", "verified", "outdated"].map((status) => `status-${status}`),
     ...literals(toolbar, /\bid: "([\w-]+)"/g).map((id) => `toolbar-${id}`),
+    // Work planning (D225): statuses, health, insights and priorities.
+    ...["backlog", "planned", "in-progress", "completed", "canceled"].map(
+      (status) => `plan-status-${status}`,
+    ),
+    ...["on-track", "at-risk", "off-track", "none"].map((health) => `plan-health-${health}`),
+    ...["lead_time", "cycle_time", "triage_time", "throughput", "created"].map(
+      (measure) => `plan-measure-${measure}`,
+    ),
+    ...["none", "team", "assignee", "priority", "label", "project", "cycle", "estimate"].map(
+      (pivot) => `plan-pivot-${pivot}`,
+    ),
+    ...["none", "urgent", "high", "normal", "low"].map((name) => `plan-priority-${name}`),
     // Parse errors of collection editors, returned by parseInput.
     ...literals(
       readFileSync(path.join(SOURCE_ROOT, "collections/value.ts"), "utf8"),

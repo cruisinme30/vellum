@@ -125,93 +125,95 @@ export function BookTree({
     return { id: row.id, zone };
   };
 
+  // A tree may hold only tree items (axe aria-required-children), so the
+  // help text and the live status sit beside it.
   return (
-    <div
-      className="vl-book-tree"
-      role="tree"
-      aria-label={t("books-contents")}
-      aria-busy={busy}
-      aria-describedby={`vl-book-tree-help-${book}`}
-      ref={list}
-    >
+    <>
       <p id={`vl-book-tree-help-${book}`} className="vl-visually-hidden">
         {t("books-tree-help")}
       </p>
-      {rows.map((row, at) => {
-        const label =
-          row.node.number == undefined ? row.node.title : `${row.node.number} ${row.node.title}`;
-        const zone = drop?.id === row.id ? drop.zone : undefined;
-        return (
-          <div
-            key={row.id}
-            role="treeitem"
-            data-section-id={row.id}
-            data-drop={zone}
-            aria-level={row.level}
-            aria-setsize={row.siblings.length}
-            aria-posinset={row.index + 1}
-            aria-selected={row.id === current}
-            aria-current={row.id === current ? "page" : undefined}
-            tabIndex={row.id === tabStop ? 0 : -1}
-            className="vl-book-tree-row"
-            style={{ paddingInlineStart: `${String(row.level * 14 - 6)}px` }}
-            draggable={!busy}
-            onDragStart={(event) => {
-              setDragging(row.id);
-              event.dataTransfer.setData(DRAG_TYPE, row.id);
-              event.dataTransfer.effectAllowed = "move";
-            }}
-            onDragEnd={() => {
-              setDragging(undefined);
-              setDrop(undefined);
-            }}
-            onDragOver={(event) => {
-              const next = zoneOf(event, row);
-              if (next === undefined) {
+      <div
+        className="vl-book-tree"
+        role="tree"
+        aria-label={t("books-contents")}
+        aria-busy={busy}
+        aria-describedby={`vl-book-tree-help-${book}`}
+        ref={list}
+      >
+        {rows.map((row, at) => {
+          const label =
+            row.node.number == undefined ? row.node.title : `${row.node.number} ${row.node.title}`;
+          const zone = drop?.id === row.id ? drop.zone : undefined;
+          return (
+            <div
+              key={row.id}
+              role="treeitem"
+              data-section-id={row.id}
+              data-drop={zone}
+              aria-level={row.level}
+              aria-setsize={row.siblings.length}
+              aria-posinset={row.index + 1}
+              aria-selected={row.id === current}
+              aria-current={row.id === current ? "page" : undefined}
+              tabIndex={row.id === tabStop ? 0 : -1}
+              className="vl-book-tree-row"
+              style={{ paddingInlineStart: `${String(row.level * 14 - 6)}px` }}
+              draggable={!busy}
+              onDragStart={(event) => {
+                setDragging(row.id);
+                event.dataTransfer.setData(DRAG_TYPE, row.id);
+                event.dataTransfer.effectAllowed = "move";
+              }}
+              onDragEnd={() => {
+                setDragging(undefined);
                 setDrop(undefined);
-                return;
-              }
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "move";
-              if (next.id !== drop?.id || next.zone !== drop.zone) setDrop(next);
-            }}
-            onDragLeave={() => {
-              if (drop?.id === row.id) setDrop(undefined);
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              const dragged = rows.find((r) => r.id === dragging);
-              const box = event.currentTarget.getBoundingClientRect();
-              if (dragged !== undefined && !isWithin(rows, row.id, dragged.id)) {
-                move(
-                  dragged.id,
-                  dropPlace(row, dragged, event.clientY - box.top, box.height, maxDepth),
-                  dragged.node.title,
-                );
-              }
-              setDragging(undefined);
-              setDrop(undefined);
-            }}
-            onFocus={(event) => {
-              if (event.target === event.currentTarget) setFocusId(row.id);
-            }}
-            onKeyDown={(event) => {
-              if (event.target === event.currentTarget) onKeyDown(event, row, at);
-            }}
-            onClick={() => {
-              void navigate(sectionPath(row.id));
-            }}
-          >
-            <span className="vl-book-tree-grip" aria-hidden="true">
-              ⋮⋮
-            </span>
-            <span className="vl-book-tree-title">{label}</span>
-          </div>
-        );
-      })}
+              }}
+              onDragOver={(event) => {
+                const next = zoneOf(event, row);
+                if (next === undefined) {
+                  setDrop(undefined);
+                  return;
+                }
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                if (next.id !== drop?.id || next.zone !== drop.zone) setDrop(next);
+              }}
+              onDragLeave={() => {
+                if (drop?.id === row.id) setDrop(undefined);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const dragged = rows.find((r) => r.id === dragging);
+                const box = event.currentTarget.getBoundingClientRect();
+                if (dragged !== undefined && !isWithin(rows, row.id, dragged.id)) {
+                  move(
+                    dragged.id,
+                    dropPlace(row, dragged, event.clientY - box.top, box.height, maxDepth),
+                    dragged.node.title,
+                  );
+                }
+                setDragging(undefined);
+                setDrop(undefined);
+              }}
+              onFocus={(event) => {
+                if (event.target === event.currentTarget) setFocusId(row.id);
+              }}
+              onKeyDown={(event) => {
+                if (event.target === event.currentTarget) onKeyDown(event, row, at);
+              }}
+              onClick={() => {
+                void navigate(sectionPath(row.id));
+              }}
+            >
+              <span className="vl-book-tree-grip" aria-hidden="true" />
+              <span className="vl-book-tree-title">{label}</span>
+            </div>
+          );
+        })}
+      </div>
       <p className="vl-visually-hidden" role="status">
         {status}
       </p>
-    </div>
+    </>
   );
 }

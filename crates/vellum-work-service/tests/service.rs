@@ -139,7 +139,15 @@ async fn every_operation_is_valid_and_unique() {
         .filter(|o| o.scope() == Scope::Admin)
         .map(Operation::id)
         .collect();
-    assert_eq!(admin, ["work.create_team", "work.put_team"]);
+    assert_eq!(
+        admin,
+        [
+            "work.create_team",
+            "work.put_team",
+            "work.archive_team",
+            "work.restore_team"
+        ]
+    );
     assert!(
         w.ops
             .iter()
@@ -441,6 +449,121 @@ async fn callers_need_a_handle_and_bad_input_changes_nothing() {
 }
 
 #[tokio::test]
+async fn archived_teams_leave_lists_and_take_no_new_issues() {
+    let w = world().await;
+    with_eng(&w).await;
+    let _ = w
+        .call(
+            "mara",
+            "work.create_team",
+            json!({"key": "OPS", "name": "Operations"}),
+        )
+        .await;
+    let kept = w
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({"team": "OPS", "title": "Rotate keys"}),
+        )
+        .await;
+    assert_eq!(kept["issue"]["key"], "OPS-1");
+
+    // Admin scope and a fresh sign-in, as every_operation_is_valid_and_unique checks.
+    let out = w
+        .call("mara", "work.archive_team", json!({"team": "OPS"}))
+        .await;
+    assert_eq!(out["archived"], true);
+    let yaml = std::fs::read_to_string(w.dir.path().join("teams/OPS/team.yaml")).unwrap();
+    assert!(yaml.contains("archived: true"), "{yaml}");
+
+    // Gone from the default list, there when asked for.
+    let keys = |v: &Value| -> Vec<String> {
+        v["teams"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["key"].as_str().unwrap().to_owned())
+            .collect()
+    };
+    assert_eq!(
+        keys(&w.call("dev", "work.list_teams", json!({})).await),
+        ["ENG"]
+    );
+    assert_eq!(
+        keys(
+            &w.call("dev", "work.list_teams", json!({"include_archived": true}))
+                .await
+        ),
+        ["ENG", "OPS"]
+    );
+
+    // Its issue still reads; new work is refused with a conflict.
+    assert_eq!(
+        w.call("dev", "work.get_issue", json!({"key": "OPS-1"}))
+            .await["title"],
+        "Rotate keys"
+    );
+    assert_eq!(
+        w.call("dev", "work.get_team", json!({"team": "OPS"})).await["archived"],
+        true
+    );
+    let me = w.principal("dev", ScopeSet::FULL);
+    assert_eq!(
+        w.call_as(
+            me.clone(),
+            "work.create_issue",
+            json!({"team": "OPS", "title": "New"})
+        )
+        .await,
+        Err(ErrorKind::Conflict)
+    );
+    let eng = w
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({"team": "ENG", "title": "Move me"}),
+        )
+        .await;
+    assert_eq!(
+        w.call_as(
+            me,
+            "work.move_issue",
+            json!({"key": eng["issue"]["key"], "to": "OPS"})
+        )
+        .await,
+        Err(ErrorKind::Conflict)
+    );
+
+    // It survives a restart, and restoring reopens it.
+    let (w, _) = w.reopen().await;
+    assert_eq!(
+        keys(&w.call("dev", "work.list_teams", json!({})).await),
+        ["ENG"]
+    );
+    let out = w
+        .call("mara", "work.restore_team", json!({"team": "OPS"}))
+        .await;
+    assert_eq!(out["archived"], false);
+    let next = w
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({"team": "OPS", "title": "Back"}),
+        )
+        .await;
+    assert_eq!(
+        next["issue"]["key"], "OPS-2",
+        "numbers continue after a restore"
+    );
+    assert_eq!(
+        w.call("mara", "work.restore_team", json!({"team": "OPS"}))
+            .await["archived"],
+        false,
+        "restoring twice is harmless"
+    );
+}
+
+#[tokio::test]
 async fn a_corrupt_file_is_skipped_not_fatal() {
     let w = world().await;
     with_eng(&w).await;
@@ -671,4 +794,252 @@ async fn events_name_who_made_the_change() {
         .await;
     let batches = w.events.take_batches();
     assert_eq!(batches[0].0, Some(UserRef::parse("priya").unwrap()));
+}
+
+#[tokio::test]
+async fn saved_views_are_shared_by_visibility_and_survive_a_restart() {
+    let w = world().await;
+    with_eng(&w).await;
+    let filter = r#"{"or":[{"field":"priority","op":"is","values":["urgent"]},{"field":"assignee","op":"is","values":["@me"]}]}"#;
+    let team_view = w
+        .call(
+            "dev",
+            "work.create_view",
+            json!({"name": "Urgent or mine", "team": "ENG", "visibility": "team",
+                   "layout": "board", "group_by": "assignee", "filter": filter}),
+        )
+        .await;
+    let team_id = team_view["id"].as_str().unwrap().to_owned();
+    assert_eq!(team_view["layout"], "board");
+    assert_eq!(team_view["owner"], "dev");
+    let private = w
+        .call("dev", "work.create_view", json!({"name": "Mine only"}))
+        .await;
+    let private_id = private["id"].as_str().unwrap().to_owned();
+
+    // A team member sees the team view, not dev's private one.
+    let seen = w.call("priya", "work.list_views", json!({})).await;
+    let names: Vec<&str> = seen["views"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["Urgent or mine"]);
+    // Only the owner changes a view; a hidden view is "not found".
+    let priya = w.principal("priya", ScopeSet::FULL);
+    assert_eq!(
+        w.call_as(
+            priya.clone(),
+            "work.put_view",
+            json!({"view_id": team_id, "name": "Mine"})
+        )
+        .await,
+        Err(ErrorKind::PermissionDenied)
+    );
+    assert_eq!(
+        w.call_as(
+            priya.clone(),
+            "work.delete_view",
+            json!({"view_id": private_id})
+        )
+        .await,
+        Err(ErrorKind::NotFound)
+    );
+    // Bad input is refused.
+    for bad in [
+        json!({"name": ""}),
+        json!({"name": "x", "visibility": "team"}),
+        json!({"name": "x", "layout": "grid"}),
+        json!({"name": "x", "filter": "{\"field\":\"nope\"}"}),
+    ] {
+        assert_eq!(
+            w.call_as(priya.clone(), "work.create_view", bad.clone())
+                .await,
+            Err(ErrorKind::InvalidInput),
+            "{bad}"
+        );
+    }
+
+    let renamed = w
+        .call(
+            "dev",
+            "work.put_view",
+            json!({"view_id": team_id, "name": "Hot", "team": "ENG", "visibility": "team",
+                   "layout": "board", "group_by": "assignee", "filter": filter}),
+        )
+        .await;
+    assert_eq!(renamed["name"], "Hot");
+
+    let (w, skipped) = w.reopen().await;
+    assert_eq!(skipped, 0);
+    let views = w
+        .call("dev", "work.list_views", json!({"team": "ENG"}))
+        .await;
+    let views = views["views"].as_array().unwrap();
+    assert_eq!(views.len(), 2);
+    assert_eq!(views[0]["name"], "Hot");
+    let back: Value = serde_json::from_str(views[0]["filter"].as_str().unwrap()).unwrap();
+    assert_eq!(back, serde_json::from_str::<Value>(filter).unwrap());
+    // The stored filter runs as a query.
+    let _ = w
+        .call(
+            "dev",
+            "work.query_issues",
+            json!({"team": "ENG", "filter": views[0]["filter"], "group_by": "assignee"}),
+        )
+        .await;
+
+    let _ = w
+        .call("dev", "work.delete_view", json!({"view_id": private_id}))
+        .await;
+    let left = w.call("dev", "work.list_views", json!({})).await;
+    assert_eq!(left["views"].as_array().unwrap().len(), 1);
+    assert!(
+        !w.dir
+            .path()
+            .join(format!("views/{private_id}.yaml"))
+            .exists()
+    );
+}
+
+#[tokio::test]
+async fn team_settings_round_trip_as_json_and_numbers_never_go_back() {
+    let w = world().await;
+    with_eng(&w).await;
+    let read = w
+        .call("dev", "work.get_team_settings", json!({"team": "ENG"}))
+        .await;
+    let mut settings = read["settings"].clone();
+    assert!(read["yaml"].as_str().unwrap().contains("key: ENG"));
+    // Rename a status, add one, turn on one-week cycles, add an SLA rule
+    // and map Git moments, as the settings screen does.
+    let statuses = settings["workflow"]["statuses"].as_array_mut().unwrap();
+    let todo = statuses.iter_mut().find(|s| s["key"] == "todo").unwrap();
+    todo["name"] = json!("Up next");
+    statuses.push(json!({"key": "qa", "name": "QA", "category": "started"}));
+    settings["cycles"] = json!({"duration_weeks": 1, "start_day": "tuesday", "upcoming": 2});
+    settings["sla"]["rules"]
+        .as_array_mut()
+        .unwrap()
+        .push(json!({"name": "Low", "when": {"field": "priority", "op": "is", "values": ["low"]}, "within_hours": 240}));
+    settings["git"] = json!({"pr_opened": "qa", "pr_merged": "done"});
+    // A stale copy: an issue is filed between the read and the save.
+    let _ = w
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({"team": "ENG", "title": "Filed meanwhile"}),
+        )
+        .await;
+    let saved = w
+        .call(
+            "mara",
+            "work.put_team",
+            json!({"team": "ENG", "yaml": settings.to_string()}),
+        )
+        .await;
+    assert!(
+        saved["statuses"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["name"] == "Up next")
+    );
+    assert_eq!(saved["cycles"], true);
+
+    let (w, skipped) = w.reopen().await;
+    assert_eq!(skipped, 0);
+    let back = w
+        .call("dev", "work.get_team_settings", json!({"team": "ENG"}))
+        .await;
+    assert_eq!(back["settings"]["git"]["pr_opened"], "qa");
+    assert_eq!(back["settings"]["cycles"]["duration_weeks"], 1);
+    assert_eq!(
+        back["settings"]["last_number"], 1,
+        "the stale copy did not reset numbering"
+    );
+    let next = w
+        .call(
+            "dev",
+            "work.create_issue",
+            json!({"team": "ENG", "title": "Next"}),
+        )
+        .await;
+    assert_eq!(next["issue"]["key"], "ENG-2");
+
+    // A Git moment naming a missing status, or a changed team ID, is refused.
+    let mara = w.principal("mara", ScopeSet::FULL);
+    let mut bad = back["settings"].clone();
+    bad["git"] = json!({"pr_merged": "shipped"});
+    assert_eq!(
+        w.call_as(
+            mara.clone(),
+            "work.put_team",
+            json!({"team": "ENG", "yaml": bad.to_string()})
+        )
+        .await,
+        Err(ErrorKind::InvalidInput)
+    );
+    let mut moved = back["settings"].clone();
+    moved["id"] = json!("01JBV0000000000000000000ZZ");
+    assert!(
+        w.call_as(
+            mara,
+            "work.put_team",
+            json!({"team": "ENG", "yaml": moved.to_string()})
+        )
+        .await
+        .is_err()
+    );
+}
+
+/// RT-040: a refused view's reason quoted the caller's filter values and
+/// was leaked to get a `&'static str`, so each bad request kept up to a
+/// request body of memory for good; and views had no bounds. A bad
+/// filter is now a plain error, filters are capped at 16 kilobytes and each
+/// person at 200 views.
+#[tokio::test]
+async fn saved_views_are_bounded_and_refusals_hold_nothing() {
+    let w = world().await;
+    with_eng(&w).await;
+    let dev = w.principal("dev", ScopeSet::FULL);
+    let big = "x".repeat(8 * 1024);
+    let bad = format!(r#"{{"field":"priority","op":"is","values":["{big}"]}}"#);
+    assert_eq!(
+        w.call_as(
+            dev.clone(),
+            "work.create_view",
+            json!({"name": "x", "filter": bad})
+        )
+        .await,
+        Err(ErrorKind::InvalidInput)
+    );
+    let huge = format!(
+        r#"{{"field":"title","op":"contains","values":["{}"]}}"#,
+        "y".repeat(20 * 1024)
+    );
+    assert_eq!(
+        w.call_as(
+            dev.clone(),
+            "work.create_view",
+            json!({"name": "x", "filter": huge})
+        )
+        .await,
+        Err(ErrorKind::InvalidInput)
+    );
+    for n in 0..200 {
+        let _ = w
+            .call("dev", "work.create_view", json!({"name": format!("v{n}")}))
+            .await;
+    }
+    assert_eq!(
+        w.call_as(dev, "work.create_view", json!({"name": "one too many"}))
+            .await,
+        Err(ErrorKind::InvalidInput)
+    );
+    // Someone else still can.
+    let _ = w
+        .call("priya", "work.create_view", json!({"name": "mine"}))
+        .await;
 }

@@ -126,6 +126,19 @@ function fakeApi(overrides: Partial<AdminConsoleApi> = {}) {
       }),
     ),
     usage: vi.fn(() => Promise.resolve(USAGE)),
+    users: vi.fn(() => Promise.resolve([])),
+    createUser: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    updateUser: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    spaces: vi.fn(() => Promise.resolve([])),
+    createSpace: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    updateSpace: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    setMember: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    groups: vi.fn(() => Promise.resolve([])),
+    createGroup: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    updateGroup: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    deleteGroup: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    groupMembers: vi.fn(() => Promise.reject(new Error("not in this test"))),
+    changeGroupMembers: vi.fn(() => Promise.reject(new Error("not in this test"))),
     ...overrides,
   };
   return { api, audit, settings, saveSettings, state };
@@ -284,6 +297,22 @@ describe("settings page", () => {
     expect(settings.telemetry?.endpoint).toBeUndefined();
     expect(settings.telemetry?.interval_hours).toBe(6);
     expect(settings.telemetry?.enabled).toBe(false);
+  });
+
+  it("reads the secret-scanning policy and its allow-list, one entry per line", () => {
+    const data = new FormData();
+    data.set("security.secret_scanning", "block");
+    data.set("security.secret_allow", "jwt\n\n  AKIAIOSFODNN7EXAMPLE  \n");
+    const settings = settingsFromForm(SETTINGS.settings, data);
+    expect(settings.security?.secret_scanning).toBe("block");
+    expect(settings.security?.secret_allow).toEqual(["jwt", "AKIAIOSFODNN7EXAMPLE"]);
+  });
+
+  it("reads the hybrid-ranking switch", () => {
+    const on = new FormData();
+    on.set("search.hybrid", "on");
+    expect(settingsFromForm(SETTINGS.settings, on).search?.hybrid).toBe(true);
+    expect(settingsFromForm(SETTINGS.settings, new FormData()).search?.hybrid).toBe(false);
   });
 });
 

@@ -7,9 +7,11 @@ import { failureText } from "../../data/failure";
 import { formatSize } from "../../data/format";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import { type AdminConsoleApi, type AdminState, type BackupFile, type DrillReport } from "./api";
 import { AdminScreen } from "./context";
+import { ScrollRegion } from "./scroll-region";
 
 const TIME = new Intl.DateTimeFormat("en", {
   month: "short",
@@ -74,7 +76,7 @@ function BackupTable({ backups }: { readonly backups: readonly BackupFile[] }) {
     return <p>{t("admin-backups-empty")}</p>;
   }
   return (
-    <div className="vl-admin-scroll">
+    <ScrollRegion label={t("admin-backups-caption")}>
       <table className="vl-admin-table">
         <caption>{t("admin-backups-caption")}</caption>
         <thead>
@@ -92,7 +94,7 @@ function BackupTable({ backups }: { readonly backups: readonly BackupFile[] }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }
 
@@ -170,12 +172,14 @@ function Overview({ api }: { readonly api: AdminConsoleApi }) {
       {notice?.ok === false && (
         <p className="vl-field-error" role="alert">
           {notice.message}
+          <CopyDiagnostic message={notice.message} />
         </p>
       )}
       {loaded.state === "loading" && <p className="vl-muted">{t("admin-loading")}</p>}
       {loaded.state === "failed" && (
         <p className="vl-field-error" role="alert">
           {loaded.message}
+          <CopyDiagnostic message={loaded.message} />
         </p>
       )}
       {loaded.state === "ready" && (

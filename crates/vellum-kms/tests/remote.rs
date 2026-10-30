@@ -12,7 +12,10 @@ use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 use vellum_crypto::{CryptoError, KeyProvider, kek_of, open, rewrap, seal};
-use vellum_kms::{AwsCredentials, AwsKms, GcpKms, MetadataServerToken, StaticToken, VaultTransit};
+use vellum_kms::{
+    AwsCredentialProvider, AwsCredentials, AwsKms, GcpKms, MetadataServerToken, StaticToken,
+    VaultTransit,
+};
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
@@ -103,9 +106,13 @@ async fn connection(
         if let Ok(mut log) = log.lock() {
             log.push(seen);
         }
-        let reply = reply.to_string();
+        // A JSON string is sent as plain text (instance metadata answers).
+        let (kind, reply) = match reply {
+            Value::String(text) => ("text/plain", text),
+            other => ("application/json", other.to_string()),
+        };
         let response = format!(
-            "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\n\r\n{reply}",
+            "HTTP/1.1 {status} X\r\ncontent-type: {kind}\r\ncontent-length: {}\r\n\r\n{reply}",
             reply.len()
         );
         reader.get_mut().write_all(response.as_bytes()).await?;
@@ -225,15 +232,20 @@ async fn vault_refuses_a_dek_moved_to_another_kek_id() -> Result<(), BoxError> {
 }
 
 fn aws_handler() -> Arc<Handler> {
-    Arc::new(|seen: &Seen| {
+    aws_handler_for("AKIDEXAMPLE", "session")
+}
+
+/// The KMS fake, accepting calls signed with `access_key` and `session`.
+fn aws_handler_for(access_key: &'static str, session: &'static str) -> Arc<Handler> {
+    Arc::new(move |seen: &Seen| {
         let signed = seen.header("authorization").is_some_and(|a| {
-            a.starts_with("AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/")
+            a.starts_with(&format!("AWS4-HMAC-SHA256 Credential={access_key}/"))
                 && a.contains("/eu-west-1/kms/aws4_request")
                 && a.contains(
                     "SignedHeaders=content-type;host;x-amz-date;x-amz-security-token;x-amz-target",
                 )
         });
-        if !signed || seen.header("x-amz-security-token") != Some("session") {
+        if !signed || seen.header("x-amz-security-token") != Some(session) {
             return (400, json!({ "__type": "IncompleteSignatureException" }));
         }
         let body = seen.json();
@@ -378,5 +390,144 @@ async fn providers_refuse_kek_ids_of_other_backends() -> Result<(), BoxError> {
         open(&aws, &sealed).await,
         Err(CryptoError::UnknownKek(_))
     ));
+    Ok(())
+}
+
+/// A KMS fake that also answers STS, container and instance metadata
+/// requests, and only accepts KMS calls signed with the role's key.
+fn aws_role_handler() -> Arc<Handler> {
+    let kms = aws_handler_for("ASIAROLE", "role-session");
+    Arc::new(move |seen: &Seen| {
+        let creds = json!({
+            "AccessKeyId": "ASIAROLE",
+            "SecretAccessKey": "role-secret",
+            "Token": "role-session",
+            "Expiration": "2999-01-01T00:00:00Z",
+        });
+        match (seen.method.as_str(), seen.path.as_str()) {
+            ("POST", "/sts/") => {
+                let body = String::from_utf8_lossy(&seen.body).into_owned();
+                if !body.contains("Action=AssumeRoleWithWebIdentity")
+                    || !body.contains("WebIdentityToken=oidc-token-1")
+                    || !body.contains("RoleArn=arn%3Aaws%3Aiam%3A%3A111122223333%3Arole%2Fvellum")
+                {
+                    return (400, json!({ "Error": { "Code": "InvalidIdentityToken" } }));
+                }
+                (
+                    200,
+                    json!({ "AssumeRoleWithWebIdentityResponse": {
+                    "AssumeRoleWithWebIdentityResult": { "Credentials": {
+                        "AccessKeyId": "ASIAROLE",
+                        "SecretAccessKey": "role-secret",
+                        "SessionToken": "role-session",
+                        "Expiration": 32_503_680_000_u64,
+                    } }
+                } }),
+                )
+            }
+            ("GET", "/creds") => {
+                if seen.header("authorization") == Some("pod-identity-token") {
+                    (200, creds)
+                } else {
+                    (401, json!({ "message": "bad token" }))
+                }
+            }
+            ("PUT", "/latest/api/token") => {
+                if seen
+                    .header("x-aws-ec2-metadata-token-ttl-seconds")
+                    .is_some()
+                {
+                    (200, Value::String("imds-session".into()))
+                } else {
+                    (400, Value::Null)
+                }
+            }
+            ("GET", path) if path.starts_with("/latest/meta-data/iam/security-credentials/") => {
+                if seen.header("x-aws-ec2-metadata-token") != Some("imds-session") {
+                    return (401, Value::Null);
+                }
+                if path.ends_with('/') {
+                    (200, Value::String("vellum-node\n".into()))
+                } else if path.ends_with("/vellum-node") {
+                    let mut body = creds;
+                    if let Some(map) = body.as_object_mut() {
+                        let _ = map.insert("Code".into(), json!("Success"));
+                    }
+                    (200, body)
+                } else {
+                    (404, Value::Null)
+                }
+            }
+            _ => kms(seen),
+        }
+    })
+}
+
+async fn role_round_trip(credentials: AwsCredentialProvider, base: &str) -> Result<(), BoxError> {
+    let kms = AwsKms::new("eu-west-1", "alias/vellum", credentials)?.with_endpoint(base);
+    let sealed = seal(&kms, b"role credentials").await?;
+    assert_eq!(open(&kms, &sealed).await?, b"role credentials");
+    Ok(())
+}
+
+#[tokio::test]
+async fn aws_kms_uses_web_identity_without_static_keys() -> Result<(), BoxError> {
+    let (base, log) = serve(aws_role_handler()).await?;
+    let dir = std::env::temp_dir().join(format!("vellum-irsa-{}", std::process::id()));
+    std::fs::create_dir_all(&dir)?;
+    let token = dir.join("token");
+    std::fs::write(&token, "oidc-token-1\n")?;
+    let credentials = AwsCredentialProvider::from_vars(|name| match name {
+        "AWS_WEB_IDENTITY_TOKEN_FILE" => Some(token.display().to_string()),
+        "AWS_ROLE_ARN" => Some("arn:aws:iam::111122223333:role/vellum".into()),
+        "AWS_ENDPOINT_URL_STS" => Some(format!("{base}/sts")),
+        _ => None,
+    })?;
+    assert_eq!(credentials.kind(), "web-identity");
+    role_round_trip(credentials, &base).await?;
+    let log = log.lock().map_err(|_| "poisoned")?.clone();
+    // Cached: one STS call for both KMS calls, and the token never in a URL.
+    assert_eq!(log.iter().filter(|s| s.path == "/sts/").count(), 1);
+    assert!(log.iter().all(|s| !s.path.contains("oidc-token")));
+    std::fs::remove_dir_all(&dir)?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn aws_kms_uses_container_credentials() -> Result<(), BoxError> {
+    let (base, _) = serve(aws_role_handler()).await?;
+    let dir = std::env::temp_dir().join(format!("vellum-pod-identity-{}", std::process::id()));
+    std::fs::create_dir_all(&dir)?;
+    let token = dir.join("token");
+    std::fs::write(&token, "pod-identity-token")?;
+    let credentials =
+        AwsCredentialProvider::container(&format!("{base}/creds"), Some(token.clone()))?;
+    role_round_trip(credentials, &base).await?;
+
+    std::fs::write(&token, "stale")?;
+    let refused = AwsCredentialProvider::container(&format!("{base}/creds"), Some(token))?;
+    let error = AwsKms::new("eu-west-1", "alias/vellum", refused)?
+        .with_endpoint(&base)
+        .wrap(&vellum_crypto::SecretKey::generate()?)
+        .await
+        .err()
+        .map(|e| e.to_string())
+        .unwrap_or_default();
+    assert!(error.contains("401"), "{error}");
+    assert!(!error.contains("stale"), "{error}");
+    std::fs::remove_dir_all(&dir)?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn aws_kms_uses_imds_v2_instance_roles() -> Result<(), BoxError> {
+    let (base, log) = serve(aws_role_handler()).await?;
+    role_round_trip(AwsCredentialProvider::imds(&base)?, &base).await?;
+    let log = log.lock().map_err(|_| "poisoned")?.clone();
+    let first = log.first().ok_or("no requests")?;
+    assert_eq!(
+        (first.method.as_str(), first.path.as_str()),
+        ("PUT", "/latest/api/token")
+    );
     Ok(())
 }

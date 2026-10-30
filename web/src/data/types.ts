@@ -46,9 +46,29 @@ export interface MoveTarget {
   readonly index: number;
 }
 
+/** A run of text, marked when it matched the query. */
+export interface Fragment {
+  readonly text: string;
+  readonly hit: boolean;
+}
+
 /** A search result. */
 export interface SearchHit {
   readonly page: PageMeta;
   /** Text around the match, when the body matched. */
   readonly snippet: string;
+  /** The snippet split into matched and unmatched runs, when the server marked them. */
+  readonly fragments?: readonly Fragment[];
+}
+
+/** Narrows a search (R-DR-9). Every field is optional; absent means "any". */
+export interface SearchFilters {
+  /** `me`: only pages I own. */
+  readonly owner?: "me";
+  /** Only pages changed in the last this many days. */
+  readonly modifiedDays?: number;
+  /** Only starred pages. */
+  readonly starred?: boolean;
+  /** Only pages in this space. */
+  readonly spaceId?: string;
 }

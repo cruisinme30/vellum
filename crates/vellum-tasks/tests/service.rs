@@ -357,7 +357,7 @@ fn operations_are_unique_and_versioned() {
     ids.sort_unstable();
     ids.dedup();
     assert_eq!(ids.len(), count);
-    assert_eq!(count, 27);
+    assert_eq!(count, 28);
 }
 
 #[tokio::test]
@@ -677,6 +677,20 @@ async fn the_feed_needs_its_secret() {
         404
     );
     assert_eq!(f.raw("POST", path, &[], "").await.status, 405);
+}
+
+#[tokio::test]
+async fn connections_name_the_caldav_url_and_what_capture_offers() {
+    let f = fixture();
+    let view = f.service.connections(f.user, NoInput {}).await.unwrap();
+    assert_eq!(
+        view.caldav_url,
+        "https://vellum.northstar.dev/dav/calendars/ana/"
+    );
+    assert!(view.email);
+    // Slack capture is not set up here, so nobody can be linked.
+    assert!(!view.slack);
+    assert!(!view.slack_linked);
 }
 
 #[tokio::test]

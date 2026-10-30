@@ -34,7 +34,39 @@ them.
 
 ## Search for models {#search}
 
-MCP search combines keyword search with optional local embeddings,
-computed on your server by a small ONNX model. Nothing is sent to an
-external vector service. Turn embeddings on in **Admin → AI → Semantic
-search**; Vellum builds them in the background.
+MCP search, and search in the app, combine keyword search with optional
+local embeddings, computed on your server by a small ONNX model. Nothing
+is sent to an external vector service, and nothing is downloaded.
+
+To turn embeddings on, put a sentence-embedding model exported to ONNX
+in a folder the server can read (for example `all-MiniLM-L6-v2` or
+`bge-small-en-v1.5`, with its `model.onnx`, `vocab.txt` and
+`config.json`) and set:
+
+::: facts
+
+- `VELLUM_EMBEDDINGS`: the model folder; unset, search is keyword-only
+- `VELLUM_EMBEDDINGS_IDLE_MINUTES`: how long the model stays in memory unused, 15 by default
+
+:::
+
+A folder Vellum cannot use stops the server at start with the reason.
+Pages indexed before you turned embeddings on get them in the
+background. On Postgres, run `vellum reindex` after switching to a
+different model.
+
+**Admin → Settings → Search** shows the index, the model and whether it
+is in memory, and how far a rebuild or the background embedding has
+got, updating every few seconds while it runs. Its switch **Rank results
+by meaning as well as words** turns the model off for queries without a
+restart, for example to compare results. Pages keep getting vectors
+while it is off, so turning it back on takes effect at once. To free the
+model's memory for good, unset `VELLUM_EMBEDDINGS` and restart.
+
+## Markdown for models and crawlers {#llms-txt}
+
+Every Vellum server answers `/llms.txt` (the format at `llmstxt.org`)
+format) and `/sitemap.md` with the pages the caller may read, and any
+page URL with `?format=md` returns the page as Markdown. A signed-in
+browser or a personal API token sees its own pages; an anonymous
+visitor sees none.

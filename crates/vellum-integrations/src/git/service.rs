@@ -190,7 +190,11 @@ async fn apply_one<W: WorkCommands, L: LinkStore>(
         (GitEvent::Push { .. }, None) => return Ok(None),
     };
     store.save(&issue.key, &links).await?;
-    let moved_to = match settings.mappings.get(&issue.key.team) {
+    let own = work.git_mapping(&issue.key.team).await?;
+    let mapping = own
+        .as_ref()
+        .or_else(|| settings.mappings.get(&issue.key.team));
+    let moved_to = match mapping {
         Some(mapping) => match decide(&issue, links.stage(), mapping) {
             Some(target) => {
                 work.set_state(&issue.key, target, &reason).await?;

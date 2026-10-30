@@ -12,6 +12,7 @@
 
 use std::collections::BTreeSet;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -244,6 +245,38 @@ pub struct Rebuilt {
     pub documents: usize,
 }
 
+/// How far a rebuild or an embedding backfill has got, for Admin →
+/// Search (D300). Shared between the task doing the work and readers.
+#[derive(Debug, Default)]
+pub struct Progress {
+    done: AtomicUsize,
+    total: AtomicUsize,
+}
+
+impl Progress {
+    /// Starts counting `total` documents from zero.
+    pub fn start(&self, total: usize) {
+        self.done.store(0, Ordering::Relaxed);
+        self.total.store(total, Ordering::Relaxed);
+    }
+
+    fn advance(&self, n: usize) {
+        let _ = self.done.fetch_add(n, Ordering::Relaxed);
+    }
+
+    /// Documents done so far.
+    #[must_use]
+    pub fn done(&self) -> usize {
+        self.done.load(Ordering::Relaxed)
+    }
+
+    /// Documents to do in all.
+    #[must_use]
+    pub fn total(&self) -> usize {
+        self.total.load(Ordering::Relaxed)
+    }
+}
+
 /// Empties the index and indexes every document again (`vellum reindex`).
 ///
 /// # Errors
@@ -254,17 +287,75 @@ pub async fn rebuild(
     source: &dyn DocumentSource,
     batch: usize,
 ) -> Result<Rebuilt> {
+    rebuild_with_progress(service, source, batch, &Progress::default()).await
+}
+
+/// As [`rebuild`], counting documents into `progress` as it goes.
+///
+/// # Errors
+/// As [`rebuild`].
+pub async fn rebuild_with_progress(
+    service: &SearchService,
+    source: &dyn DocumentSource,
+    batch: usize,
+    progress: &Progress,
+) -> Result<Rebuilt> {
     let span = tracing::info_span!("search.rebuild", search.engine = service.engine());
     async {
         service.clear().await?;
         let docs = source.list().await?;
+        progress.start(docs.len());
         for chunk in docs.chunks(batch.max(1)) {
             index_batch(service, source, chunk).await?;
+            progress.advance(chunk.len());
         }
         tracing::info!(documents = docs.len(), "search index rebuilt");
         Ok(Rebuilt {
             documents: docs.len(),
         })
+    }
+    .instrument(span)
+    .await
+}
+
+/// Indexes `docs` again without emptying the index first, `batch` at a
+/// time, logging progress as it goes. Used to add embeddings to documents
+/// indexed before hybrid search was turned on.
+///
+/// # Errors
+/// Source or backend failures; the documents done so far stay done.
+pub async fn reindex(
+    service: &SearchService,
+    source: &dyn DocumentSource,
+    docs: &[DocId],
+    batch: usize,
+) -> Result<usize> {
+    reindex_with_progress(service, source, docs, batch, &Progress::default()).await
+}
+
+/// As [`reindex`], counting documents into `progress` as it goes.
+///
+/// # Errors
+/// As [`reindex`].
+pub async fn reindex_with_progress(
+    service: &SearchService,
+    source: &dyn DocumentSource,
+    docs: &[DocId],
+    batch: usize,
+    progress: &Progress,
+) -> Result<usize> {
+    let span = tracing::info_span!("search.reindex", search.engine = service.engine());
+    async {
+        let total = docs.len();
+        progress.start(total);
+        let mut done = 0;
+        for chunk in docs.chunks(batch.max(1)) {
+            index_batch(service, source, chunk).await?;
+            done += chunk.len();
+            progress.advance(chunk.len());
+            tracing::info!(done, total, "search: indexing again");
+        }
+        Ok(done)
     }
     .instrument(span)
     .await
@@ -382,9 +473,19 @@ mod tests {
             let _ = files.docs.lock().unwrap().insert(doc.doc, doc);
         }
         let service = service(&corpus);
-        let report = rebuild(&service, &files, 2).await.unwrap();
+        let progress = Progress::default();
+        let report = rebuild_with_progress(&service, &files, 2, &progress)
+            .await
+            .unwrap();
         assert_eq!(report.documents, 5);
+        assert_eq!((progress.done(), progress.total()), (5, 5));
         assert!(hits(&service, &corpus, "gateway").await >= 4);
+
+        let some = [corpus.runbook, corpus.issue];
+        let done = reindex_with_progress(&service, &files, &some, 1, &progress)
+            .await
+            .unwrap();
+        assert_eq!((done, progress.done(), progress.total()), (2, 2, 2));
     }
 
     struct Broken;

@@ -11,7 +11,17 @@
 import type { Command, Scope } from "./keymap";
 
 /** Where the `G` chords go. */
-type Destination = "inbox" | "my-work" | "board" | "cycle" | "triage";
+export type Destination = "inbox" | "my-work" | "board" | "cycle" | "triage";
+
+/**
+ * The `G` chords the app keyboard binds on every screen. A Work screen binds
+ * only `SCREEN_DESTINATIONS`, because both sets are global and the keymap
+ * throws when two commands share a chord.
+ */
+export const APP_DESTINATIONS: readonly Destination[] = ["inbox", "my-work"];
+
+/** The `G` chords only the Work screens bind. */
+export const SCREEN_DESTINATIONS: readonly Destination[] = ["board", "cycle", "triage"];
 
 /** What the current screen can do. Every action is optional. */
 export interface WorkActions {
@@ -19,6 +29,8 @@ export interface WorkActions {
   readonly newIssueFromTemplate?: () => void;
   readonly quickAddTask?: () => void;
   readonly goTo?: (destination: Destination) => void;
+  /** The destinations `goTo` can reach; all of them when absent. */
+  readonly destinations?: readonly Destination[];
   /** Issue-list actions apply to the focused or selected issues. */
   readonly setStatus?: () => void;
   readonly setPriority?: () => void;
@@ -32,7 +44,7 @@ export interface WorkActions {
   readonly copyBranchName?: () => void;
 }
 
-type Simple = Exclude<keyof WorkActions, "goTo">;
+type Simple = Exclude<keyof WorkActions, "goTo" | "destinations">;
 
 type Spec = readonly [Simple, string, string, Scope, (readonly string[])?];
 
@@ -91,9 +103,10 @@ export function workCommands(actions: WorkActions): Command[] {
       commands.push({ id, title, scope, keys: [KEYS[action]], keywords: keywords ?? [], run });
     }
   }
-  const { goTo } = actions;
+  const { goTo, destinations } = actions;
   if (goTo !== undefined) {
     for (const [destination, key, title] of DESTINATIONS) {
+      if (destinations !== undefined && !destinations.includes(destination)) continue;
       commands.push({
         id: `go.${destination}`,
         title,

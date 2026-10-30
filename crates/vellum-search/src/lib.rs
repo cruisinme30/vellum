@@ -11,7 +11,8 @@
 //! - **Block-level retrieval** (D62): hits are blocks with stable IDs and
 //!   citations; [`SearchService::context`] returns a hit's heading section.
 //! - **Hybrid ranking**: BM25 plus optional local embeddings
-//!   ([`Embedder`], [`OnnxEmbedder`]), fused by reciprocal rank.
+//!   ([`Embedder`]; an ONNX embedder behind the `onnx` feature), fused by
+//!   reciprocal rank.
 //! - **Permission filtering** (D61): a readable-spaces pre-filter and an
 //!   exact batch check through [`ReadAccess`], deny by default.
 //! - **Drive filters** (R-DR-9): owner, modified range, type, location,
@@ -35,6 +36,7 @@ pub mod indexer;
 pub mod markdown;
 pub mod meili_index;
 pub mod model;
+#[cfg(feature = "onnx")]
 pub mod onnx;
 pub mod postgres_index;
 pub mod service;
@@ -50,12 +52,16 @@ pub use api::{SearchApi, TitlesPage};
 pub use backend::{Change, IndexEntry, Scope, SearchBackend};
 pub use drive_feed::{DriveFeed, DriveSource, FeedConfig, Start};
 pub use error::{Result, SearchError};
-pub use indexer::{DocumentSource, Indexer, IndexerConfig, rebuild};
+pub use indexer::{
+    DocumentSource, Indexer, IndexerConfig, Progress, rebuild, rebuild_with_progress, reindex,
+    reindex_with_progress,
+};
 pub use meili_index::{MeiliBackend, MeiliConfig};
 pub use model::{
     BlockKind, DocKind, Filters, Fragment, IndexBlock, IndexDocument, SearchHit, SearchPage,
     SearchQuery, StoredBlock, TitleHit,
 };
+#[cfg(feature = "onnx")]
 pub use onnx::{OnnxConfig, OnnxEmbedder};
 pub use postgres_index::PostgresBackend;
 pub use service::{Context, SearchService, Tuning, Update};

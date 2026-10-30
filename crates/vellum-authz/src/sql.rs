@@ -17,7 +17,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use vellum_db::sqlx::types::Uuid;
 use vellum_db::sqlx::{self, QueryBuilder};
-use vellum_db::{Index, IndexPool, traced};
+use vellum_db::{BeginWrite as _, Index, IndexPool, traced};
 
 use crate::graph::SpaceGraph;
 use crate::model::{Id, Object, Principal, Relation, Subject, Tuple, TupleRelation};
@@ -187,7 +187,7 @@ macro_rules! commit {
     ($pool:expr, $system:expr, $db:ty, $commit:expr) => {{
         let c: Commit = $commit;
         let space = uuid(c.space);
-        let mut tx = $pool.begin().await.map_err(backend)?;
+        let mut tx = $pool.begin_write().await.map_err(backend)?;
         let bumped = traced(
             $system,
             "authz.bump_epoch",
@@ -383,12 +383,12 @@ impl AuthzStore for SqlStore {
         let system = self.system();
         match self.pool()? {
             Pool::Sqlite(pool) => {
-                let mut tx = pool.begin().await.map_err(backend)?;
+                let mut tx = pool.begin_write().await.map_err(backend)?;
                 write_tuples!(tx, system, Id::DIRECTORY, &upsert, &delete);
                 tx.commit().await.map_err(backend)
             }
             Pool::Postgres(pool) => {
-                let mut tx = pool.begin().await.map_err(backend)?;
+                let mut tx = pool.begin_write().await.map_err(backend)?;
                 write_tuples!(tx, system, Id::DIRECTORY, &upsert, &delete);
                 tx.commit().await.map_err(backend)
             }

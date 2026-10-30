@@ -8,7 +8,10 @@ const SOURCES = {
   read_cached: 'http_req_duration{scenario:read_cached}',
   read_uncached: 'http_req_duration{scenario:read_uncached}',
   write: 'http_req_duration{scenario:write}',
+  render_cold: 'render_cold',
   collab_sync: 'collab_sync',
+  keystroke: 'keystroke',
+  pdf_export: 'pdf_export',
 };
 
 export function summarise(data, path) {

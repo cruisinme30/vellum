@@ -11,6 +11,7 @@
 //!   .vellum-folder.yaml                 folder (or space) id, icon, settings
 //!   Title.md                            a page
 //!   Title/                              the pages nested under it (D168)
+//!   Title/.attachments/                 the files uploaded to it (D211)
 //!   .vellum-order.yaml                  the order of a container's items (D169)
 //!   Name/                               a folder
 //!   Name.book/book.yaml                 a book
@@ -186,6 +187,9 @@ pub fn file_name(kind: NodeKind, title: &str, counter: u32) -> String {
 /// the path of the file that carries its ID.
 #[must_use]
 pub fn classify(path: &BlobPath) -> Option<(NodeKind, BlobPath)> {
+    if vellum_store::layout::in_attachments(path) {
+        return None;
+    }
     let name = path.file_name();
     let dir = path.parent();
     if name == FOLDER_FILE {
@@ -380,6 +384,7 @@ mod tests {
         assert_eq!(page_dir(&p("d/Plan.md")), Some(p("d/Plan")));
         assert_eq!(page_dir(&p("Plan.MD")), Some(p("Plan")));
         assert_eq!(page_dir(&p("d/F")), None);
+        assert_eq!(classify(&p("d/Plan/.attachments/notes.md")), None);
         let (from, to) = (p("d/Plan.md"), p("e/Goal.md"));
         assert_eq!(
             rebase_member(NodeKind::Page, &p("d/Plan/a/b.md"), &from, &to).ok(),

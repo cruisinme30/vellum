@@ -17,6 +17,8 @@
 //! desktop unit tests only the files related to its changes, without the
 //! coverage gate. CI runs the whole workspace. `VELLUM_FAST_ALL_TESTS=1`
 //! runs the full checks locally too.
+//! `VELLUM_FAST_ALL_TESTS=1` also adds the UI layout checks: the
+//! integrator's full run (issue #532).
 
 use std::env;
 use std::ffi::OsString;
@@ -31,16 +33,23 @@ enum Area {
     Rust,
     Web,
     Desktop,
+    /// The UI layout, focus and loading checks: the web app and the website.
+    Ui,
     /// Always runs: files, docs, secrets and commits.
     Any,
 }
 
 /// Which areas the branch changed, as `scripts/ci/changed-areas.sh` says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "one flag per line the script prints"
+)]
 struct Areas {
     rust: bool,
     web: bool,
     desktop: bool,
+    ui: bool,
 }
 
 impl Areas {
@@ -48,6 +57,7 @@ impl Areas {
         rust: true,
         web: true,
         desktop: true,
+        ui: true,
     };
 
     /// Parses the script's `rust=true` / `web=false` lines.
@@ -62,6 +72,7 @@ impl Areas {
             rust: flag("rust"),
             web: flag("web"),
             desktop: flag("desktop"),
+            ui: flag("ui"),
         }
     }
 
@@ -70,6 +81,7 @@ impl Areas {
             Area::Rust => self.rust,
             Area::Web => self.web,
             Area::Desktop => self.desktop,
+            Area::Ui => self.ui,
             Area::Any => true,
         }
     }
@@ -384,6 +396,15 @@ fn steps(base: Option<&str>, branch: Option<&str>, tested: Option<&[String]>) ->
     let focus = base.filter(|_| tested.is_some());
     steps.extend(web_steps(focus));
     steps.extend(desktop_steps(focus));
+    // The "UI layout (quick)" job: what a merged batch most often breaks
+    // without any single branch failing on its own (issue #532). It takes
+    // minutes, so only the integrator's full run (VELLUM_FAST_ALL_TESTS=1)
+    // includes it; threads run focused tests.
+    let mut ui = Step::new("UI layout (quick)", "scripts/ci/ui-quick.sh", &[])
+        .needs("mdbook")
+        .area(Area::Ui);
+    ui.not_needed = !env_flag(ALL_TESTS);
+    steps.push(ui);
     steps.extend([
         // Files, docs and secrets
         Step::new("REUSE headers", "reuse", &["lint"]),
@@ -750,11 +771,12 @@ mod tests {
     #[test]
     fn areas_follow_the_script_output() {
         assert_eq!(
-            Areas::parse("rust=false\nweb=true\ndesktop=false\n"),
+            Areas::parse("rust=false\nweb=true\ndesktop=false\nui=false\n"),
             Areas {
                 rust: false,
                 web: true,
-                desktop: false
+                desktop: false,
+                ui: false,
             }
         );
         assert_eq!(Areas::parse(""), Areas::ALL);
@@ -769,10 +791,12 @@ mod tests {
         assert_eq!(area("Web lint"), Some(Area::Web));
         assert_eq!(area("Prose (Vale)"), Some(Area::Any));
         assert_eq!(area("Desktop lint"), Some(Area::Desktop));
+        assert_eq!(area("UI layout (quick)"), Some(Area::Ui));
         let docs_only = Areas {
             rust: false,
             web: false,
             desktop: false,
+            ui: false,
         };
         assert!(!docs_only.includes(Area::Rust));
         assert!(docs_only.includes(Area::Any));

@@ -1082,6 +1082,145 @@ async fn scheduled_retention_covers_every_space(kind: Kind) -> TestResult {
     Ok(())
 }
 
+/// Files uploaded to a page live beside it and travel with it (D211).
+async fn files_travel_with_their_page(kind: Kind) -> TestResult {
+    let w = world(kind).await?;
+    let eng = w
+        .drive
+        .create_space(&w.alice, SpaceKind::SharedDrive, "eng", "Engineering", None)
+        .await?;
+    let plan = w
+        .drive
+        .create_page(&w.alice, eng.id, None, "Plan", "")
+        .await?;
+    let png = Bytes::from_static(b"\x89PNG\r\n\x1a\nchart");
+    let chart = w
+        .drive
+        .attach(&w.alice, plan.id, "chart.png", png.clone())
+        .await?;
+    assert_eq!((chart.name.as_str(), chart.size), ("chart.png", 13));
+    let on_disk = w
+        .dir
+        .path()
+        .join("drives/shared/eng/Plan/.attachments/chart.png");
+    assert_eq!(std::fs::read(&on_disk)?, png.to_vec());
+    // A taken name gets a number; a Markdown file stays a file.
+    let again = w
+        .drive
+        .attach(&w.alice, plan.id, "chart.png", png.clone())
+        .await?;
+    assert_eq!(again.name, "chart (2).png");
+    let _ = w
+        .drive
+        .attach(
+            &w.alice,
+            plan.id,
+            "notes.md",
+            Bytes::from_static(b"# Notes\n"),
+        )
+        .await?;
+    let report = w.drive.scan().await?;
+    assert_eq!(report.added, 0, "{report:?}");
+    let names = |files: Vec<vellum_drive::Attachment>| -> Vec<String> {
+        files.into_iter().map(|f| f.name).collect()
+    };
+    assert_eq!(
+        names(w.drive.attachments(&w.alice, plan.id).await?),
+        ["chart (2).png", "chart.png", "notes.md"]
+    );
+    assert!(
+        w.drive
+            .list(&w.alice, eng.id, Some(plan.id))
+            .await?
+            .is_empty()
+    );
+    // Bad names and items that are not pages are refused.
+    for bad in ["../Plan.md", ".env", "a/b.png"] {
+        assert!(matches!(
+            w.drive.attach(&w.alice, plan.id, bad, png.clone()).await,
+            Err(DriveError::Invalid(_))
+        ));
+    }
+    let folder = w.drive.create_folder(&w.alice, eng.id, None, "Ops").await?;
+    assert!(matches!(
+        w.drive
+            .attach(&w.alice, folder.id, "a.png", png.clone())
+            .await,
+        Err(DriveError::Invalid(_))
+    ));
+
+    // A viewer may read the files but not change them.
+    w.access.grant(w.bob_id, plan.id, Role::Viewer);
+    let (_, bytes) = w.drive.attachment(&w.bob, plan.id, "chart.png").await?;
+    assert_eq!(bytes, png);
+    assert!(matches!(
+        w.drive.attach(&w.bob, plan.id, "b.png", png.clone()).await,
+        Err(DriveError::PermissionDenied)
+    ));
+    assert!(matches!(
+        w.drive.detach(&w.bob, plan.id, "chart.png").await,
+        Err(DriveError::PermissionDenied)
+    ));
+
+    files_follow_their_page(&w, &eng, &plan, &folder).await
+}
+
+/// Rename, move, copy, trash and restore carry a page's files; deleting
+/// one works; and files count against the quota.
+async fn files_follow_their_page(
+    w: &World,
+    eng: &vellum_drive::Space,
+    plan: &Node,
+    folder: &Node,
+) -> TestResult {
+    // Rename, move, copy, trash and restore carry the files.
+    let _ = w.drive.rename(&w.alice, plan.id, "Roadmap").await?;
+    let _ = w
+        .drive
+        .move_node(&w.alice, plan.id, eng.id, Some(folder.id))
+        .await?;
+    assert!(
+        w.dir
+            .path()
+            .join("drives/shared/eng/Ops/Roadmap/.attachments/chart.png")
+            .exists()
+    );
+    let copy = w.drive.copy_node(&w.alice, plan.id, eng.id, None).await?;
+    assert_eq!(w.drive.attachments(&w.alice, copy.id).await?.len(), 3);
+    let _ = w.drive.trash(&w.alice, plan.id).await?;
+    assert!(matches!(
+        w.drive.attachment(&w.alice, plan.id, "chart.png").await,
+        Err(DriveError::NotFound(_))
+    ));
+    let _ = w.drive.restore(&w.alice, plan.id).await?;
+    assert_eq!(w.drive.attachments(&w.alice, plan.id).await?.len(), 3);
+
+    // Deleting a file, then reading it, says not found.
+    w.drive.detach(&w.alice, plan.id, "chart (2).png").await?;
+    assert!(matches!(
+        w.drive.attachment(&w.alice, plan.id, "chart (2).png").await,
+        Err(DriveError::NotFound(_))
+    ));
+
+    // Uploaded files count against the space's quota.
+    let used = w.drive.usage(&w.alice, eng.id).await?.used;
+    let settings = SpaceSettings {
+        quota_bytes: Some(used + 64),
+        ..SpaceSettings::default()
+    };
+    let _ = w
+        .drive
+        .update_space(&w.alice, eng.id, None, settings)
+        .await?;
+    assert!(matches!(
+        w.drive
+            .attach(&w.alice, plan.id, "big.bin", Bytes::from(vec![0_u8; 32]))
+            .await,
+        Err(DriveError::QuotaExceeded { .. })
+    ));
+    Ok(())
+}
+
 macro_rules! on_every_index {
     ($($name:ident),* $(,)?) => {$(
         mod $name {
@@ -1121,4 +1260,5 @@ on_every_index!(
     siblings_keep_their_order_and_the_tree_comes_whole,
     my_drive_is_made_once_per_person,
     scheduled_retention_covers_every_space,
+    files_travel_with_their_page,
 );

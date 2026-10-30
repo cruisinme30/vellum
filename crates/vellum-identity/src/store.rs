@@ -24,7 +24,7 @@ use std::sync::{Mutex, PoisonError};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use vellum_contracts::Scope;
-use vellum_kernel::{Error, ErrorKind, Timestamp, UserId};
+use vellum_kernel::{Error, ErrorKind, ObjectId, Timestamp, UserId};
 
 use crate::oauth::Client;
 use crate::secret::SecretHash;
@@ -61,6 +61,134 @@ pub struct User {
     /// Single sign-on identities that sign in as this user.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sso: Vec<SsoLink>,
+    /// Authenticator apps, passkeys and recovery codes (D290).
+    #[serde(default, skip_serializing_if = "SecondFactors::is_empty")]
+    pub factors: SecondFactors,
+    /// A break-glass admin: may still sign in with a password and a second
+    /// factor when single sign-on is required (D292).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub break_glass: bool,
+    /// The identity provider's ID for the account, when SCIM manages it
+    /// (D294).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<String>,
+}
+
+/// A person's second factors (ADR 0069, D290).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SecondFactors {
+    /// The authenticator app, once confirmed.
+    pub totp: Option<TotpFactor>,
+    /// An authenticator app being added, until its first code is entered.
+    pub pending_totp: Option<PendingTotp>,
+    /// Registered passkeys.
+    pub passkeys: Vec<Passkey>,
+    /// Hashes of the recovery codes not used yet.
+    pub recovery: Vec<String>,
+}
+
+impl SecondFactors {
+    /// Whether nothing is stored.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self == &Self::default()
+    }
+
+    /// Whether sign-in needs a second step: a confirmed app or a passkey.
+    #[must_use]
+    pub const fn any(&self) -> bool {
+        self.totp.is_some() || !self.passkeys.is_empty()
+    }
+}
+
+/// A confirmed authenticator app.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TotpFactor {
+    /// The secret, sealed with the identity key ([`crate::seal`]).
+    pub sealed: String,
+    /// The last step a code was accepted for; earlier steps are refused.
+    pub last_step: Option<u64>,
+    /// When it was added.
+    pub added_at: Timestamp,
+}
+
+/// An authenticator app waiting for its first code.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PendingTotp {
+    /// The secret, sealed.
+    pub sealed: String,
+    /// When the offer lapses.
+    pub expires: Timestamp,
+}
+
+/// A registered passkey.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Passkey {
+    /// The credential ID, base64url.
+    pub id: String,
+    /// The owner's label for it.
+    pub name: String,
+    /// The public key.
+    pub key: crate::webauthn::PublicKey,
+    /// The signature counter last seen.
+    pub sign_count: u32,
+    /// When it was added.
+    pub created_at: Timestamp,
+    /// When it last signed in.
+    pub last_used_at: Option<Timestamp>,
+}
+
+/// What a second-factor challenge is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChallengePurpose {
+    /// The second step of a password sign-in.
+    SignIn,
+    /// A sign-in that may finish only once a factor is added.
+    Enrol,
+    /// Adding a passkey from the settings page.
+    Register,
+    /// Confirming a session's owner with a passkey.
+    Reauth,
+}
+
+/// A second-factor challenge in flight: a sign-in ticket or a passkey
+/// ceremony, keyed by the hash of its secret.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MfaChallenge {
+    /// Whose it is.
+    pub user: UserId,
+    /// What it is for.
+    pub purpose: ChallengePurpose,
+    /// The `WebAuthn` challenge issued for it, base64url.
+    pub webauthn: Option<String>,
+    /// Wrong answers so far; the ticket ends after a few.
+    pub failures: u32,
+    /// When it lapses.
+    pub expires: Timestamp,
+    /// The browser that started it.
+    pub user_agent: Option<String>,
+    /// For [`ChallengePurpose::Reauth`], the session it confirms.
+    pub session: Option<String>,
+}
+
+/// A named group of people (ADR 0057, D273). Who is in it lives in the
+/// permission engine; this is its name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Group {
+    /// The group's ID; grants name it as `group:<ID>`.
+    pub id: ObjectId,
+    /// The display name, unique ignoring case.
+    pub name: String,
+    /// What the group is for.
+    #[serde(default)]
+    pub description: String,
+    /// When it was created.
+    pub created_at: Timestamp,
+    /// The identity provider's ID for it, when SCIM manages it (D294).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<String>,
 }
 
 /// A provider's user, linked to a Vellum account on first sign-in.
@@ -148,6 +276,13 @@ pub struct Grant {
     pub audience: Vec<String>,
     /// When the user approved it.
     pub created_at: Timestamp,
+    /// When the user last proved their identity before approving it: the
+    /// session's sign-in time, not the approval's. Tokens of the grant
+    /// count as signed in then, so approving a client from an old session
+    /// never yields a credential that passes a recent-sign-in check
+    /// (RT-039). Grants from before this field use `created_at`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_time: Option<Timestamp>,
     /// The current refresh token's hash.
     #[serde(with = "hash_b64")]
     pub refresh_hash: SecretHash,
@@ -218,6 +353,9 @@ pub struct PendingCode {
     pub audience: Vec<String>,
     /// The PKCE challenge.
     pub challenge: String,
+    /// When the approving session last proved the user's identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth_time: Option<Timestamp>,
     /// When the code stops working.
     pub expires: Timestamp,
 }
@@ -246,6 +384,136 @@ pub struct State {
     /// `OAuth` authorization codes by the base64 of their hash.
     #[serde(default)]
     pub oauth_codes: BTreeMap<String, PendingCode>,
+    /// Named groups by ID.
+    #[serde(default)]
+    pub groups: BTreeMap<String, Group>,
+    /// How people may sign in, set in Admin → Sign-in (ADR 0069).
+    #[serde(default)]
+    pub sign_in: SignInSettings,
+    /// Second-factor challenges by the base64 of their secret's hash.
+    #[serde(default)]
+    pub mfa_challenges: BTreeMap<String, MfaChallenge>,
+    /// SAML sign-ins in progress by the base64 of their relay state's hash.
+    #[serde(default)]
+    pub saml_requests: BTreeMap<String, SamlRequest>,
+    /// Assertions already used, by the base64 of the hash of provider and
+    /// assertion ID, until they expire (replay protection).
+    #[serde(default)]
+    pub saml_seen: BTreeMap<String, Timestamp>,
+}
+
+/// The workspace's sign-in rules, one record set by administrators
+/// (ADR 0069).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SignInSettings {
+    /// The longest expiry, in days, a personal API token may have; `None`
+    /// allows tokens that never expire (D291).
+    pub max_token_days: Option<u32>,
+    /// Who must use a second factor with a password (D290).
+    pub second_factor: SecondFactorPolicy,
+    /// Whether passwords are refused, except for break-glass admins (D292).
+    pub require_sso: bool,
+    /// Identity providers added in Admin → Sign-in (D292).
+    pub providers: Vec<Provider>,
+    /// The SCIM provisioning token, when provisioning is on (D294).
+    pub scim: Option<ScimToken>,
+}
+
+/// The SCIM provisioning token, kept as a hash.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScimToken {
+    /// The base64url SHA-256 of the token.
+    pub hash: String,
+    /// When it was made; rotating makes a new one.
+    pub created_at: Timestamp,
+}
+
+/// An identity provider people sign in with (ADR 0069, D292).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Provider {
+    /// A short, stable ID (`okta`, `google-2`), used in URLs.
+    pub id: String,
+    /// The button label: "Sign in with {name}".
+    pub name: String,
+    /// Whether the sign-in page offers it.
+    pub enabled: bool,
+    /// Email domains whose people get an account on first sign-in.
+    #[serde(default)]
+    pub allowed_domains: Vec<String>,
+    /// Whether a verified address with no account gets one.
+    #[serde(default)]
+    pub auto_create: bool,
+    /// When it was added.
+    pub created_at: Timestamp,
+    /// The protocol and its settings.
+    pub protocol: Protocol,
+}
+
+/// How Vellum talks to a provider.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Protocol {
+    /// `OpenID Connect`, authorization code flow with PKCE.
+    Oidc {
+        /// The issuer URL.
+        issuer: String,
+        /// The client ID registered with the provider.
+        client_id: String,
+        /// The client secret, sealed ([`crate::seal`]); `None` for a
+        /// public client.
+        client_secret: Option<String>,
+    },
+    /// SAML 2.0, Vellum as the service provider (D293).
+    Saml {
+        /// The provider's entity ID, as its assertions name their issuer.
+        entity_id: String,
+        /// Where sign-in requests go (HTTP-Redirect binding).
+        sso_url: String,
+        /// The signing certificates, base64 DER.
+        certificates: Vec<String>,
+        /// The metadata URL the settings were imported from, if any.
+        #[serde(default)]
+        metadata_url: Option<String>,
+    },
+}
+
+/// A SAML sign-in in progress, by the hash of its relay state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SamlRequest {
+    /// The provider it went to.
+    pub provider: String,
+    /// The `AuthnRequest` ID the response must answer.
+    pub request_id: String,
+    /// Where to go afterwards (a local path).
+    pub next: String,
+    /// When it lapses.
+    pub expires: Timestamp,
+}
+
+/// Who must use a second factor when signing in with a password.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SecondFactorPolicy {
+    /// Nobody: people choose.
+    #[default]
+    Optional,
+    /// Administrators.
+    Admins,
+    /// Everyone.
+    Everyone,
+}
+
+impl SecondFactorPolicy {
+    /// Whether the policy covers `user`.
+    #[must_use]
+    pub const fn covers(self, user: &User) -> bool {
+        match self {
+            Self::Optional => false,
+            Self::Admins => user.admin,
+            Self::Everyone => true,
+        }
+    }
 }
 
 impl State {
@@ -308,6 +576,9 @@ impl State {
             .retain(|_, t| t.expires_at > now && grants.contains_key(&t.grant));
         self.oauth_consents.retain(|_, c| c.expires > now);
         self.oauth_codes.retain(|_, c| c.expires > now);
+        self.mfa_challenges.retain(|_, c| c.expires > now);
+        self.saml_requests.retain(|_, r| r.expires > now);
+        self.saml_seen.retain(|_, until| *until > now);
         let forget = i64::try_from(LOCKOUT_MEMORY.as_millis()).unwrap_or(i64::MAX);
         self.lockouts
             .retain(|_, a| a.until.unix_ms().saturating_add(forget) > now.unix_ms());
@@ -331,6 +602,7 @@ impl State {
     /// Revokes every credential of a user.
     pub fn revoke_user(&mut self, user: UserId) {
         self.sessions.retain(|_, s| s.user != user);
+        self.mfa_challenges.retain(|_, c| c.user != user);
         self.api_tokens.retain(|_, t| t.user != user);
         self.grants.retain(|_, g| g.user != user);
         let grants = &self.grants;
@@ -588,6 +860,9 @@ mod tests {
                         disabled: false,
                         created_at: Timestamp::now(),
                         sso: Vec::new(),
+                        factors: SecondFactors::default(),
+                        break_glass: false,
+                        external_id: None,
                     },
                 );
                 let _ = s.sessions.insert(

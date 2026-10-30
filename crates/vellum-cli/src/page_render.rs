@@ -27,11 +27,11 @@ use std::sync::{Arc, Mutex};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
-use vellum_contracts::{BoxFuture, Operation, RequestContext, Scope, Service};
+use vellum_contracts::{BoxFuture, HttpMethod, Operation, RequestContext, Scope, Service};
 use vellum_drive::Drive;
 use vellum_kernel::{Actor, Error, ErrorKind, ObjectId, UserId};
 use vellum_render::figure::{FigureConfig, Figures};
-use vellum_render::resolve::{IssueView, IssuesAt, Resolver};
+use vellum_render::resolve::{IssueView, IssuesAt, NoResolver, Resolver};
 use vellum_render::{RENDER_VERSION, RenderOptions, Renderer};
 use vellum_work::UserRef;
 use vellum_work_service::{LiveIssues, WorkService};
@@ -88,6 +88,126 @@ pub struct RenderedPageView {
     pub etag: String,
     /// The renderer version that produced it.
     pub render_version: u32,
+}
+
+/// One fenced block to draw, as the editor holds it (ADR 0068, D286).
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct BlockInput {
+    /// The fence language, such as `mermaid` or `roadmap`.
+    pub lang: String,
+    /// The rest of the fence's opening line, such as `title="Launch"`.
+    #[serde(default)]
+    pub args: String,
+    /// The fence body.
+    pub source: String,
+}
+
+/// One block drawn for the editor.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct RenderedBlockView {
+    /// Sanitised HTML: one `<article class="vl-doc">` holding the block.
+    pub html: String,
+    /// What fell back, for the author; empty when the block drew cleanly.
+    pub warnings: Vec<String>,
+    /// Whether a diagram shows its last good picture because the diagram
+    /// server was unavailable.
+    pub stale: bool,
+    /// The renderer version that produced it.
+    pub render_version: u32,
+}
+
+/// Which accent colour to draw figures in (ADR 0068, D302).
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StylesheetInput {
+    /// The app's accent colour as six hex digits, `rrggbb` (a leading `#`
+    /// is accepted). Absent draws in Vellum's own colours.
+    #[serde(default)]
+    pub seed: Option<String>,
+}
+
+/// The app stylesheet for `seed`, or why the seed is unreadable.
+///
+/// # Errors
+///
+/// [`ErrorKind::InvalidInput`] when the seed is not six hex digits.
+pub fn app_stylesheet(seed: Option<&str>) -> Result<String, Error> {
+    let Some(raw) = seed.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(vellum_render::theme::scoped_stylesheet(
+            RENDER_SCOPE,
+            "data-theme",
+        ));
+    };
+    let hex = raw.strip_prefix('#').unwrap_or(raw);
+    let color: vellum_render::theme::Color = format!("#{hex}").parse().map_err(|_| {
+        Error::new(
+            ErrorKind::InvalidInput,
+            "seed must be six hex digits, rrggbb",
+        )
+    })?;
+    Ok(vellum_render::theme::scoped_stylesheet_from_seed(
+        RENDER_SCOPE,
+        "data-theme",
+        color,
+    ))
+}
+
+/// The stylesheet for rendered HTML inside the app.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct RenderStylesheet {
+    /// CSS scoped to [`RENDER_SCOPE`]; the theme follows the app's
+    /// `<html data-theme>`.
+    pub css: String,
+    /// The class the app puts on the element that holds rendered HTML.
+    pub scope: String,
+    /// The renderer version it matches.
+    pub render_version: u32,
+}
+
+/// The class of the element that holds rendered HTML in the web app.
+pub const RENDER_SCOPE: &str = ".vl-render";
+/// The longest block body the editor may ask to draw.
+pub const MAX_BLOCK_SOURCE: usize = 64 * 1024;
+/// The longest fence argument line.
+const MAX_BLOCK_ARGS: usize = 512;
+
+/// Checks a block and writes it as a Markdown fence. The fence is longer
+/// than any backtick run in the body, so the body cannot close it early.
+fn block_markdown(input: &BlockInput) -> Result<String, Error> {
+    let invalid = |m: &str| Error::new(ErrorKind::InvalidInput, m.to_owned());
+    let lang_ok = !input.lang.is_empty()
+        && input.lang.len() <= 32
+        && input
+            .lang
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_');
+    if !lang_ok {
+        return Err(invalid("`lang` must be a fence language such as `mermaid`"));
+    }
+    if input.args.len() > MAX_BLOCK_ARGS || input.args.contains(['\n', '\r', '`']) {
+        return Err(invalid("`args` must be one short line without backticks"));
+    }
+    if input.source.len() > MAX_BLOCK_SOURCE {
+        return Err(invalid(
+            "the block is too large to preview (64 KiB at most)",
+        ));
+    }
+    let mut longest = 0;
+    let mut run = 0;
+    for c in input.source.chars() {
+        run = if c == '`' { run + 1 } else { 0 };
+        longest = longest.max(run);
+    }
+    let fence = "`".repeat(longest.max(2) + 1);
+    let args = input.args.trim();
+    let head = if args.is_empty() {
+        format!("{fence}{}", input.lang)
+    } else {
+        format!("{fence}{} {args}", input.lang)
+    };
+    let body = input.source.trim_end_matches(['\n', '\r']);
+    Ok(format!("{head}\n{body}\n{fence}\n"))
 }
 
 /// The reader's view of the page's references.
@@ -292,6 +412,35 @@ impl PageRenderService {
     }
 }
 
+impl PageRenderService {
+    /// Draws one block for the editor. It reads nothing on the server:
+    /// links stay unresolved and `::: issues` shows its placeholder, so the
+    /// answer depends only on the block, never on who asks.
+    ///
+    /// # Errors
+    ///
+    /// `InvalidInput` for a bad language, argument line or an oversized body.
+    pub async fn render_block(
+        &self,
+        ctx: &RequestContext,
+        input: BlockInput,
+    ) -> Result<RenderedBlockView, Error> {
+        let _user = ctx.principal.require_user()?;
+        let markdown = block_markdown(&input)?;
+        let doc = vellum_format::parse(&markdown).document;
+        let page = self
+            .renderer
+            .render(&doc, &NoResolver, &RenderOptions::default())
+            .await;
+        Ok(RenderedBlockView {
+            html: page.html,
+            warnings: page.warnings.into_iter().map(|w| w.message).collect(),
+            stale: page.stale_figures > 0,
+            render_version: RENDER_VERSION,
+        })
+    }
+}
+
 impl Service for PageRenderService {
     fn name(&self) -> &'static str {
         "render"
@@ -316,6 +465,40 @@ impl Service for PageRenderService {
                  outline and render warnings. Embedded `::: issues` blocks show the \
                  issues the caller may see.",
             ),
+            {
+                let s = Arc::clone(&self);
+                Operation::mutation(
+                    "render.block",
+                    HttpMethod::Post,
+                    "/v1/render/block",
+                    Scope::Read,
+                    move |ctx, input: BlockInput| {
+                        let s = Arc::clone(&s);
+                        async move { s.render_block(&ctx, input).await }
+                    },
+                )
+                .summary("Draws one fenced block, such as a diagram, for the editor")
+                .description(
+                    "Renders a single fence (Mermaid, Kroki diagrams, charts, timelines, \
+                     roadmaps, risk matrices, architecture, boards, calculators) to the \
+                     same sanitised HTML as `render.page`. It changes nothing; it is a \
+                     POST only because the body can be long.",
+                )
+            },
+            Operation::query(
+                "render.stylesheet",
+                "/v1/render/stylesheet",
+                Scope::Read,
+                |_ctx, input: StylesheetInput| async move {
+                    Ok::<_, Error>(RenderStylesheet {
+                        css: app_stylesheet(input.seed.as_deref())?,
+                        scope: RENDER_SCOPE.trim_start_matches('.').to_owned(),
+                        render_version: RENDER_VERSION,
+                    })
+                },
+            )
+            .summary("The theme stylesheet for rendered HTML shown inside the app")
+            .revalidate(),
         ]
     }
 }
@@ -583,5 +766,264 @@ mod tests {
             .unwrap();
         assert!(saved["html"].as_str().unwrap().contains("Rewritten."));
         assert_ne!(saved["etag"], first["etag"]);
+    }
+
+    #[test]
+    fn blocks_become_one_fence_the_body_cannot_close() {
+        let block = |lang: &str, args: &str, source: &str| BlockInput {
+            lang: lang.into(),
+            args: args.into(),
+            source: source.into(),
+        };
+        assert_eq!(
+            block_markdown(&block("mermaid", "", "graph TD\n  A --> B\n")).unwrap(),
+            "```mermaid\ngraph TD\n  A --> B\n```\n"
+        );
+        assert_eq!(
+            block_markdown(&block("roadmap", " title=\"Q3\" ", "x")).unwrap(),
+            "```roadmap title=\"Q3\"\nx\n```\n"
+        );
+        // A body holding a fence gets a longer one.
+        let tricky = block_markdown(&block("mermaid", "", "a\n````\n# not a heading")).unwrap();
+        assert!(tricky.starts_with("`````mermaid\n"), "{tricky}");
+        assert!(tricky.ends_with("\n`````\n"), "{tricky}");
+        let doc = vellum_format::parse(&tricky).document;
+        assert_eq!(doc.blocks.len(), 1);
+
+        for bad in [
+            block("", "", "x"),
+            block("Mermaid", "", "x"),
+            block("mermaid x", "", "x"),
+            block("mermaid", "a\nb", "x"),
+            block("mermaid", "`", "x"),
+            block("mermaid", "", &"x".repeat(MAX_BLOCK_SOURCE + 1)),
+        ] {
+            let err = block_markdown(&bad).unwrap_err();
+            assert_eq!(err.kind(), ErrorKind::InvalidInput);
+        }
+    }
+
+    #[tokio::test]
+    async fn blocks_render_for_the_editor_without_reading_anything() {
+        let w = world().await;
+        let draw = |lang: &str, source: &str| {
+            call(
+                &w.ops,
+                w.bob,
+                "render.block",
+                json!({"lang": lang, "source": source}),
+            )
+        };
+        let timeline = draw("timeline", "2026-01-10 | Kickoff\n2026-03-01 | Beta\n")
+            .await
+            .unwrap();
+        let html = timeline["html"].as_str().unwrap();
+        assert!(html.contains("vl-timeline"), "{html}");
+        assert!(html.contains("Kickoff"), "{html}");
+        assert_eq!(timeline["warnings"], json!([]));
+        assert_eq!(timeline["stale"], false);
+        assert_eq!(timeline["render_version"], RENDER_VERSION);
+
+        let mermaid = draw("mermaid", "graph TD\n  A[Plan] --> B[Ship]\n")
+            .await
+            .unwrap();
+        assert!(mermaid["html"].as_str().unwrap().contains("<svg"));
+
+        // A broken block still answers, with the warning.
+        let broken = draw("calculator", "nothing: here\n").await.unwrap();
+        assert!(
+            !broken["warnings"].as_array().unwrap().is_empty(),
+            "{broken}"
+        );
+        // With no diagram server, a Kroki diagram shows its source and why.
+        let d2 = draw("d2", "gateway -> engine\n").await.unwrap();
+        assert!(!d2["warnings"].as_array().unwrap().is_empty(), "{d2}");
+        assert!(
+            d2["html"]
+                .as_str()
+                .unwrap()
+                .contains("gateway -&gt; engine"),
+            "{d2}"
+        );
+
+        // Script never survives, whatever the block holds.
+        let hostile = draw("board", "## Todo\n- <script>alert(1)</script>\n")
+            .await
+            .unwrap();
+        assert!(!hostile["html"].as_str().unwrap().contains("<script"));
+
+        // `::: issues` cannot be smuggled in to read Work as the caller.
+        let smuggled = draw("mermaid", "x\n```\n\n::: issues\nfilter: {}\n:::\n")
+            .await
+            .unwrap();
+        assert!(!smuggled["html"].as_str().unwrap().contains("vl-issue-row"));
+
+        let err = draw("Mermaid", "x").await.unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::InvalidInput);
+    }
+
+    #[tokio::test]
+    async fn the_app_stylesheet_is_scoped_to_rendered_html() {
+        let w = world().await;
+        let out = call(&w.ops, w.mara, "render.stylesheet", json!({}))
+            .await
+            .unwrap();
+        assert_eq!(out["scope"], "vl-render");
+        let css = out["css"].as_str().unwrap();
+        assert!(css.contains("[data-theme=\"sepia\"] .vl-render {"));
+        assert!(css.contains("--vl-chart-1:"));
+        let op = w
+            .ops
+            .iter()
+            .find(|o| o.id() == "render.stylesheet")
+            .unwrap();
+        assert!(op.revalidates());
+    }
+
+    #[tokio::test]
+    async fn the_app_stylesheet_follows_the_accent_colour() {
+        let w = world().await;
+        let plain = call(&w.ops, w.mara, "render.stylesheet", json!({}))
+            .await
+            .unwrap();
+        let tinted = call(
+            &w.ops,
+            w.mara,
+            "render.stylesheet",
+            json!({"seed": FIXTURE_ACCENT}),
+        )
+        .await
+        .unwrap();
+        let hashed = call(
+            &w.ops,
+            w.mara,
+            "render.stylesheet",
+            json!({"seed": "#C2185B"}),
+        )
+        .await
+        .unwrap();
+        assert_ne!(tinted["css"], plain["css"]);
+        assert_eq!(tinted["css"], hashed["css"]);
+        let seed = "#c2185b".parse().unwrap();
+        let dark =
+            vellum_render::theme::Theme::from_seed(vellum_render::theme::BuiltinTheme::Dark, seed);
+        let primary = format!("--vl-primary: {};", dark.get("primary"));
+        assert!(tinted["css"].as_str().unwrap().contains(&primary));
+        for bad in ["red", "12345", "#12345g", "1234567"] {
+            let err = call(&w.ops, w.mara, "render.stylesheet", json!({"seed": bad}))
+                .await
+                .unwrap_err();
+            assert_eq!(err.kind(), ErrorKind::InvalidInput, "{bad}");
+        }
+    }
+
+    /// Fences from the render corpus that the web app's UI tests draw: one
+    /// of every block issue #522 lists. Images and collections need the
+    /// server's files, so they stay out.
+    fn fixture_fences() -> Vec<BlockInput> {
+        let corpus = include_str!("../../../corpus/render/fences.md");
+        let mut fences = Vec::new();
+        let mut open: Option<BlockInput> = None;
+        for line in corpus.lines() {
+            match open.as_mut() {
+                None => {
+                    if let Some(head) = line.strip_prefix("```") {
+                        let (lang, args) = head.split_once(' ').unwrap_or((head, ""));
+                        open = Some(BlockInput {
+                            lang: lang.to_owned(),
+                            args: args.to_owned(),
+                            source: String::new(),
+                        });
+                    }
+                }
+                Some(block) if line == "```" => {
+                    let done = std::mem::take(block);
+                    open = None;
+                    if !matches!(done.lang.as_str(), "image" | "collection" | "sparkle") {
+                        fences.push(done);
+                    }
+                }
+                Some(block) => {
+                    block.source.push_str(line);
+                    block.source.push('\n');
+                }
+            }
+        }
+        fences
+    }
+
+    /// The accent colour the UI tests pick to see figures follow it.
+    const FIXTURE_ACCENT: &str = "c2185b";
+
+    /// The server's answers the web UI tests replay (web/e2e/support/
+    /// render-fixture.gen.json): the app stylesheet, every fixture block
+    /// drawn alone, and a page holding all of them. Fails when the renderer
+    /// changes its output; `VELLUM_BLESS=1` rewrites the file.
+    #[tokio::test]
+    async fn the_web_render_fixture_matches_the_renderer() {
+        let w = world().await;
+        let fences = fixture_fences();
+        assert!(fences.len() >= 11, "{}", fences.len());
+        let mut blocks = serde_json::Map::new();
+        let mut page =
+            String::from("# Every block\n\nOne of every drawn block, from the server.\n");
+        for fence in &fences {
+            let out = w
+                .svc
+                .render_block(&ctx(w.mara), fence.clone())
+                .await
+                .unwrap();
+            let _ = blocks.insert(fence.lang.clone(), serde_json::to_value(out).unwrap());
+            let _ = write!(page, "\n{}", block_markdown(fence).unwrap());
+        }
+        let doc = vellum_format::parse(&page).document;
+        let rendered = w
+            .svc
+            .renderer
+            .render(&doc, &NoResolver, &RenderOptions::default())
+            .await;
+        let blob = rendered.to_blob();
+        let stylesheet = call(&w.ops, w.mara, "render.stylesheet", json!({}))
+            .await
+            .unwrap();
+        // The same sheet recoloured from an accent, for the D302 UI test.
+        let accented = call(
+            &w.ops,
+            w.mara,
+            "render.stylesheet",
+            json!({"seed": FIXTURE_ACCENT}),
+        )
+        .await
+        .unwrap();
+        let fixture = json!({
+            "markdown": page,
+            "stylesheet": stylesheet,
+            "accent": format!("#{FIXTURE_ACCENT}"),
+            "stylesheet_accent": accented,
+            "blocks": blocks,
+            "page": {
+                "id": "01M6400000PAGE00ROADMAP001",
+                "title": rendered.title,
+                "html": rendered.html,
+                "outline": rendered.toc.iter().map(|e| json!({"level": e.level, "id": e.id, "text": e.text})).collect::<Vec<_>>(),
+                "warnings": rendered.warnings.iter().map(|w| json!({"block": w.block, "message": w.message})).collect::<Vec<_>>(),
+                "stale_figures": rendered.stale_figures,
+                "etag": blob.etag,
+                "render_version": RENDER_VERSION,
+            },
+        });
+        let text = format!("{}\n", serde_json::to_string_pretty(&fixture).unwrap());
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../web/e2e/support/render-fixture.gen.json");
+        if std::env::var_os("VELLUM_BLESS").is_some() {
+            std::fs::write(&path, &text).unwrap();
+            return;
+        }
+        let committed = std::fs::read_to_string(&path).unwrap_or_default();
+        assert!(
+            committed == text,
+            "web/e2e/support/render-fixture.gen.json is out of date. Regenerate it with \
+             `VELLUM_BLESS=1 cargo test -p vellum-cli web_render_fixture`."
+        );
     }
 }

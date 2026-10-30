@@ -30,18 +30,20 @@ use vellum_work::my_issues::{Tab, my_issues};
 use vellum_work::project::Project;
 use vellum_work::view::{self, View, Visibility};
 use vellum_work::{
-    BlockRef, Changes, Ctx, Estimate, Issue, IssueId, IssuePatch, NewIssue, Priority, ProjectId,
-    Relation, StatusKey, Team, TeamKey, TriageAction, UserRef, ViewId, WorkGraph,
+    BlockRef, Changes, Ctx, Estimate, Issue, IssueId, IssuePatch, MilestoneId, NewIssue, Priority,
+    ProjectId, Relation, Repeat, StatusKey, Team, TeamKey, TriageAction, UserRef, ViewId,
+    WorkGraph,
 };
 
 use crate::api::{
     self, AddComment, AssignThread, AssignmentOut, AssignmentsOut, ChipOut, CommentRef,
     CommentResult, CreateIssue, CreateTeam, CreatedIssue, CycleOut, CyclesOut, EditComment,
-    FocusedIssue, GroupOut, IssueGroups, IssueOut, IssueRef, ListComments, MoveIssue, MyIssues,
-    MyIssuesOut, NoInput, ProjectOut, ProjectRef, PutProject, PutTeam, QueryIssues, React,
-    ResolveThread, TeamOut, TeamRef, ThreadOut, ThreadsOut, TriageIssue, UpdateIssue, invalid,
-    parse_name,
+    FocusedIssue, GroupOut, IssueGroups, IssueOut, IssueRef, ListComments, ListTeams, MoveIssue,
+    MyIssues, MyIssuesOut, NoInput, ProjectOut, ProjectRef, PutProject, PutTeam, QueryIssues,
+    React, ResolveThread, TeamOut, TeamRef, ThreadOut, ThreadsOut, TriageIssue, UpdateIssue,
+    invalid, parse_name,
 };
+use crate::api::{Done, ListViews, PutView, ViewIn, ViewOut, ViewRef, ViewsOut};
 use crate::journal::{self, CatchUp};
 use crate::ports::{Clock, Directory, EventSink};
 use crate::routes;
@@ -50,6 +52,7 @@ pub mod embed;
 pub mod embeds;
 pub mod insights;
 pub mod live;
+pub mod planning;
 pub mod triage;
 
 /// The most issues one list returns.
@@ -65,6 +68,10 @@ pub struct State {
     pub(crate) comments: Comments,
     /// Where each project page lives; titles can change, paths do not.
     project_paths: BTreeMap<ProjectId, String>,
+    /// Saved views, stored as `views/<id>.yaml`.
+    pub(crate) views: BTreeMap<ViewId, View>,
+    /// Project updates and initiatives (D223).
+    pub(crate) planning: planning::Planning,
     /// The journal revision this copy reflects (see [`crate::journal`]).
     pub(crate) seen: u64,
     /// When this copy last compared itself with the journal for a read.
@@ -210,8 +217,37 @@ impl WorkService {
         let sla = st.graph.sla_tick(now);
         changes.issues.extend(sla.issues);
         changes.events.extend(sla.events);
+        let recur = st
+            .graph
+            .recur(now, |t| planning::team_today(t, now), IssueId::generate)?;
+        changes.issues.extend(recur.issues);
+        changes.teams.extend(recur.teams);
+        changes.cycles.extend(recur.cycles);
+        changes.events.extend(recur.events);
         self.commit(&mut st, backup, changes, None, Vec::new(), None)
             .await
+    }
+
+    /// Files the next issue of each repeating issue whose due date has
+    /// passed in its team's time zone (D224). Cheap when nothing is due;
+    /// `vellum serve` runs it every few minutes on one replica.
+    ///
+    /// # Errors
+    ///
+    /// Returns `unavailable` if the files cannot be written.
+    #[instrument(skip_all)]
+    pub async fn run_recurring(&self) -> Result<(), Error> {
+        retrying(|| async {
+            let now = self.clock.now();
+            let mut st = self.write_state().await?;
+            let backup = st.clone();
+            let changes =
+                st.graph
+                    .recur(now, |t| planning::team_today(t, now), IssueId::generate)?;
+            self.commit(&mut st, backup, changes, None, Vec::new(), None)
+                .await
+        })
+        .await
     }
 
     // ----- replicas -----
@@ -459,11 +495,16 @@ impl WorkService {
     pub(crate) async fn list_teams(
         &self,
         _rc: RequestContext,
-        _: NoInput,
+        i: ListTeams,
     ) -> Result<routes::TeamsOut, Error> {
         let st = self.read_state().await;
         Ok(routes::TeamsOut {
-            teams: st.graph.teams().map(TeamOut::of).collect(),
+            teams: st
+                .graph
+                .teams()
+                .filter(|t| i.include_archived || !t.archived)
+                .map(TeamOut::of)
+                .collect(),
         })
     }
 
@@ -474,6 +515,25 @@ impl WorkService {
             .team(&key)
             .map(TeamOut::of)
             .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("unknown team {}", i.team)))
+    }
+
+    pub(crate) async fn get_team_settings(
+        &self,
+        _rc: RequestContext,
+        i: TeamRef,
+    ) -> Result<crate::api::TeamSettingsOut, Error> {
+        let st = self.read_state().await;
+        let key = Self::team_key(&st.graph, &i.team)?;
+        let team = st
+            .graph
+            .team(&key)
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("unknown team {}", i.team)))?;
+        let settings = serde_json::to_value(team)
+            .map_err(|e| Error::new(ErrorKind::Internal, format!("team {key}: {e}")))?;
+        Ok(crate::api::TeamSettingsOut {
+            settings,
+            yaml: team.to_yaml()?,
+        })
     }
 
     pub(crate) async fn get_issue(
@@ -608,6 +668,149 @@ impl WorkService {
         })
     }
 
+    // ----- saved views -----
+
+    pub(crate) async fn list_views(
+        &self,
+        rc: RequestContext,
+        i: ListViews,
+    ) -> Result<ViewsOut, Error> {
+        let me = self.actor(&rc).await?;
+        let st = self.read_state().await;
+        let team = i
+            .team
+            .as_deref()
+            .map(|t| Self::team_key(&st.graph, t))
+            .transpose()?;
+        let member_of = |key: &TeamKey| st.graph.team(key).is_some_and(|t| t.is_member(&me));
+        let mut views: Vec<&View> = st
+            .views
+            .values()
+            .filter(|v| v.visible_to(&me, member_of))
+            .filter(|v| team.is_none() || v.team.is_none() || v.team == team)
+            .collect();
+        views.sort_by_key(|v| v.name.to_lowercase());
+        Ok(ViewsOut {
+            views: views.into_iter().map(ViewOut::of).collect(),
+        })
+    }
+
+    pub(crate) async fn create_view(
+        &self,
+        rc: RequestContext,
+        i: ViewIn,
+    ) -> Result<ViewOut, Error> {
+        self.save_view(rc, ViewId::generate(), i, true).await
+    }
+
+    pub(crate) async fn put_view(&self, rc: RequestContext, i: PutView) -> Result<ViewOut, Error> {
+        let id = parse_id::<ViewId>("view_id", &i.view_id)?;
+        self.save_view(rc, id, i.settings(), false).await
+    }
+
+    async fn save_view(
+        &self,
+        rc: RequestContext,
+        id: ViewId,
+        i: ViewIn,
+        new: bool,
+    ) -> Result<ViewOut, Error> {
+        let me = self.actor(&rc).await?;
+        if i.filter
+            .as_ref()
+            .is_some_and(|f| f.len() > MAX_VIEW_FILTER_BYTES)
+        {
+            return Err(invalid("filter: at most 16 KiB of JSON"));
+        }
+        let mut st = self.write_state().await?;
+        if new {
+            let owned = st.views.values().filter(|v| v.owner == me).count();
+            if owned >= MAX_VIEWS_PER_PERSON {
+                return Err(invalid(
+                    "you have 200 saved views; delete one to save another",
+                ));
+            }
+        } else {
+            let _ = Self::own_view(&st, &id, &me)?;
+        }
+        let name = i.name.trim();
+        if name.is_empty() || name.chars().count() > 120 {
+            return Err(invalid("name: 1 to 120 characters"));
+        }
+        let team = i
+            .team
+            .as_deref()
+            .map(|t| Self::team_key(&st.graph, t))
+            .transpose()?;
+        let filter = match i.filter.as_deref() {
+            Some(text) => {
+                serde_json::from_str(text).map_err(|e| invalid(&format!("filter: {e}")))?
+            }
+            None => Filter::default(),
+        };
+        let view = View {
+            id,
+            name: name.to_owned(),
+            owner: me.clone(),
+            team,
+            visibility: pick("visibility", i.visibility.as_deref())?.unwrap_or_default(),
+            layout: pick("layout", i.layout.as_deref())?.unwrap_or_default(),
+            filter,
+            group_by: pick("group_by", i.group_by.as_deref())?.unwrap_or_default(),
+            order_by: pick("order_by", i.order_by.as_deref())?.unwrap_or_default(),
+            show_closed: pick("show_closed", i.show_closed.as_deref())?.unwrap_or_default(),
+            show_sub_issues: i.show_sub_issues.unwrap_or(true),
+        };
+        view.check().map_err(Error::from)?;
+        let text = view.to_yaml().map_err(Error::from)?;
+        let backup = st.clone();
+        let _ = st.views.insert(id, view.clone());
+        self.commit(
+            &mut st,
+            backup,
+            Changes::default(),
+            None,
+            vec![(view.path(), text)],
+            Some(&me),
+        )
+        .await?;
+        Ok(ViewOut::of(&view))
+    }
+
+    pub(crate) async fn delete_view(&self, rc: RequestContext, i: ViewRef) -> Result<Done, Error> {
+        let me = self.actor(&rc).await?;
+        let id = parse_id::<ViewId>("view_id", &i.view_id)?;
+        let mut st = self.write_state().await?;
+        let path = Self::own_view(&st, &id, &me)?.path();
+        let backup = st.clone();
+        let _ = st.views.remove(&id);
+        let changes = Changes {
+            removed_paths: BTreeSet::from([path]),
+            ..Changes::default()
+        };
+        self.commit(&mut st, backup, changes, None, Vec::new(), Some(&me))
+            .await?;
+        Ok(Done { ok: true })
+    }
+
+    /// The view, if `me` owns it. A view the caller cannot see is "not
+    /// found", so IDs of private views do not leak.
+    fn own_view<'s>(st: &'s State, id: &ViewId, me: &UserRef) -> Result<&'s View, Error> {
+        let not_found = || Error::new(ErrorKind::NotFound, format!("view {id}"));
+        let view = st.views.get(id).ok_or_else(not_found)?;
+        let member_of = |key: &TeamKey| st.graph.team(key).is_some_and(|t| t.is_member(me));
+        if !view.visible_to(me, member_of) {
+            return Err(not_found());
+        }
+        if &view.owner != me {
+            return Err(Error::new(
+                ErrorKind::PermissionDenied,
+                "only the view's owner can change it".to_owned(),
+            ));
+        }
+        Ok(view)
+    }
+
     pub(crate) async fn list_projects(
         &self,
         _rc: RequestContext,
@@ -618,7 +821,7 @@ impl WorkService {
             projects: st
                 .graph
                 .projects()
-                .map(|p| ProjectOut::of(p, &st.graph.project_progress(&p.id)))
+                .map(|p| planning::project_out(&st, p, self.clock.now().date()))
                 .collect(),
         })
     }
@@ -634,7 +837,7 @@ impl WorkService {
             .graph
             .project(&id)
             .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("unknown project {id}")))?;
-        Ok(ProjectOut::of(p, &st.graph.project_progress(&id)))
+        Ok(planning::project_out(&st, p, self.clock.now().date()))
     }
 
     pub(crate) async fn list_comments(
@@ -712,8 +915,22 @@ impl WorkService {
             .as_deref()
             .map(|k| Self::issue_id(&st.graph, k))
             .transpose()?;
+        draft.milestone = i
+            .milestone
+            .as_deref()
+            .map(|m| parse_id("milestone", m))
+            .transpose()?;
         draft.due = i.due.as_deref().map(date).transpose()?;
         draft.intake = i.intake;
+        let repeat = match i.repeat.as_deref() {
+            Some(text) => Some(text.parse::<Repeat>()?),
+            None => draft.template.as_ref().and_then(|name| {
+                st.graph
+                    .team(&draft.team)
+                    .and_then(|t| t.templates.iter().find(|x| &x.name == name))
+                    .and_then(|x| x.repeat)
+            }),
+        };
         let source = i
             .source_block
             .as_deref()
@@ -726,7 +943,22 @@ impl WorkService {
         }
         let id = draft.id;
         let backup = st.clone();
-        let changes = st.graph.create_issue(draft, &ctx)?;
+        let mut changes = match st.graph.create_issue(draft, &ctx) {
+            Ok(c) => c,
+            Err(e) => {
+                *st = backup;
+                return Err(e.into());
+            }
+        };
+        if repeat.is_some() {
+            match st.graph.set_repeat(&id, repeat, ctx.now) {
+                Ok(more) => changes.issues.extend(more.issues),
+                Err(e) => {
+                    *st = backup;
+                    return Err(e.into());
+                }
+            }
+        }
         self.commit(
             &mut st,
             backup,
@@ -763,9 +995,29 @@ impl WorkService {
             .graph
             .issue(&id)
             .ok_or_else(|| Error::new(ErrorKind::NotFound, i.key.clone()))?;
+        let repeat = i
+            .repeat
+            .as_deref()
+            .map(|t| (!t.is_empty()).then(|| t.parse::<Repeat>()).transpose())
+            .transpose()?;
         let patch = patch_from(&st.graph, current, i, me)?;
         let backup = st.clone();
-        let changes = st.graph.update_issue(&id, patch, &ctx)?;
+        let mut changes = match st.graph.update_issue(&id, patch, &ctx) {
+            Ok(c) => c,
+            Err(e) => {
+                *st = backup;
+                return Err(e.into());
+            }
+        };
+        if let Some(repeat) = repeat {
+            match st.graph.set_repeat(&id, repeat, ctx.now) {
+                Ok(more) => changes.issues.extend(more.issues),
+                Err(e) => {
+                    *st = backup;
+                    return Err(e.into());
+                }
+            }
+        }
         self.commit(
             &mut st,
             backup,
@@ -919,6 +1171,35 @@ impl WorkService {
             .ok_or_else(|| Error::new(ErrorKind::NotFound, key.to_string()))
     }
 
+    /// Archives or restores a team (D303).
+    pub(crate) async fn set_team_archived(
+        &self,
+        rc: RequestContext,
+        i: TeamRef,
+        archived: bool,
+    ) -> Result<TeamOut, Error> {
+        let ctx = self.ctx(&rc).await?;
+        let mut st = self.write_state().await?;
+        let key = Self::team_key(&st.graph, &i.team)?;
+        let backup = st.clone();
+        let changes = st.graph.set_team_archived(&key, archived)?;
+        if !changes.teams.is_empty() {
+            self.commit(
+                &mut st,
+                backup,
+                changes,
+                None,
+                Vec::new(),
+                ctx.actor.as_ref(),
+            )
+            .await?;
+        }
+        st.graph
+            .team(&key)
+            .map(TeamOut::of)
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, key.to_string()))
+    }
+
     pub(crate) async fn put_project(
         &self,
         rc: RequestContext,
@@ -953,7 +1234,7 @@ impl WorkService {
             .graph
             .project(&id)
             .ok_or_else(|| Error::new(ErrorKind::NotFound, id.to_string()))?;
-        Ok(ProjectOut::of(p, &st.graph.project_progress(&id)))
+        Ok(planning::project_out(&st, p, ctx.today))
     }
 
     // ----- comments -----
@@ -1189,6 +1470,13 @@ fn patch_from(
                     .transpose()
             })
             .transpose()?,
+        milestone: clearable(i.milestone)
+            .map(|v| {
+                v.as_deref()
+                    .map(|m| parse_id::<MilestoneId>("milestone", m))
+                    .transpose()
+            })
+            .transpose()?,
         cycle: clearable(i.cycle)
             .map(|v| v.as_deref().map(CycleKey::parse).transpose())
             .transpose()?,
@@ -1256,6 +1544,20 @@ fn date(text: &str) -> Result<Date, Error> {
         .map_err(|_| invalid(&format!("date {text:?} must be YYYY-MM-DD")))
 }
 
+/// Saved views one person may own (RT-040): every view stays in memory
+/// and is listed on each read.
+const MAX_VIEWS_PER_PERSON: usize = 200;
+/// The largest filter a saved view takes, as JSON text (RT-040).
+const MAX_VIEW_FILTER_BYTES: usize = 16 * 1024;
+
+/// An optional engine enum from its serde name.
+fn pick<T: serde::de::DeserializeOwned>(
+    field: &str,
+    text: Option<&str>,
+) -> Result<Option<T>, Error> {
+    text.map(|t| parse_name(field, t)).transpose()
+}
+
 fn parse_id<T: std::str::FromStr>(field: &str, text: &str) -> Result<T, Error> {
     text.parse::<T>()
         .map_err(|_| invalid(&format!("{field}: {text:?} is not a valid ID")))
@@ -1291,7 +1593,7 @@ async fn load_all(store: &dyn BlobStore) -> Result<(State, LoadReport), Error> {
     let mut state = State::default();
     let mut report = LoadReport::default();
     let mut paths = Vec::new();
-    for dir in ["teams", "projects", ".comments"] {
+    for dir in ["teams", "projects", "initiatives", ".comments", "views"] {
         paths.extend(list(store, dir).await?);
     }
     // Teams first: issues and cycles need their team.
@@ -1347,7 +1649,14 @@ async fn apply_paths(
                     state.comments.load(thread)?;
                 }
             }
-            Kind::Team | Kind::Cycle | Kind::Project => {
+            Kind::View => {
+                state.views.retain(|_, v| v.path() != *path);
+                if let Some(text) = read_text(store, path).await? {
+                    let view = View::from_yaml(path, &text)?;
+                    let _ = state.views.insert(view.id, view);
+                }
+            }
+            Kind::Team | Kind::Cycle | Kind::Project | Kind::Update | Kind::Initiative => {
                 return Err(Error::new(ErrorKind::Conflict, "team settings changed"));
             }
             Kind::Other => {}
@@ -1399,6 +1708,11 @@ async fn load_one(store: &dyn BlobStore, state: &mut State, path: &str) -> Resul
             let _ = state.graph.upsert_project(p)?;
         }
         Kind::Thread => state.comments.load(Thread::from_yaml(path, text)?)?,
+        Kind::View => {
+            let view = View::from_yaml(path, text)?;
+            let _ = state.views.insert(view.id, view);
+        }
+        Kind::Update | Kind::Initiative => state.planning.load(kind == Kind::Update, path, text)?,
         Kind::Other => {}
     }
     Ok(true)
@@ -1411,6 +1725,9 @@ enum Kind {
     Cycle,
     Project,
     Thread,
+    View,
+    Update,
+    Initiative,
     Other,
 }
 
@@ -1427,7 +1744,10 @@ fn classify(path: &str) -> Kind {
         ["teams", _, "issues", f] if has_ext(f, "md") => Kind::Issue,
         ["teams", _, "cycles", f] if has_ext(f, "yaml") => Kind::Cycle,
         ["projects", _, "project.md"] => Kind::Project,
+        ["projects", _, "updates", f] if has_ext(f, "md") => Kind::Update,
+        ["initiatives", f] if has_ext(f, "md") => Kind::Initiative,
         [".comments", _, f] if has_ext(f, "yaml") => Kind::Thread,
+        ["views", f] if has_ext(f, "yaml") => Kind::View,
         _ => Kind::Other,
     }
 }
@@ -1450,8 +1770,9 @@ mod tests {
         assert_eq!(classify(".comments/01JB/01JD.yaml"), Kind::Thread);
         assert_eq!(
             classify("projects/gateway/updates/2026-11-02-abc.md"),
-            Kind::Other
+            Kind::Update
         );
+        assert_eq!(classify("initiatives/q4-launch.md"), Kind::Initiative);
         assert_eq!(classify("teams/ENG/notes.md"), Kind::Other);
     }
 

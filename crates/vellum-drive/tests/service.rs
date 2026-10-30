@@ -31,7 +31,8 @@ const ALICE: UserId = UserId::from_u128(1);
 const BOB: UserId = UserId::from_u128(2);
 
 /// `Bearer alice`, `Bearer bob` (full scopes), `Bearer alice-read`
-/// (read only); no header is anonymous.
+/// (read only), `Bearer alice-stale` (full scopes, signed in an hour
+/// ago); no header is anonymous.
 struct Tokens;
 
 impl Authenticator for Tokens {
@@ -44,16 +45,20 @@ impl Authenticator for Tokens {
             .get("authorization")
             .and_then(|v| v.to_str().ok())
             .unwrap_or_default();
-        let user = |id, scopes| {
+        let signed_in_at = |id, scopes, at| {
             Ok(Authenticated {
-                principal: Principal::user(id, CredentialKind::ApiToken, scopes, Timestamp::now()),
+                principal: Principal::user(id, CredentialKind::ApiToken, scopes, at),
                 csrf_binding: None,
             })
         };
+        let user = |id, scopes| signed_in_at(id, scopes, Timestamp::now());
+        let an_hour_ago = Timestamp::from_unix_ms(Timestamp::now().unix_ms() - 3_600_000)
+            .unwrap_or_else(|_| Timestamp::now());
         let result = match header {
             "Bearer alice" => user(ALICE, ScopeSet::FULL),
             "Bearer bob" => user(BOB, ScopeSet::FULL),
             "Bearer alice-read" => user(ALICE, ScopeSet::from_scopes([Scope::Read])),
+            "Bearer alice-stale" => signed_in_at(ALICE, ScopeSet::FULL, an_hour_ago),
             "" => Ok(Authenticated::anonymous()),
             _ => Err(Error::new(ErrorKind::Unauthenticated, "invalid token")),
         };
@@ -157,11 +162,62 @@ async fn every_operation_is_in_openapi_and_graphql() -> TestResult {
         .filter_map(|op| op["operationId"].as_str().map(str::to_owned))
         .filter(|id| id.starts_with("drive"))
         .collect();
-    assert_eq!(ids.len(), 33, "{ids:?}");
+    assert_eq!(ids.len(), 42, "{ids:?}");
     let sdl = w.gateway.graphql_sdl();
-    for needle in ["driveGet(", "driveCreatePage(", "driveFind(", "driveSave("] {
+    for needle in [
+        "driveGet(",
+        "driveCreatePage(",
+        "driveFind(",
+        "driveSave(",
+        "driveSharing(",
+        "driveCreateLink(",
+    ] {
         assert!(sdl.contains(needle), "SDL lacks {needle}");
     }
+    Ok(())
+}
+
+/// Admins manage every space; others cannot, and an old sign-in is asked
+/// to confirm again first (R-SE-7, D241-D242).
+#[tokio::test]
+async fn admins_manage_spaces_over_rest() -> TestResult {
+    let w = world().await?;
+    let made = ok(
+        &w,
+        "POST",
+        "/api/v1/admin/spaces",
+        "alice",
+        Some(json!({"slug": "ops", "name": "Operations", "owner_id": BOB.to_string()})),
+    )
+    .await?;
+    let space_id = field(&made, "/space/id");
+    assert_eq!(field(&made, "/members/0/role"), "owner");
+    assert_eq!(field(&made, "/members/0/user_id"), BOB.to_string());
+
+    let added = ok(
+        &w,
+        "PUT",
+        &format!("/api/v1/admin/spaces/{space_id}/members/{ALICE}"),
+        "alice",
+        Some(json!({"role": "viewer"})),
+    )
+    .await?;
+    assert_eq!(added["members"].as_array().map(Vec::len), Some(2));
+    let listed = ok(&w, "GET", "/api/v1/admin/spaces", "alice", None).await?;
+    assert_eq!(field(&listed, "/spaces/0/space/name"), "Operations");
+
+    let reader = call(&w, "GET", "/api/v1/admin/spaces", "alice-read", None).await?;
+    assert_eq!(reader.status, StatusCode::FORBIDDEN, "{}", reader.text);
+    let stale = call(
+        &w,
+        "PUT",
+        &format!("/api/v1/admin/spaces/{space_id}/members/{ALICE}"),
+        "alice-stale",
+        Some(json!({"role": "owner"})),
+    )
+    .await?;
+    assert_eq!(stale.status, StatusCode::UNAUTHORIZED, "{}", stale.text);
+    assert_eq!(field(&stale.body, "/message"), "reauthentication required");
     Ok(())
 }
 

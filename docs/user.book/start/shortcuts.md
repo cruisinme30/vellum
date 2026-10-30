@@ -13,7 +13,7 @@ Windows and Linux, read `⌘` as `Ctrl` and `⌥` as `Alt`.
 
 | Keys | Action |
 | --- | --- |
-| `⌘K` | Search and run any command |
+| `⌘K` | Find a page by title, or run any command |
 | `C` | New issue |
 | `Alt C` | New issue from a template |
 | `Q` | Quick-add a task |
@@ -34,7 +34,7 @@ Windows and Linux, read `⌘` as `Ctrl` and `⌥` as `Alt`.
 | `Tab` `⇧Tab` | Indent, outdent |
 | `⌘↵` | Toggle a task |
 | `⌘⌥M` | Comment on the selection |
-| `T` | Turn the selection into a task |
+| `⌘⌥↵` | Turn the selection into a task |
 
 Markdown shortcuts work as you type: `#`, `-`, `[]`, `>`, three
 backticks, `:::` and `|`.

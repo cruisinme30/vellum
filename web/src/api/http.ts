@@ -54,11 +54,15 @@ export class ApiError extends Error {
   readonly status: number;
   readonly retryable: boolean;
   readonly requestId: string | undefined;
+  /** The request that failed, such as `GET /api/v1/my-work` (no query string). */
+  readonly route: string | undefined;
+  /** When it failed. */
+  readonly at: Date;
 
   constructor(
     code: ErrorCode,
     message: string,
-    details: { status?: number; retryable?: boolean; requestId?: string } = {},
+    details: { status?: number; retryable?: boolean; requestId?: string; route?: string } = {},
   ) {
     super(message);
     this.name = "ApiError";
@@ -66,6 +70,8 @@ export class ApiError extends Error {
     this.status = details.status ?? 0;
     this.retryable = details.retryable ?? false;
     this.requestId = details.requestId;
+    this.route = details.route;
+    this.at = new Date();
   }
 }
 
@@ -80,6 +86,13 @@ export interface Http {
   get<T>(path: string, query?: Query): Promise<T>;
   /** An unsafe request with a JSON body. */
   send<T>(method: Exclude<Method, "GET">, path: string, body?: unknown): Promise<T>;
+  /**
+   * A POST whose body is raw bytes (a file upload), with its media type.
+   * Like `send` it carries the CSRF token and an idempotency key.
+   */
+  upload<T>(path: string, query: Query, body: Blob, type: string): Promise<T>;
+  /** A GET whose answer is a file (an export). */
+  blob(path: string, query?: Query): Promise<Blob>;
   /** Forgets the CSRF token; called after signing in or out, when the session changes. */
   forgetSession(): void;
 }
@@ -120,7 +133,14 @@ function requestIdOf(fromBody: unknown, header: string | undefined): { requestId
   return header === undefined ? {} : { requestId: header };
 }
 
-async function errorOf(response: Response): Promise<ApiError> {
+/** `METHOD /path` without the query string, which may hold search text. */
+function routeOf(method: string, url: string): string {
+  const path = url.split(/[?#]/, 1)[0] ?? url;
+  return `${method} ${path}`;
+}
+
+async function errorOf(response: Response, route?: string): Promise<ApiError> {
+  const where = route === undefined ? {} : { route };
   const header = response.headers.get("x-request-id") ?? undefined;
   let body: unknown;
   try {
@@ -135,6 +155,7 @@ async function errorOf(response: Response): Promise<ApiError> {
       status: response.status,
       retryable: body["retryable"] === true,
       ...requestIdOf(body["request_id"], header),
+      ...where,
     });
   }
   return new ApiError(
@@ -144,6 +165,7 @@ async function errorOf(response: Response): Promise<ApiError> {
       status: response.status,
       retryable: response.status >= 500,
       ...(header === undefined ? {} : { requestId: header }),
+      ...where,
     },
   );
 }
@@ -169,6 +191,7 @@ export function createHttp(options: HttpOptions = {}): Http {
     } catch {
       throw new ApiError("network", "Vellum could not reach the server. Check your connection.", {
         retryable: true,
+        route: routeOf(method, url),
       });
     }
     health.report(response.status, retryAfterSeconds(response.headers.get("retry-after")));
@@ -202,10 +225,42 @@ export function createHttp(options: HttpOptions = {}): Http {
     return csrf;
   };
 
-  const parse = async <T>(response: Response): Promise<T> => {
-    if (!response.ok) throw await errorOf(response);
+  const parse = async <T>(response: Response, route: string): Promise<T> => {
+    if (!response.ok) throw await errorOf(response, route);
     if (response.status === 204) return undefined as T;
     return (await response.json()) as T;
+  };
+
+  /** A request that changes something: CSRF token, idempotency key, one retry for a new session. */
+  const unsafe = async <T>(
+    method: Exclude<Method, "GET">,
+    path: string,
+    content: { readonly body: BodyInit; readonly type: string } | undefined,
+  ): Promise<T> => {
+    const key = idempotencyKey();
+    const attempt = async (): Promise<Response> => {
+      const token = await csrfToken();
+      const headers: Record<string, string> = {
+        accept: "application/json",
+        "idempotency-key": key,
+      };
+      if (token !== undefined) headers["x-csrf-token"] = token;
+      if (content !== undefined) headers["content-type"] = content.type;
+      return request(method, path, {
+        headers,
+        ...(content === undefined ? {} : { body: content.body }),
+      });
+    };
+    let response = await attempt();
+    // A new session (just signed in or out) needs a new token: fetch it once more.
+    if (response.status === 403) {
+      const error = await errorOf(response.clone());
+      if (/csrf/i.test(error.message)) {
+        csrf = undefined;
+        response = await attempt();
+      }
+    }
+    return parse<T>(response, routeOf(method, path));
   };
 
   return {
@@ -213,34 +268,25 @@ export function createHttp(options: HttpOptions = {}): Http {
       const response = await request("GET", `${path}${queryString(query)}`, {
         headers: { accept: "application/json" },
       });
-      return parse<T>(response);
+      return parse<T>(response, routeOf("GET", path));
     },
 
-    async send<T>(method: Exclude<Method, "GET">, path: string, body?: unknown): Promise<T> {
-      const key = idempotencyKey();
-      const attempt = async (): Promise<Response> => {
-        const token = await csrfToken();
-        const headers: Record<string, string> = {
-          accept: "application/json",
-          "idempotency-key": key,
-        };
-        if (token !== undefined) headers["x-csrf-token"] = token;
-        if (body !== undefined) headers["content-type"] = "application/json";
-        return request(method, path, {
-          headers,
-          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        });
-      };
-      let response = await attempt();
-      // A new session (just signed in or out) needs a new token: fetch it once more.
-      if (response.status === 403) {
-        const error = await errorOf(response.clone());
-        if (/csrf/i.test(error.message)) {
-          csrf = undefined;
-          response = await attempt();
-        }
-      }
-      return parse<T>(response);
+    send<T>(method: Exclude<Method, "GET">, path: string, body?: unknown): Promise<T> {
+      return unsafe<T>(
+        method,
+        path,
+        body === undefined ? undefined : { body: JSON.stringify(body), type: "application/json" },
+      );
+    },
+
+    async blob(path: string, query?: Query): Promise<Blob> {
+      const response = await request("GET", `${path}${queryString(query)}`, {});
+      if (!response.ok) throw await errorOf(response);
+      return response.blob();
+    },
+
+    upload<T>(path: string, query: Query, body: Blob, type: string): Promise<T> {
+      return unsafe<T>("POST", `${path}${queryString(query)}`, { body, type });
     },
 
     forgetSession(): void {

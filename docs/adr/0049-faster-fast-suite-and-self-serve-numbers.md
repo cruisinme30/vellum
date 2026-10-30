@@ -35,9 +35,10 @@ Threads also stopped work to ask the coordinator for ADR and D numbers.
 
 ### D214: shard the quick UI layout check
 
-- The quick check runs as two matrix jobs, `--shard=N/2`, with four
-  workers each instead of the default two.
-- Expected: about 3 minutes instead of 8.6, at the cost of one more job
+- The quick check runs as four matrix jobs, `--shard=N/4`, with four
+  workers each instead of the default two. Two shards were enough for
+  334 tests, but the suite had grown to 962 by the same evening.
+- Expected: about 3 to 4 minutes per shard, at the cost of three more jobs
   per run.
 - Only "Fast suite" is a required check, so the renamed jobs need no
   ruleset change.

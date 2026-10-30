@@ -6,6 +6,7 @@ import { Link, useNavigate } from "react-router";
 
 import { failureText } from "../data/failure";
 import { useT } from "../i18n/i18n";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import type { DriveApi, NodeView, SpaceView } from "./api";
 import { DetailsPanel } from "./details-panel";
@@ -66,6 +67,7 @@ function ItemName({ api, node }: { readonly api: DriveApi; readonly node: NodeVi
       {problem !== undefined && (
         <small className="vl-field-error" role="alert">
           {problem}
+          <CopyDiagnostic message={problem} />
         </small>
       )}
     </>
@@ -195,6 +197,7 @@ export function ItemTable({
         {problem !== undefined && (
           <p className="vl-field-error" role="alert">
             {problem}
+            <CopyDiagnostic message={problem} />
           </p>
         )}
         {items.length === 0 ? (

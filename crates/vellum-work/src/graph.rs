@@ -165,7 +165,8 @@ pub struct Changes {
 }
 
 impl Changes {
-    pub(crate) fn merge(&mut self, other: Self) {
+    /// Adds what `other` changed, for a command made of several steps.
+    pub fn merge(&mut self, other: Self) {
         self.issues.extend(other.issues);
         self.removed_paths.extend(other.removed_paths);
         self.teams.extend(other.teams);
@@ -235,12 +236,21 @@ impl WorkGraph {
     /// # Errors
     ///
     /// Returns [`WorkError::UnknownTeam`] or the [`Team::check`] error.
-    pub fn update_team(&mut self, team: Team) -> Result<Changes> {
+    pub fn update_team(&mut self, mut team: Team) -> Result<Changes> {
         team.check()?;
         let old = self
             .teams
             .get(&team.key)
             .ok_or_else(|| WorkError::UnknownTeam(team.key.clone()))?;
+        if team.id != old.id {
+            return Err(WorkError::TeamConfig {
+                team: team.key.clone(),
+                reason: "the team ID cannot change".to_owned(),
+            });
+        }
+        // A settings file read before an issue was filed must not hand its
+        // number out again: numbers only grow.
+        team.last_number = team.last_number.max(old.last_number);
         let mut changes = Changes::default();
         diff_labels(
             Some(&team.key),
@@ -251,6 +261,36 @@ impl WorkGraph {
         let _ = changes.teams.insert(team.key.clone());
         let _ = self.teams.insert(team.key.clone(), team);
         Ok(changes)
+    }
+
+    /// Archives or restores a team (D303). An archived team keeps its
+    /// issues, keys and history but takes no new issues, by creation, a
+    /// triage rule or a move. Setting the state it already has changes
+    /// nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkError::UnknownTeam`].
+    pub fn set_team_archived(&mut self, key: &TeamKey, archived: bool) -> Result<Changes> {
+        let team = self
+            .teams
+            .get_mut(key)
+            .ok_or_else(|| WorkError::UnknownTeam(key.clone()))?;
+        let mut changes = Changes::default();
+        if team.archived != archived {
+            team.archived = archived;
+            let _ = changes.teams.insert(key.clone());
+        }
+        Ok(changes)
+    }
+
+    /// The team, refusing an archived one: it takes no new issues.
+    fn open_team(&self, key: &TeamKey) -> Result<&Team> {
+        let team = self.team_ref(key)?;
+        if team.archived {
+            return Err(WorkError::ArchivedTeam(key.clone()));
+        }
+        Ok(team)
     }
 
     /// Replaces the workspace-wide labels.
@@ -635,6 +675,8 @@ impl WorkGraph {
         let mut issue = self.draft_to_issue(draft, ctx)?;
         // Triage rules route the issue before it gets a number.
         let rule_name = self.route_by_rules(&mut issue, ctx)?;
+        // Checked after routing: a rule may point at an archived team.
+        let _ = self.open_team(&issue.team)?;
         let category = self
             .category_of(&issue)
             .ok_or_else(|| WorkError::UnknownStatus {
@@ -933,7 +975,7 @@ impl WorkGraph {
             return Ok(Changes::default());
         }
         let category = self.category_of(&before).unwrap_or(Category::Backlog);
-        let target = self.team_ref(to)?;
+        let target = self.open_team(to)?;
         let mut issue = before.clone();
         issue.state = target.workflow.map_from(&before.state, category);
         issue.team = to.clone();
@@ -1198,6 +1240,104 @@ impl WorkGraph {
         let mut changes = self.ensure_cycles(today)?;
         changes.merge(self.rollover(now, today));
         changes.merge(self.record_burn_up(today));
+        Ok(changes)
+    }
+
+    /// Sets or clears how often an issue repeats.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkError::UnknownIssue`] for an unknown issue,
+    /// and [`WorkError::Invalid`] when a repeat is set on an issue with no
+    /// due date (it would never fire).
+    pub fn set_repeat(
+        &mut self,
+        id: &IssueId,
+        repeat: Option<crate::recur::Repeat>,
+        now: OffsetDateTime,
+    ) -> Result<Changes> {
+        let issue = self.issue_ref(id)?;
+        if repeat == issue.repeat {
+            return Ok(Changes::default());
+        }
+        if let Some(r) = repeat.filter(|_| issue.due.is_none()) {
+            return Err(WorkError::Invalid {
+                what: "repeat",
+                value: r.to_string(),
+                reason: "a repeating issue needs a due date",
+            });
+        }
+        let issue = self
+            .issues
+            .get_mut(id)
+            .ok_or_else(|| WorkError::UnknownIssue(id.to_string()))?;
+        issue.repeat = repeat;
+        issue.updated_at = now;
+        let mut changes = Changes::default();
+        let _ = changes.issues.insert(*id);
+        Ok(changes)
+    }
+
+    /// Files the next issue of every repeating issue whose due date is
+    /// before today in its team's time zone, as `today_of` gives it (D224):
+    /// run every few minutes, that is 00:01 team time the day after. The copy keeps the team, title,
+    /// description, priority, estimate, assignee, labels, project and
+    /// milestone, starts in the team's default status and takes over the
+    /// repeat; the old issue keeps its history and stops repeating.
+    ///
+    /// # Errors
+    ///
+    /// As [`WorkGraph::create_issue`]; nothing changes for the issue that
+    /// failed, and earlier ones stay filed.
+    pub fn recur(
+        &mut self,
+        now: OffsetDateTime,
+        today_of: impl Fn(&Team) -> Date,
+        mut new_id: impl FnMut() -> IssueId,
+    ) -> Result<Changes> {
+        let due: Vec<(IssueId, crate::recur::Repeat, Date, Date)> = self
+            .issues
+            .values()
+            .filter_map(|i| {
+                let today = today_of(self.teams.get(&i.team)?);
+                Some((i.id, i.repeat?, i.due?, today))
+            })
+            .filter(|(_, _, due, today)| due < today)
+            .collect();
+        let mut changes = Changes::default();
+        for (id, repeat, due_on, today) in due {
+            let ctx = Ctx {
+                now,
+                today,
+                actor: None,
+            };
+            let ctx = &ctx;
+            let old = self.issue_ref(&id)?.clone();
+            let Some(team) = self.teams.get(&old.team) else {
+                continue;
+            };
+            let mut draft = NewIssue::new(new_id(), old.team.clone(), &old.title);
+            draft.body.clone_from(&old.body);
+            draft.state = Some(team.workflow.default.clone());
+            draft.priority = Some(old.priority);
+            draft.estimate = old.estimate;
+            draft.assignee.clone_from(&old.assignee);
+            draft.labels.clone_from(&old.labels);
+            draft.project = old.project;
+            draft.milestone = old.milestone;
+            draft.due = Some(repeat.next_on_or_after(due_on, ctx.today));
+            let next = draft.id;
+            changes.merge(self.create_issue(draft, ctx)?);
+            if let Some(i) = self.issues.get_mut(&next) {
+                i.repeat = Some(repeat);
+                i.creator.clone_from(&old.creator);
+            }
+            if let Some(i) = self.issues.get_mut(&id) {
+                i.repeat = None;
+                i.updated_at = ctx.now;
+            }
+            let _ = changes.issues.insert(id);
+        }
         Ok(changes)
     }
 }

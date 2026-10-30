@@ -98,6 +98,36 @@ pub struct ConnectionLimits {
     /// For HTTP/2, where the header timer does not apply, this is what
     /// frees a connection whose client only answers pings.
     pub idle_timeout: Duration,
+    /// The upload routes' path prefixes. A body sent there with a
+    /// `Content-Length` gets `body_timeout` plus the time to send that
+    /// many bytes at `upload_rate`, so a large file on a slow link
+    /// finishes; gaps are still bounded by `header_read_timeout` (D213).
+    pub upload_prefixes: &'static [&'static str],
+    /// The slowest average rate, in bytes a second, an upload is given
+    /// time for.
+    pub upload_rate: u64,
+}
+
+/// The most extra time an upload body is given.
+const MAX_UPLOAD_EXTRA: Duration = Duration::from_mins(30);
+
+impl ConnectionLimits {
+    /// The time a request body to `path` declaring `length` bytes may take.
+    #[must_use]
+    pub fn body_time(&self, path: &str, length: Option<u64>) -> Duration {
+        let upload = self.upload_prefixes.iter().any(|prefix| {
+            path.strip_prefix(prefix)
+                .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+        });
+        match length {
+            // The route's own body limit refuses a larger declared length
+            // before the body is read; the cap only bounds a lie.
+            Some(length) if upload && self.upload_rate > 0 => self.body_timeout.saturating_add(
+                Duration::from_secs(length / self.upload_rate).min(MAX_UPLOAD_EXTRA),
+            ),
+            _ => self.body_timeout,
+        }
+    }
 }
 
 impl Default for ConnectionLimits {
@@ -109,6 +139,8 @@ impl Default for ConnectionLimits {
             max_connections_per_ip: 0,
             body_timeout: Duration::from_mins(2),
             idle_timeout: Duration::from_mins(1),
+            upload_prefixes: &[],
+            upload_rate: 512 * 1024,
         }
     }
 }
@@ -372,10 +404,15 @@ fn per_connection(
         let busy = activity.begin();
         let (mut parts, body) = request.into_parts();
         let _ = parts.extensions.insert(ConnectInfo(peer));
+        let length = parts
+            .headers
+            .get(http::header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok());
         let body = axum::body::Body::new(Deadline::new(
             body,
             limits.header_read_timeout,
-            limits.body_timeout,
+            limits.body_time(parts.uri.path(), length),
         ));
         let router = router.clone();
         async move {
@@ -631,6 +668,28 @@ async fn redirect(request: Request) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn uploads_get_time_for_their_size() {
+        let limits = ConnectionLimits {
+            upload_prefixes: &["/api/v1/attachments"],
+            ..ConnectionLimits::default()
+        };
+        let base = limits.body_timeout;
+        let mib100 = 100 * 1024 * 1024;
+        assert_eq!(
+            limits.body_time("/api/v1/attachments/01J", Some(mib100)),
+            base + Duration::from_secs(200)
+        );
+        // Other routes, unknown lengths and lies keep their bounds.
+        assert_eq!(limits.body_time("/api/v1/books", Some(mib100)), base);
+        assert_eq!(limits.body_time("/api/v1/attachmentsX", Some(mib100)), base);
+        assert_eq!(limits.body_time("/api/v1/attachments/01J", None), base);
+        assert_eq!(
+            limits.body_time("/api/v1/attachments/01J", Some(u64::MAX)),
+            base + MAX_UPLOAD_EXTRA
+        );
+    }
 
     #[tokio::test]
     async fn redirects_keep_host_and_path() {
