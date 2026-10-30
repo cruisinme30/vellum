@@ -24,6 +24,70 @@ flowchart LR
   C --> H[Helm]
 ```
 
+## What each profile looks like {#shapes}
+
+::: tabs
+
+## Single
+
+```architecture
+Clients: Browser, Desktop app, MCP client
+Server: vellum serve
+Data: SQLite index, Data folder
+Browser -> vellum serve
+Desktop app -> vellum serve
+MCP client -> vellum serve
+vellum serve -> SQLite index
+vellum serve -> Data folder
+```
+
+One process holds every service. The index is an encrypted SQLite file
+and your pages are files in a local folder or a mounted volume.
+
+## Team
+
+```architecture
+Clients: Browser, Desktop app, MCP client
+Edge: Vellum
+Sidecars: Kroki, ClamAV
+Data: Postgres, MinIO
+Browser -> Vellum
+Desktop app -> Vellum
+MCP client -> Vellum
+Vellum -> Kroki
+Vellum -> ClamAV
+Vellum -> Postgres
+Vellum -> MinIO
+```
+
+`docker compose` runs Vellum next to Postgres, MinIO for content and
+Kroki for extra diagram types. Only Vellum publishes a port.
+
+## Org
+
+```architecture
+Clients: Browser, Desktop app, MCP client
+Edge: Ingress
+Replicas: Vellum A, Vellum B
+Data: Postgres primary, Postgres replica, Object store
+Browser -> Ingress
+Desktop app -> Ingress
+MCP client -> Ingress
+Ingress -> Vellum A
+Ingress -> Vellum B
+Vellum A -> Postgres primary
+Vellum B -> Postgres primary
+Postgres primary -> Postgres replica
+Vellum A -> Object store
+Vellum B -> Object store
+```
+
+The Helm chart runs at least two replicas on different nodes, one
+Postgres cluster per shard with a synchronous replica, and an object
+store. Live editing rooms are routed to one replica per document.
+
+:::
+
 ## What each profile promises
 
 ::: facts

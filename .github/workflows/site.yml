@@ -16,6 +16,8 @@ on:
       - "docs/**"
       - "scripts/ci/build-site.sh"
       - "scripts/ci/check-site.sh"
+      - "crates/vellum-render/**"
+      - "crates/vellum-format/**"
       - ".github/workflows/site.yml"
   push:
     branches: [main]
@@ -32,7 +34,7 @@ jobs:
   build:
     name: Build website
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -40,6 +42,15 @@ jobs:
           # Release tags, so each release's guides are published too (D257).
           fetch-depth: 0
           fetch-tags: true
+      # The rich blocks in the books are drawn by vellum-render's
+      # site_blocks example (ADR 0071, D309); build-site.sh builds it.
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: site
+          # Only develop and main save the cache, as in the CI workflow
+          # (ADR 0035, D138).
+          save-if: ${{ github.event_name == 'push' }}
       - name: Install mdBook
         run: |
           tarball="mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz"

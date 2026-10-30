@@ -9,6 +9,23 @@ vellum: 1
 Models write drafts, not pages. Unless you grant `write:direct`, every
 change a model makes lands as a **Draft** for a person to review.
 
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> Draft: a model proposes a change
+  Draft --> Accepted: Accept
+  Draft --> Edited: Edit then accept
+  Edited --> Accepted
+  Draft --> Discarded: Discard
+  Accepted --> [*]: becomes a new version of the page
+  Discarded --> [*]
+```
+
+::: info
+A model never gets more access than the person it acts for. With
+`write:draft`, the most a model can do is ask; you decide.
+:::
+
 ## Reviewing a draft {#review}
 
 Drafts appear in your Inbox and on the page as a banner. A draft names

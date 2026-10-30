@@ -9,6 +9,17 @@ vellum: 1
 Your pages are files, so you can edit them with any text editor,
 script or sync tool. Vellum notices the change and merges it.
 
+```mermaid
+flowchart LR
+  E[You edit a file in another app] --> W[Vellum notices the change]
+  W --> F[Finds the page by the id in its front matter]
+  F --> M{Same lines changed in Vellum too?}
+  M -- No --> P[Both changes merged into the page]
+  M -- Yes --> C[Vellum's text stays, yours is saved as a conflict copy]
+  P --> V[New version, everyone sees it live]
+  C --> V
+```
+
 ## How merging works {#merge}
 
 Vellum never lets the last write win. When a file changes outside

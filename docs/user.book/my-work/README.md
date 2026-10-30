@@ -11,6 +11,24 @@ from: your own task lists, tasks assigned to you in pages and comments,
 issues assigned to you, review requests and things you captured from
 email or Slack.
 
+```image
+src: assets/mywork.jpg
+alt: My Work showing Today's tasks from pages, issues and review requests in one list
+caption: Everything assigned to you, from every page, issue and review, in one list.
+```
+
+```mermaid
+flowchart LR
+  P[Tasks in pages] --> MW((My Work))
+  C[Tasks in comments] --> MW
+  I[Issues assigned to you] --> MW
+  R[Review requests] --> MW
+  Q[Quick-add, email and Slack] --> MW
+  MW --> T[Today]
+  MW --> U[Upcoming]
+  MW --> IN[Inbox]
+```
+
 ## Buckets {#buckets}
 
 ::: facts

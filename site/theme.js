@@ -37,11 +37,21 @@
     return root.dataset.theme || stored() || (system && system.matches ? "dark" : "light");
   }
 
+  // With no choice made, follow the system when it changes.
+  function follow() {
+    if (stored()) return;
+    root.dataset.theme = system.matches ? "dark" : "light";
+    render();
+  }
+
   // Before first paint: an explicit choice wins over the system setting.
   // mdBook reads its own key a moment later, so keep it in step; with no
   // choice, clear it so mdBook follows the system too.
+  // data-theme is always set, to the choice or else the system setting, so
+  // stylesheets that only follow the attribute (the rendered diagrams and
+  // callouts in the help books, ADR 0071) match the rest of the page.
   var choice = stored();
-  if (choice) root.dataset.theme = choice;
+  root.dataset.theme = choice || (system && system.matches ? "dark" : "light");
   // The toggle is shown from first paint, so it never shifts the bar in
   // later; without JavaScript it stays hidden, since it could not work.
   root.setAttribute("data-theme-toggle", "");
@@ -70,13 +80,33 @@
     render();
   }
 
+  // The site bar wraps when its text is long or the screen narrow; keep
+  // --vb-height at its real height, so a help book starts its sidebar and
+  // page below it (ADR 0071, D310). Set through the CSSOM, which the
+  // site's Content Security Policy allows.
+  // A help book also calls this straight after the bar is parsed, before
+  // first paint, so a bar taller than usual never shifts the page later.
+  var measured = false;
+  function measureBar() {
+    var bar = document.querySelector("header.vellum-site");
+    if (!bar) return;
+    root.style.setProperty("--vb-height", bar.offsetHeight + "px");
+    if (measured || !window.ResizeObserver) return;
+    measured = true;
+    new ResizeObserver(function () {
+      root.style.setProperty("--vb-height", bar.offsetHeight + "px");
+    }).observe(bar);
+  }
+  window.vellumMeasureBar = measureBar;
+
   function wire() {
     var buttons = document.querySelectorAll(".theme-toggle");
     for (var i = 0; i < buttons.length; i++) buttons[i].addEventListener("click", toggle);
+    measureBar();
     render();
   }
 
-  if (system && system.addEventListener) system.addEventListener("change", render);
+  if (system && system.addEventListener) system.addEventListener("change", follow);
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
   else wire();
 })();

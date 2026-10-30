@@ -14,6 +14,22 @@ vellum: 1
 - OpenID Connect (Google Workspace, Microsoft Entra ID, Okta, Keycloak and any other OIDC provider)
 - SAML 2.0
 
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant V as Vellum
+  participant P as Identity provider
+  B->>V: Sign in with Northstar SSO
+  V-->>B: redirect to the provider (state, PKCE)
+  B->>P: sign in, second factor
+  P-->>B: redirect back with a code
+  B->>V: code
+  V->>P: exchange the code for an ID token
+  P-->>V: ID token (email, name)
+  V->>V: check the issuer, audience and email domain
+  V-->>B: session cookie (HttpOnly, Secure, SameSite)
+```
+
 People turn on two-step verification in **Settings → Two-step
 verification**: an authenticator app, passkeys, or both, plus ten
 one-time recovery codes. In **Admin → Sign-in**, require it for admins
@@ -49,6 +65,16 @@ Servers that share one database (replicas) must share the identity key:
 set the same 64-hex-character `VELLUM_IDENTITY_KEY` on each of them.
 
 ## SCIM provisioning {#scim}
+
+```mermaid
+flowchart LR
+  IdP[Okta or Entra ID] -- create user --> S[/scim/v2/]
+  IdP -- deactivate user --> S
+  IdP -- group membership --> S
+  S --> U[Account without a password, signs in through the provider]
+  S --> X[Blocked: sessions and API tokens end, content stays]
+  S --> G[Group you can share with]
+```
 
 Turn on SCIM in **Admin → Sign-in → Provisioning** and paste the URL
 (`https://<your server>/scim/v2`) and token into your identity provider.

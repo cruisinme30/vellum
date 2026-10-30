@@ -146,49 +146,61 @@ body {
   background: var(--quote-bg);
 }
 
-/* The site bar from theme/header.hbs. It wraps on small screens. mdBook
-   pulls .page up by the menu bar's height to hide an invisible hover strip
-   that sits above the menu bar; the site bar takes that strip's place, so
-   it pushes back down and the strip is turned off. The menu bar still
-   comes back when the reader scrolls up. */
-.vellum-site + #mdbook-menu-bar-hover-placeholder {
+/* The site bar (site/bar.html, styled by bar.css) runs across the top of
+   every page, over the sidebar, as on the landing page and the docs home
+   (ADR 0071, D310). It is fixed, so the sidebar, the page and mdBook's own
+   menu bar start below it, at --vb-height, which theme.js keeps at the
+   bar's real height when its links wrap.
+   mdBook's invisible hover strip above the menu bar is turned off, and the
+   page no longer pulls itself up over it. */
+header.vellum-site {
+  position: fixed;
+  inset: 0 0 auto 0;
+}
+/* A chart's data table for screen readers is visually hidden; as a table
+   it ignores the 1 px width and would widen the page, so it is a block.
+   Card grids never ask for a column wider than the page, so they fit a
+   phone with large text. */
+.vl-render.vl-site-block table.vl-sr-only {
+  display: block;
+}
+.vl-render.vl-site-block :is(.vl-cards, .vl-pages) {
+  grid-template-columns: repeat(auto-fill, minmax(min(14em, 100%), 1fr));
+}
+/* Diagram labels may run a little past their box when the reader's font
+   is wider than the one the layout measured; show them whole. */
+.vl-site-block foreignObject {
+  overflow: visible;
+}
+.vellum-site ~ #mdbook-menu-bar-hover-placeholder {
   display: none;
 }
-.vellum-site {
-  /* Above mdBook's full-height previous and next arrows on wide screens,
-     which otherwise cover the end of the bar and swallow its clicks. */
-  position: relative;
-  z-index: 1;
-  margin-block-start: var(--menu-bar-height);
-  margin-inline: calc(0px - var(--page-padding));
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 20px;
-  padding: 10px var(--page-padding);
-  border-bottom: 1px solid var(--sidebar-spacer);
-  background: var(--sidebar-bg);
-  font-size: 1.4rem;
+.page-wrapper {
+  padding-block-start: var(--vb-height);
 }
-.vellum-site a {
-  color: var(--sidebar-fg);
-  text-decoration: none;
+.page {
+  margin-block-start: 0;
 }
-.vellum-site a:hover {
-  color: var(--links);
-  text-decoration: underline;
+.sidebar {
+  top: var(--vb-height);
 }
-.vellum-site .vellum-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-inline-end: 8px;
-  color: var(--fg);
-  font-size: 1.6rem;
-  font-weight: 500;
+#mdbook-menu-bar.sticky,
+#mdbook-menu-bar:hover,
+html.sidebar-visible #mdbook-menu-bar {
+  top: var(--vb-height) !important;
 }
-.vellum-site img {
-  display: block;
+html {
+  scroll-padding-top: calc(var(--vb-height) + var(--menu-bar-height));
+}
+/* The bar's own colours follow mdBook's theme class too, so a book that
+   mdBook shows in navy never gets a light bar. */
+.navy {
+  --vb-bg: #131314;
+  --vb-ink: #e3e3e3;
+  --vb-ink-2: #c4c7c5;
+  --vb-line: #333537;
+  --vb-line-strong: #444746;
+  --vb-primary: #a8c7fa;
 }
 
 /* WCAG 2.2 AA fixes for mdBook's default theme (#249). */
@@ -249,12 +261,16 @@ td > a {
   min-height: 24px;
 }
 
-/* Long titles and code wrap instead of spilling over the page or the next cell. */
+/* Long titles and code wrap instead of spilling over the page or the next
+   cell. Table cells break a word only when it cannot fit on its own line,
+   so short words such as "single" are never split across lines. */
 .chapter li a,
-td,
-th,
 td code {
   overflow-wrap: anywhere;
+}
+td,
+th {
+  overflow-wrap: break-word;
 }
 
 td code {
@@ -263,25 +279,14 @@ td code {
 
 /* Scrolling code blocks and tables take keyboard focus (build-site.sh adds tabindex). */
 pre > code:focus-visible,
-.table-wrapper:focus-visible {
+.table-wrapper:focus-visible,
+.vl-table-wrap:focus-visible,
+.vl-board:focus-visible {
   outline: 3px solid var(--links);
   outline-offset: 2px;
 }
 
-/* Other releases' guides in the site bar, and the feedback line at the
-   end of every page (ADR 0024, D257). */
-.vellum-versions {
-  display: inline-flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  margin-inline-start: auto;
-  color: var(--sidebar-fg);
-}
-.vellum-versions a[aria-current] {
-  font-weight: 600;
-  text-decoration: underline;
-}
+/* The feedback line at the end of every page (ADR 0024, D257). */
 .vellum-feedback {
   display: flex;
   flex-wrap: wrap;
@@ -302,40 +307,84 @@ pre > code:focus-visible,
   font-weight: 500;
 }
 
-/* One light and dark toggle for the whole site (D308) replaces mdBook's
-   menu of five themes, three of which were never recoloured. */
+/* One light and dark toggle for the whole site (D308), in the site bar,
+   replaces mdBook's menu of five themes, three of which were never
+   recoloured. */
 #mdbook-menu-bar #mdbook-theme-toggle {
   display: none;
 }
-.vellum-site .theme-toggle {
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid var(--searchbar-border-color);
-  border-radius: 50%;
+
+/* Rendered rich blocks (ADR 0071, D309, D311): diagrams, callouts, cards
+   and tabs drawn by vellum-render, themed by render.css. blocks.js turns
+   each tabs block into a row of tabs; printed, every tab shows. */
+.vl-render.vl-site-block {
+  font-size: 1.6rem;
+}
+/* Diagram labels: the renderer sized each box for 16 px text at a line
+   height of 1.5 with no paragraph margins; the book's own paragraph and
+   line-height rules must not reach inside. */
+.vl-site-block foreignObject {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.vl-site-block foreignObject p {
+  margin: 0;
+}
+/* mdBook re-indents the HTML it passes through, so the white space between
+   a label's tags would show as an empty first line in labels that keep
+   white space; collapsing it keeps the label in its box. */
+.vl-site-block foreignObject div[style*="break-spaces"] {
+  white-space: normal !important;
+}
+.vl-site-tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: -0.5em -1em 0.75em;
+  padding: 0 0.5em;
+  border-bottom: 1px solid var(--vl-outline-variant);
+}
+.vl-site-tab {
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 0;
+  border-bottom: 3px solid transparent;
   background: transparent;
-  color: var(--icons);
+  color: var(--vl-on-surface-variant, var(--fg));
+  font: inherit;
+  font-weight: 500;
   cursor: pointer;
 }
-/* At the end of the bar, after the version links when there are any. */
-.vellum-site .theme-toggle {
-  margin-inline-start: auto;
+.vl-site-tab[aria-selected="true"] {
+  border-bottom-color: var(--vl-primary);
+  color: var(--vl-primary);
 }
-.vellum-site .vellum-versions + .theme-toggle {
-  margin-inline-start: 0;
+.vl-site-tab:hover {
+  background: color-mix(in srgb, var(--vl-primary) 8%, transparent);
 }
-:root:not([data-theme-toggle]) .vellum-site .theme-toggle,
-.theme-toggle[aria-pressed="true"] .theme-moon,
-.theme-toggle:not([aria-pressed="true"]) .theme-sun {
-  display: none;
+.vl-site-tab:focus-visible {
+  outline: 3px solid var(--vl-primary);
+  outline-offset: -3px;
 }
-.vellum-site .theme-toggle:hover {
-  color: var(--icons-hover);
-  background: var(--theme-hover);
+.vl-site-tabs .vl-site-tab-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
-.vellum-site .theme-toggle:focus-visible {
-  outline: 3px solid var(--links);
-  outline-offset: 2px;
+@media print {
+  .vl-site-tablist {
+    display: none;
+  }
+  .vl-site-tabs .vl-tab[hidden] {
+    display: block;
+  }
+  .vl-site-tabs .vl-site-tab-heading {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+  }
 }

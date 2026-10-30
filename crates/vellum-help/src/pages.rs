@@ -659,6 +659,26 @@ pub static SUMMARIES: &[(Book, &str)] = &[
 pub static ASSETS: &[Asset] = &[
     Asset {
         book: Book::User,
+        path: "ai/assets/ai.jpg",
+        bytes: include_bytes!("../../../docs/user.book/ai/assets/ai.jpg"),
+    },
+    Asset {
+        book: Book::User,
+        path: "my-work/assets/mywork.jpg",
+        bytes: include_bytes!("../../../docs/user.book/my-work/assets/mywork.jpg"),
+    },
+    Asset {
+        book: Book::User,
+        path: "start/assets/editor.jpg",
+        bytes: include_bytes!("../../../docs/user.book/start/assets/editor.jpg"),
+    },
+    Asset {
+        book: Book::User,
+        path: "work/assets/board.jpg",
+        bytes: include_bytes!("../../../docs/user.book/work/assets/board.jpg"),
+    },
+    Asset {
+        book: Book::User,
         path: "writing/assets/request-path-dark.svg",
         bytes: include_bytes!("../../../docs/user.book/writing/assets/request-path-dark.svg"),
     },
