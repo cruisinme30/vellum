@@ -38,7 +38,9 @@ vellum-crypto = { path = "../vellum-crypto" }
 vellum-db = { path = "../vellum-db" }
 vellum-format = { path = "../vellum-format" }
 vellum-kernel.workspace = true
-yrs = { version = "0.28.0", features = ["sync"] }
+# Exact: protocol::UpdateGuard relies on the order in which yrs reads a v1
+# update; re-check its table of counts before moving this.
+yrs = { version = "=0.28.0", features = ["sync"] }
 
 [dev-dependencies]
 tempfile = "3"
