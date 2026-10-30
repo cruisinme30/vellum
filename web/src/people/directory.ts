@@ -4,7 +4,7 @@
 /**
  * The people directory (`GET /api/v1/directory`, D272): who can be given
  * access, shared with or restricted to. Groups join through
- * {@link combineDirectories} once their API exists.
+ * {@link combineDirectories} with {@link createHttpGroupDirectory}.
  */
 
 import type { Operations } from "../api/api.gen";
@@ -25,6 +25,19 @@ export function createHttpDirectory(http: Http): DirectoryApi {
       const found = await http.get<Operations["identity.directory"]["output"]>(
         "/api/v1/directory",
         { q: query },
+      );
+      return found.entries;
+    },
+  };
+}
+
+/** Named groups (`GET /api/v1/directory/groups`, D275), in the same entry shape. */
+export function createHttpGroupDirectory(http: Http): DirectoryApi {
+  return {
+    async search(query) {
+      const found = await http.get<Operations["groups.search"]["output"]>(
+        "/api/v1/directory/groups",
+        { q: query, limit: 8 },
       );
       return found.entries;
     },
