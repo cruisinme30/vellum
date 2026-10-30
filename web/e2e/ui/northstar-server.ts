@@ -6,7 +6,9 @@ import type { BrowserContext, Route } from "@playwright/test";
 import type {
   BookInfo,
   BookList,
+  GoogleView,
   IssueGroups,
+  ListsView,
   SectionDoc as SectionDocument,
   TeamsOut,
 } from "../../src/api/api.gen";
@@ -147,6 +149,13 @@ const READS: readonly (readonly [RegExp, unknown])[] = [
   [/^\/notifications\/preferences$/, PREFERENCES],
   [/^\/my-work$/, MY_WORK],
   [/^\/my-work\/settings$/, MY_WORK_SETTINGS],
+  [
+    /^\/task-lists$/,
+    {
+      lists: [{ doc: "P1", inbox: true, members: [], open: 2, owner: "priya", title: "Inbox" }],
+    } satisfies ListsView,
+  ],
+  [/^\/my-work\/google$/, { configured: false, connected: false } satisfies GoogleView],
   [/^\/work\/teams$/, { teams: [TEAM] } satisfies TeamsOut],
   [/^\/work\/issues$/, { groups: [{ issues: ISSUES }] } satisfies IssueGroups],
   [/^\/work\/comments$/, THREADS],
