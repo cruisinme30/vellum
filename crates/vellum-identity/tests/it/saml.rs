@@ -168,23 +168,27 @@ fn assertion_xml(c: &Claims) -> String {
         nb = c.not_before,
         audience = c.audience,
         email = c.email,
-        authn = c.authn_instant.as_deref().map_or_else(
-            String::new,
-            |at| format!("<saml:AuthnStatement \
+        authn =
+            c.authn_instant
+                .as_deref()
+                .map_or_else(String::new, |at| format!(
+                    "<saml:AuthnStatement \
                 AuthnInstant=\"{at}\"><saml:AuthnContext><saml:AuthnContextClas\
                 sRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:Auth\
-                nContextClassRef></saml:AuthnContext></saml:AuthnStatement>")
-        ),
+                nContextClassRef></saml:AuthnContext></saml:AuthnStatement>"
+                )),
     )
 }
 
 fn response_xml(status: &str, assertions: &str) -> String {
-    format!("<samlp:Response \
+    format!(
+        "<samlp:Response \
         xmlns:samlp=\"urn:oasis:names:tc:SAML:2.0:protocol\" ID=\"_r1\" \
         Version=\"2.0\" IssueInstant=\"2026-10-30T12:00:00Z\" \
         Destination=\"{ACS}\" \
         InResponseTo=\"{REQUEST}\"><samlp:Status><samlp:StatusCode \
-        Value=\"{status}\"/></samlp:Status>{assertions}</samlp:Response>")
+        Value=\"{status}\"/></samlp:Status>{assertions}</samlp:Response>"
+    )
 }
 
 struct TestIdp {
@@ -231,7 +235,8 @@ impl TestIdp {
         let canonical = exc_c14n(xml, target, None, &[]).unwrap();
         let digest =
             STANDARD.encode(sha2::Sha256::digest(canonical.as_bytes()));
-        let signature = format!("<ds:Signature \
+        let signature = format!(
+            "<ds:Signature \
             xmlns:ds=\"http://www.w3.org/2000/09/xmldsig#\"><ds:SignedInfo><ds:\
             CanonicalizationMethod \
             Algorithm=\"http://www.w3.org/2001/10/xml-exc-c14n#\"/><ds:Signatur\
@@ -243,7 +248,8 @@ impl TestIdp {
             rms><ds:DigestMethod \
             Algorithm=\"http://www.w3.org/2001/04/xmlenc#sha256\"/><ds:DigestVa\
             lue>{digest}</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:Sig\
-            natureValue>VALUE</ds:SignatureValue></ds:Signature>");
+            natureValue>VALUE</ds:SignatureValue></ds:Signature>"
+        );
         // Insert as the second child: after the Issuer or Status.
         let first = target.first_element_child().unwrap();
         let at = first.range().end;

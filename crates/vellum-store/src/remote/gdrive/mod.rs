@@ -552,7 +552,7 @@ fn child_path(prefix: Option<&BlobPath>, name: &str) -> Option<BlobPath> {
                 name,
                 error = %e,
                 "skipping file"
-            )
+            );
         })
         .ok()
 }

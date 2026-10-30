@@ -129,7 +129,7 @@ pub fn anchors(text: &str) -> Vec<String> {
                 Some((m, c))
                     if m == marker && count >= c && rest.is_empty() =>
                 {
-                    in_fence = None
+                    in_fence = None;
                 }
                 Some(_) => {}
             }

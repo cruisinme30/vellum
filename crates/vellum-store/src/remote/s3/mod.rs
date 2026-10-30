@@ -486,7 +486,7 @@ impl Inner {
         BlobPath::new(rel)
             .inspect_err(|e| {
                 tracing::debug!(error = %e, "skipping object with \
-                an invalid key")
+                an invalid key");
             })
             .ok()
     }

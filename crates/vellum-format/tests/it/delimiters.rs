@@ -59,7 +59,7 @@ fn in_context(content: &[Inline], (before, after): (&str, &str)) -> Document {
         match (all.last_mut(), inline) {
             (_, Inline::Text { text }) if text.is_empty() => {}
             (Some(Inline::Text { text: last }), Inline::Text { text }) => {
-                last.push_str(&text)
+                last.push_str(&text);
             }
             (_, inline) => all.push(inline),
         }

@@ -598,10 +598,10 @@ pub fn plain_text(inlines: &[Inline]) -> String {
             | Inline::Superscript { content }
             | Inline::Link { content, .. }
             | Inline::Image { alt: content, .. } => {
-                out.push_str(&plain_text(content))
+                out.push_str(&plain_text(content));
             }
             Inline::WikiLink { target, label } => {
-                out.push_str(label.as_deref().unwrap_or(target))
+                out.push_str(label.as_deref().unwrap_or(target));
             }
             Inline::Mention { handle } => {
                 out.push('@');

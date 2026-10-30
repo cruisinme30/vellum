@@ -21,7 +21,7 @@ pub fn merge_text(inlines: Vec<Inline>) -> Vec<Inline> {
         match (out.last_mut(), inline) {
             (_, Inline::Text { text }) if text.is_empty() => {}
             (Some(Inline::Text { text: last }), Inline::Text { text }) => {
-                last.push_str(&text)
+                last.push_str(&text);
             }
             // `<em>a</em><em>b</em>` reads as `<em>ab</em>`, and the
             // delimiters of two adjacent marks of a kind would run together
@@ -219,7 +219,7 @@ pub fn recognize(inlines: Vec<Inline>) -> Vec<Inline> {
         match inline {
             Inline::Text { text } => split_text(&text, &mut out),
             Inline::Link { .. } | Inline::Image { .. } => {
-                out.push(map_children(inline, unmark))
+                out.push(map_children(inline, unmark));
             }
             other => out.push(map_children(other, recognize)),
         }

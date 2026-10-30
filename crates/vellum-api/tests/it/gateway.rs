@@ -903,9 +903,16 @@ async fn graphql_covers_every_operation() -> TestResult {
         "{}",
         read.text
     );
-    let created = send(&gw, gql("mutation { notesCreate(input: {space: \
+    let created = send(
+        &gw,
+        gql(
+            "mutation { notesCreate(input: {space: \
         \"eng\", text: \"via graphql\", labels: [\"x\"]}) { id text } \
-        }", "Bearer full")?).await?;
+        }",
+            "Bearer full",
+        )?,
+    )
+    .await?;
     assert_eq!(
         created.body.pointer("/data/notesCreate/text"),
         Some(&json!("via graphql")),

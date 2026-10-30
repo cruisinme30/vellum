@@ -161,11 +161,11 @@ pub fn inline_text(inlines: &[Inline]) -> String {
             | Inline::Subscript { content }
             | Inline::Superscript { content }
             | Inline::Link { content, .. } => {
-                out.push_str(&inline_text(content))
+                out.push_str(&inline_text(content));
             }
             Inline::Image { alt, .. } => out.push_str(&inline_text(alt)),
             Inline::WikiLink { target, label } => {
-                out.push_str(label.as_deref().unwrap_or(target))
+                out.push_str(label.as_deref().unwrap_or(target));
             }
             Inline::Mention { handle } => {
                 out.push('@');

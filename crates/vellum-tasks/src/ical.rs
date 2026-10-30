@@ -242,7 +242,7 @@ impl Component {
                 parse_line(line).ok_or(IcalError::Line(index + 1))?;
             match property.name.as_str() {
                 "BEGIN" => {
-                    stack.push(Self::new(&property.value.to_ascii_uppercase()))
+                    stack.push(Self::new(&property.value.to_ascii_uppercase()));
                 }
                 "END" => {
                     let done = stack

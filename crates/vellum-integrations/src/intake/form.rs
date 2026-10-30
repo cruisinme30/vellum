@@ -192,7 +192,7 @@ impl Form {
                     }),
                 },
                 Target::Fact => {
-                    facts.push(Fact::new(field.label.clone(), value))
+                    facts.push(Fact::new(field.label.clone(), value));
                 }
             }
         }

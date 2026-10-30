@@ -52,7 +52,7 @@ impl WorkService {
         loop {
             match self.transact_once(actor.clone(), &mut f).await {
                 Err(e) if super::is_race(&e) && lost < super::ATTEMPTS => {
-                    lost += 1
+                    lost += 1;
                 }
                 other => return other,
             }

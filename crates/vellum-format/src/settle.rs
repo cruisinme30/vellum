@@ -25,13 +25,13 @@ pub fn blocks(blocks: &mut [Block], diagnostics: &mut Vec<Diagnostic>) {
     for block in blocks {
         match block {
             Block::Paragraph { content, .. } => {
-                settle(content, Place::Paragraph, diagnostics)
+                settle(content, Place::Paragraph, diagnostics);
             }
             Block::Heading { content, .. } => {
-                settle(content, Place::Heading, diagnostics)
+                settle(content, Place::Heading, diagnostics);
             }
             Block::BlockQuote { blocks: inner, .. } => {
-                self::blocks(inner, diagnostics)
+                self::blocks(inner, diagnostics);
             }
             Block::List(list) => {
                 for item in &mut list.items {

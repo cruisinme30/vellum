@@ -280,7 +280,7 @@ fn acme(
                 Ok(ok) => tracing::info!(event = ?ok, "acme"),
                 Err(err) => {
                     tracing::error!(error = ?err, "acme certificate renewal \
-                        failed")
+                        failed");
                 }
             }
         }

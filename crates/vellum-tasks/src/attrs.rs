@@ -240,8 +240,10 @@ mod tests {
 
     #[test]
     fn parses_bare_and_quoted_values() {
-        let attrs = Attrs::parse("{due=2026-11-03T15:00 \
-            rrule=\"FREQ=WEEKLY;BYDAY=MO\" note=\"a \\\"b\\\" \\\\\"}")
+        let attrs = Attrs::parse(
+            "{due=2026-11-03T15:00 \
+            rrule=\"FREQ=WEEKLY;BYDAY=MO\" note=\"a \\\"b\\\" \\\\\"}",
+        )
         .unwrap();
         assert_eq!(attrs.get("due"), Some("2026-11-03T15:00"));
         assert_eq!(attrs.get("rrule"), Some("FREQ=WEEKLY;BYDAY=MO"));

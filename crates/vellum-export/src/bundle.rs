@@ -67,7 +67,7 @@ async fn freeze(
                 {
                     match ports.live.collection(fence).await {
                         Ok(snapshot) => {
-                            *block = snapshot_block(&snapshot, as_of)
+                            *block = snapshot_block(&snapshot, as_of);
                         }
                         Err(error) => warnings.push(ExportWarning::new(
                             "collection",

@@ -781,7 +781,7 @@ impl Run<'_> {
                 state.when = state.when.or(when);
             }
             (TokenKind::Start, DateHit::Moment(m)) => {
-                state.start = Some(m.date())
+                state.start = Some(m.date());
             }
             (_, DateHit::Day(d, when)) => {
                 state.due_day = Some(d);

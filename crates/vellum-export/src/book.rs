@@ -239,7 +239,7 @@ fn plan<'a>(
                         }
                     }
                     BookItem::Part(title) => {
-                        steps.push(Step::Part(title.clone()))
+                        steps.push(Step::Part(title.clone()));
                     }
                     BookItem::Separator => {}
                 }
@@ -354,7 +354,7 @@ fn collect_block_refs(
                 );
             }
             Block::BlockQuote { blocks, .. } => {
-                collect_block_refs(blocks, prefix, label, refs)
+                collect_block_refs(blocks, prefix, label, refs);
             }
             Block::List(list) => {
                 for item in &list.items {

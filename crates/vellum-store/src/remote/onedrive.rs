@@ -716,7 +716,7 @@ impl Walk {
                             backend = BACKEND,
                             error = %e,
                             "skipping item"
-                        )
+                        );
                     }
                 }
             }

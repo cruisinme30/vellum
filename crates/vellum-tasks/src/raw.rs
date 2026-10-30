@@ -468,7 +468,7 @@ impl TasksService {
                     };
                     match found {
                         Some((_, object)) => {
-                            ms.object(handle, &list.info.id, object, &props)
+                            ms.object(handle, &list.info.id, object, &props);
                         }
                         None => ms.not_found(&href),
                     }

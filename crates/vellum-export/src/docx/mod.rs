@@ -473,7 +473,7 @@ impl<'a> Writer<'a> {
                 for block in blocks {
                     match block {
                         Node::Paragraph { spans, .. } => {
-                            self.styled_paragraph("Quote", spans)
+                            self.styled_paragraph("Quote", spans);
                         }
                         other => self.node(other, depth),
                     }
@@ -489,7 +489,7 @@ impl<'a> Writer<'a> {
                 w:color=\"C5C6D0\"/></w:pBdr></w:pPr></w:p>",
             ),
             Node::Callout { tone, blocks } => {
-                self.callout(*tone, blocks, depth)
+                self.callout(*tone, blocks, depth);
             }
             Node::Titled { title, blocks } => {
                 self.styled_paragraph("Subheading", title);
@@ -617,8 +617,10 @@ impl<'a> Writer<'a> {
             Some(name) => {
                 let id = self.next_bookmark;
                 self.next_bookmark += 1;
-                format!("<w:bookmarkStart w:id=\"{id}\" \
-                    w:name=\"{name}\"/>{runs}<w:bookmarkEnd w:id=\"{id}\"/>")
+                format!(
+                    "<w:bookmarkStart w:id=\"{id}\" \
+                    w:name=\"{name}\"/>{runs}<w:bookmarkEnd w:id=\"{id}\"/>"
+                )
             }
             None => runs,
         }
@@ -710,7 +712,7 @@ impl<'a> Writer<'a> {
                         );
                     }
                     Node::List { start, items } => {
-                        self.list(*start, items, depth + 1)
+                        self.list(*start, items, depth + 1);
                     }
                     other => self.node(other, depth + 1),
                 }
@@ -1030,9 +1032,11 @@ impl<'a> Writer<'a> {
         let id = self.next_drawing;
         self.next_drawing += 1;
         let svg_ext = svg_rel.map_or_else(String::new, |rel| {
-            format!("<a:extLst><a:ext \
+            format!(
+                "<a:extLst><a:ext \
                 uri=\"{{96DAC541-7B7A-43D3-8B79-37D633B846F1}}\"><asvg:svgBlip \
-                r:embed=\"{rel}\"/></a:ext></a:extLst>")
+                r:embed=\"{rel}\"/></a:ext></a:extLst>"
+            )
         });
         Some(format!(
             concat!(
@@ -1136,7 +1140,7 @@ impl<'a> Writer<'a> {
         for span in spans {
             match span {
                 Span::Text { text, style } => {
-                    text_run(text, *style, Some("Hyperlink"), out)
+                    text_run(text, *style, Some("Hyperlink"), out);
                 }
                 Span::Break => out.push_str("<w:r><w:br/></w:r>"),
                 other => {

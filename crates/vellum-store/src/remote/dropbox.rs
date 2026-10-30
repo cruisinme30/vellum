@@ -602,7 +602,7 @@ impl Inner {
                 backend = BACKEND,
                 error = %e,
                 "skipping file"
-            )
+            );
         };
         let path = BlobPath::new(rel).inspect_err(skip).ok()?;
         Some(file_meta(&path, meta).map(|m| BlobEntry {

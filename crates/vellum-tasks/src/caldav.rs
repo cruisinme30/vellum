@@ -330,7 +330,7 @@ fn scan_xml(body: &str) -> Result<XmlScan, DavError> {
                     path.last().map(|p| (p.ns.as_str(), p.name.as_str()));
                 match (ns.as_str(), local.as_str(), parent) {
                     (_, _, Some((NS_DAV, "prop"))) => {
-                        scan.props.push(name.clone())
+                        scan.props.push(name.clone());
                     }
                     (NS_DAV, "allprop", _) => scan.allprop = true,
                     (NS_DAV, "propname", _) => scan.propname = true,
@@ -661,7 +661,7 @@ impl Multistatus {
                 for name in wanted {
                     match known.iter().find(|(n, _)| n == name) {
                         Some((name, value)) => {
-                            write_value(&mut found, name, value)
+                            write_value(&mut found, name, value);
                         }
                         None => write_name(&mut missing, name),
                     }

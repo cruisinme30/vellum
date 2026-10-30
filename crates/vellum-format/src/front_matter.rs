@@ -264,7 +264,7 @@ pub fn write(front_matter: &FrontMatter, out: &mut String) {
             Ok(yaml) => out.push_str(&yaml),
             // A parsed mapping always serializes; keep the file valid anyway.
             Err(error) => {
-                tracing::error!(%error, "front matter could not be written")
+                tracing::error!(%error, "front matter could not be written");
             }
         },
         FrontMatter::Raw(raw) => {

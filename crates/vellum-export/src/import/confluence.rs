@@ -198,10 +198,12 @@ mod tests {
 
     #[test]
     fn titles_drop_the_space_name() {
-        let page = Html::parse_document("<html><head><title>Ops : \
+        let page = Html::parse_document(
+            "<html><head><title>Ops : \
             Restart</title></head><body><h1 id=\"title-heading\"><span \
             id=\"title-text\"> Ops : Restart the gateway \
-            </span></h1></body></html>");
+            </span></h1></body></html>",
+        );
         assert_eq!(title(&page).as_deref(), Some("Restart the gateway"));
     }
 }

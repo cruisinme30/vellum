@@ -193,7 +193,7 @@ fn safe_join(root: &Path, portable: &str) -> Option<PathBuf> {
         let mut comps = p.components();
         match (comps.next(), comps.next()) {
             (Some(Component::Normal(n)), None) if !part.contains('\\') => {
-                out.push(n)
+                out.push(n);
             }
             _ => return None,
         }

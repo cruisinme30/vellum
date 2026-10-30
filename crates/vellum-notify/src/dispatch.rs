@@ -90,16 +90,16 @@ impl<T: HttpTransport> Dispatcher<T> {
                     match filed {
                         Ok(()) => report.inbox += 1,
                         Err(error) => {
-                            tracing::warn!(%error, "inbox line not saved")
+                            tracing::warn!(%error, "inbox line not saved");
                         }
                     }
                 }
                 Channel::Push if step.not_before > now => report.held += 1,
                 Channel::Push => {
-                    self.push(user, notification, now, &mut report).await
+                    self.push(user, notification, now, &mut report).await;
                 }
                 Channel::Email if !self.store.email_enabled() => {
-                    report.email_skipped += 1
+                    report.email_skipped += 1;
                 }
                 Channel::Email => {
                     let queued = self.store.update(user, |state| {
@@ -114,7 +114,7 @@ impl<T: HttpTransport> Dispatcher<T> {
                     match queued {
                         Ok(()) => report.email_queued += 1,
                         Err(error) => {
-                            tracing::warn!(%error, "email not queued")
+                            tracing::warn!(%error, "email not queued");
                         }
                     }
                 }
@@ -182,7 +182,7 @@ impl<T: HttpTransport> Dispatcher<T> {
                     }
                 }
                 Outcome::Retry(_) | Outcome::Rejected => {
-                    report.push_failed += 1
+                    report.push_failed += 1;
                 }
             }
         }

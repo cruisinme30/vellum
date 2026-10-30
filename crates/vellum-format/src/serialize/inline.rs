@@ -192,7 +192,7 @@ impl Writer {
             }
             Inline::IssueKey { key } => self.out.push_str(key),
             Inline::Date { date } if date == "today" => {
-                self.out.push_str("@today")
+                self.out.push_str("@today");
             }
             Inline::Date { date } => self.out.push_str(date),
         }

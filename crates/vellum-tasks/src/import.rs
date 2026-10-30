@@ -853,10 +853,13 @@ mod tests {
         assert!(updated.starts_with(&text));
         assert!(updated.contains("\n\n- [ ] New {src=gtasks:e} ^blk-"));
         // A new subtask of a known task goes under it.
-        let child = more.replace(r#"{"id":"e","#, "{\"id\":\"f\",\"title\":\"Se\
+        let child = more.replace(
+            r#"{"id":"e","#,
+            "{\"id\":\"f\",\"title\":\"Se\
             cond \
             child\",\"status\":\"needsAction\",\"parent\":\"a\",\"position\":\"\
-            0015\"},{\"id\":\"e\",");
+            0015\"},{\"id\":\"e\",",
+        );
         let (nested, added) =
             append_new(&updated, &google_tasks(&child).unwrap()[0]).unwrap();
         assert_eq!(added, 1);

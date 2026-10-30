@@ -211,7 +211,7 @@ impl<'a> Writer<'a> {
                 attrs,
                 id,
             } => {
-                self.heading(*level, content, attrs, id.map(|b| b.to_string()))
+                self.heading(*level, content, attrs, id.map(|b| b.to_string()));
             }
             Block::ThematicBreak => self.out.push_str("<hr>"),
             Block::BlockQuote { blocks, id } => {

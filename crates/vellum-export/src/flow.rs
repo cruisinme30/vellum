@@ -479,7 +479,7 @@ pub fn plain_text(spans: &[Span]) -> String {
     for span in spans {
         match span {
             Span::Text { text, .. } | Span::Xref { text, .. } => {
-                out.push_str(text)
+                out.push_str(text);
             }
             Span::Link { spans, .. } => out.push_str(&plain_text(spans)),
             Span::Image { alt, .. } => out.push_str(alt),
@@ -571,7 +571,7 @@ impl Node {
                 items.iter().flat_map(|i| &i.blocks).for_each(|b| b.walk(f));
             }
             Self::Columns { columns } => {
-                columns.iter().flatten().for_each(|b| b.walk(f))
+                columns.iter().flatten().for_each(|b| b.walk(f));
             }
             _ => {}
         }
@@ -590,7 +590,7 @@ impl Node {
         }
         match self {
             Self::Heading { spans, .. } | Self::Paragraph { spans, .. } => {
-                runs(spans, f)
+                runs(spans, f);
             }
             Self::Titled { title, blocks } => {
                 runs(title, f);
@@ -608,7 +608,7 @@ impl Node {
                 .flat_map(|i| &mut i.blocks)
                 .for_each(|b| b.spans_mut(f)),
             Self::Columns { columns } => {
-                columns.iter_mut().flatten().for_each(|b| b.spans_mut(f))
+                columns.iter_mut().flatten().for_each(|b| b.spans_mut(f));
             }
             Self::Table(table) => table
                 .header
@@ -616,7 +616,7 @@ impl Node {
                 .chain(table.rows.iter_mut().flatten())
                 .for_each(|cell| runs(&mut cell.spans, f)),
             Self::Cards { cards } => {
-                cards.iter_mut().for_each(|card| runs(&mut card.spans, f))
+                cards.iter_mut().for_each(|card| runs(&mut card.spans, f));
             }
             _ => {}
         }

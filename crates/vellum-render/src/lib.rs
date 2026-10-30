@@ -264,13 +264,15 @@ fn kroki_fences(blocks: &[Block]) -> Vec<&Fence> {
                     out.push(f);
                 }
                 Block::BlockQuote { blocks, .. } => {
-                    walk(blocks, out, depth + 1)
+                    walk(blocks, out, depth + 1);
                 }
                 Block::List(l) => {
-                    l.items.iter().for_each(|i| walk(&i.blocks, out, depth + 1))
+                    l.items
+                        .iter()
+                        .for_each(|i| walk(&i.blocks, out, depth + 1));
                 }
                 Block::Container(c) => {
-                    c.sections.iter().for_each(|s| walk(s, out, depth + 1))
+                    c.sections.iter().for_each(|s| walk(s, out, depth + 1));
                 }
                 _ => {}
             }

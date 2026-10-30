@@ -94,7 +94,7 @@ pub fn verify(
                 );
             }
             "v1" => {
-                candidates.push(unhex(value).ok_or(SignatureError::Malformed)?)
+                candidates.push(unhex(value).ok_or(SignatureError::Malformed)?);
             }
             // Unknown schemes are ignored so a future v2 can be added.
             _ => {}

@@ -464,7 +464,7 @@ impl Writer<'_> {
             match child.node_type() {
                 NodeType::Element => self.element(child, false),
                 NodeType::Text => {
-                    html::text(&mut self.out, child.text().unwrap_or_default())
+                    html::text(&mut self.out, child.text().unwrap_or_default());
                 }
                 NodeType::Root | NodeType::Comment | NodeType::PI => {}
             }
@@ -699,10 +699,12 @@ mod tests {
 
     #[test]
     fn keeps_drawing_elements_and_prefixes_ids() {
-        let out = clean("<svg xmlns=\"http://www.w3.org/2000/svg\" id=\"m\" \
+        let out = clean(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" id=\"m\" \
             viewBox=\"0 0 10 10\"><defs><marker id=\"arrow\"><path d=\"M0 0L5 \
             5\"/></marker></defs><path d=\"M1 1\" \
-            marker-end=\"url(#arrow)\"/><use href=\"#arrow\"/></svg>");
+            marker-end=\"url(#arrow)\"/><use href=\"#arrow\"/></svg>",
+        );
         assert!(
             out.starts_with("<svg viewBox=\"0 0 10 10\" id=\"f1-root\""),
             "{out}"
@@ -714,12 +716,14 @@ mod tests {
 
     #[test]
     fn removes_scripts_handlers_and_external_links() {
-        let out = clean("<svg xmlns=\"http://www.w3.org/2000/svg\" \
+        let out = clean(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" \
             xmlns:xlink=\"http://www.w3.org/1999/xlink\"><script>alert(1)</scri\
             pt><a xlink:href=\"javascript:alert(1)\"><rect onload=\"alert(1)\" \
             width=\"5\"/></a><image href=\"https://evil.example/x.png\"/><use \
             href=\"https://evil.example/s.svg#a\"/><foreignObject><iframe \
-            src=\"x\"/><div>ok</div></foreignObject></svg>");
+            src=\"x\"/><div>ok</div></foreignObject></svg>",
+        );
         assert!(!out.contains("script"), "{out}");
         assert!(!out.contains("alert"), "{out}");
         assert!(!out.contains("evil"), "{out}");
@@ -730,12 +734,14 @@ mod tests {
 
     #[test]
     fn filters_and_scopes_css() {
-        let out = clean("<svg xmlns=\"http://www.w3.org/2000/svg\" \
+        let out = clean(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" \
             id=\"mermaid-1\"><style>@import url(https://evil.example/x.css); \
             #mermaid-1 .node rect{fill:#fff;stroke:var(--vl-outline)} \
             body{background:url(https://evil.example/t)} \
             .label{color:red;position:fixed} @media \
-            print{svg{display:none}}</style><rect class=\"node\"/></svg>");
+            print{svg{display:none}}</style><rect class=\"node\"/></svg>",
+        );
         assert!(!out.contains("evil"), "{out}");
         assert!(!out.contains('@'), "{out}");
         assert!(!out.contains("position"), "{out}");
@@ -750,8 +756,10 @@ mod tests {
 
     #[test]
     fn moves_var_colours_into_style() {
-        let out = clean("<svg xmlns=\"http://www.w3.org/2000/svg\"><rect \
-            fill=\"var(--vl-chart-1)\" stroke=\"#000\"/></svg>");
+        let out = clean(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\"><rect \
+            fill=\"var(--vl-chart-1)\" stroke=\"#000\"/></svg>",
+        );
         assert!(
             out.contains(
                 r##"<rect stroke="#000" style="fill:var(--vl-chart-1);">"##
@@ -780,9 +788,11 @@ mod tests {
 
     #[test]
     fn keeps_mathml() {
-        let out = clean("<math xmlns=\"http://www.w3.org/1998/Math/MathML\" \
+        let out = clean(
+            "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" \
             display=\"block\"><msub><mi>F</mi><mn>1</mn></msub><annotation \
-            encoding=\"application/x-tex\">F_1</annotation></math>");
+            encoding=\"application/x-tex\">F_1</annotation></math>",
+        );
         assert_eq!(
             out,
             "<math display=\"block\" id=\"f1-root\" \

@@ -397,7 +397,7 @@ impl Progress {
         self.issues = self.issues.saturating_add(1);
         match category {
             Category::Started => {
-                self.started = self.started.saturating_add(points)
+                self.started = self.started.saturating_add(points);
             }
             Category::Completed => {
                 self.completed = self.completed.saturating_add(points);
@@ -535,7 +535,7 @@ pub fn changes(before: &Project, after: &Project) -> Vec<ProjectChange> {
                     m.name.clone(),
                     old.target_date,
                     m.target_date,
-                ))
+                ));
             }
             Some(_) => {}
         }

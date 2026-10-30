@@ -307,7 +307,7 @@ fn items(
                     let n = out.len() + 1;
                     match item.blocks.first() {
                         Some(Block::Paragraph { content, .. }) => {
-                            out.push((n, content.clone()))
+                            out.push((n, content.clone()));
                         }
                         _ => problems.add(n, "list item has no text"),
                     }

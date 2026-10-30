@@ -458,11 +458,11 @@ impl WorkService {
             {
                 Ok(Some(_)) => {}
                 Ok(None) => {
-                    warn!(rev = claimed.rev, "a Work write outlived its lease")
+                    warn!(rev = claimed.rev, "a Work write outlived its lease");
                 }
                 Err(e) => {
                     warn!(rev = claimed.rev, error = %e, "Work journal entry \
-                        left pending")
+                        left pending");
                 }
             }
             if let Err(e) = written {
@@ -1798,7 +1798,7 @@ async fn load_one(
     match kind {
         Kind::Team => state.graph.insert_team(Team::from_yaml(path, text)?)?,
         Kind::Issue => {
-            state.graph.load_issue(Issue::from_markdown(path, text)?)?
+            state.graph.load_issue(Issue::from_markdown(path, text)?)?;
         }
         Kind::Cycle => state.graph.load_cycle(Cycle::from_yaml(path, text)?)?,
         Kind::Project => {
@@ -1812,7 +1812,7 @@ async fn load_one(
             let _ = state.views.insert(view.id, view);
         }
         Kind::Update | Kind::Initiative => {
-            state.planning.load(kind == Kind::Update, path, text)?
+            state.planning.load(kind == Kind::Update, path, text)?;
         }
         Kind::Other => {}
     }

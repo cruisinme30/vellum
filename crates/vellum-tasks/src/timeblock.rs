@@ -364,7 +364,7 @@ impl<'a> Planning<'a> {
         for task in ordered {
             match (&task.event, task.block) {
                 (None, Some(_)) => {
-                    self.steps.push(Step::Insert { task: task.clone() })
+                    self.steps.push(Step::Insert { task: task.clone() });
                 }
                 (Some(event), None) => {
                     if !self.settled.contains(event) {

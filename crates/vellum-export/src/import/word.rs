@@ -144,7 +144,7 @@ fn styles(xml: &str) -> HashMap<String, Style> {
                 }
             }
             Ok(Event::End(e)) if e.local_name().as_ref() == "style" => {
-                current = None
+                current = None;
             }
             Ok(Event::Eof) | Err(_) => break,
             _ => {}
@@ -213,7 +213,7 @@ fn numbering(xml: &str) -> Numbering {
                     "start" => {
                         start = attr(&e, "val")
                             .and_then(|v| v.parse().ok())
-                            .unwrap_or(1)
+                            .unwrap_or(1);
                     }
                     "numFmt" => {
                         if let (Some(a), Some(l)) = (&abstract_id, level) {
@@ -465,7 +465,7 @@ fn read_body(xml: &str) -> Result<Vec<Item>, String> {
                         }
                     }
                     "footnoteReference" | "endnoteReference" => {
-                        r.items.push(Item::Footnote)
+                        r.items.push(Item::Footnote);
                     }
                     "oMath" if !empty => {
                         r.math_depth += 1;
@@ -682,7 +682,7 @@ impl Convert<'_> {
                     Some(Style::Toc) => {}
                     Some(Style::Title) => self.heading(1, &para, &mut out),
                     Some(Style::Heading(level)) => {
-                        self.heading(level, &para, &mut out)
+                        self.heading(level, &para, &mut out);
                     }
                     Some(Style::Code) => {
                         let mut literal = plain(&para);
@@ -906,7 +906,7 @@ impl Convert<'_> {
                     continue;
                 }
                 Piece::Text(text, style, None) => {
-                    out.extend(styled(text, *style))
+                    out.extend(styled(text, *style));
                 }
                 Piece::Break => out.push(Inline::HardBreak),
                 Piece::Image { rel, alt } => match self.rels.get(rel) {

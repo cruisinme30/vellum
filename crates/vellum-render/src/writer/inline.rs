@@ -147,7 +147,7 @@ impl Writer<'_> {
                 }
             },
             Inline::WikiLink { target, label } => {
-                self.wikilink(target, label.as_deref())
+                self.wikilink(target, label.as_deref());
             }
             Inline::Mention { handle } => {
                 let name = self.resolver().mention(handle);

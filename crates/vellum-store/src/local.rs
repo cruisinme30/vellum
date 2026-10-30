@@ -369,7 +369,7 @@ fn to_blob_path(root: &Path, file: &Path) -> Option<BlobPath> {
             file = %file.display(),
             error = %e,
             "skipping file"
-        )
+        );
     };
     BlobPath::new(joined).inspect_err(skip).ok()
 }

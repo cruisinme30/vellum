@@ -640,7 +640,7 @@ impl TasksService {
                 let _ =
                     link.state.pushed.insert(event.clone(), task.fingerprint());
                 self.set_fields(user, &task.task, |f| {
-                    f.event = Some(event.clone())
+                    f.event = Some(event.clone());
                 })
                 .await?;
                 view.created += 1;
@@ -798,7 +798,11 @@ impl TasksService {
             match self.google_sync(user, NoInput {}).await {
                 Ok(_) => synced += 1,
                 Err(error) => {
-                    tracing::warn!(%error, %user, "Google Calendar sync failed")
+                    tracing::warn!(
+                        %error,
+                        %user,
+                        "Google Calendar sync failed"
+                    );
                 }
             }
         }

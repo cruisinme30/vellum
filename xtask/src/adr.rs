@@ -49,7 +49,7 @@ impl Taken {
             let value = value.trim().trim_matches('"');
             match key.trim() {
                 "decisions" => {
-                    self.decisions.extend(range(value.trim_start_matches('D')))
+                    self.decisions.extend(range(value.trim_start_matches('D')));
                 }
                 "adrs" => self.adrs.extend(range(value)),
                 _ => {}
@@ -105,7 +105,7 @@ fn new_record(args: &[String]) -> Result<(), String> {
                 issue = Some(value.trim_start_matches('#').to_owned());
             }
             other if slug.is_none() && is_slug(other) => {
-                slug = Some(other.to_owned())
+                slug = Some(other.to_owned());
             }
             _ => return Err(USAGE.to_owned()),
         }

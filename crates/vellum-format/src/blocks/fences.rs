@@ -133,7 +133,7 @@ impl Chart {
                 "ymin" => chart.ymin = number(value),
                 "ymax" => chart.ymax = number(value),
                 "legend" => {
-                    chart.legend = Some(matches!(value, "true" | "yes" | "on"))
+                    chart.legend = Some(matches!(value, "true" | "yes" | "on"));
                 }
                 "colors" | "colours" => chart.colors = list(value),
                 "source" => chart.source = Some(value.to_owned()),
@@ -235,7 +235,7 @@ impl Timeline {
                         title: (*title).to_owned(),
                         detail: Some(detail.join(" | "))
                             .filter(|d| !d.is_empty()),
-                    })
+                    });
                 }
                 _ => problems
                     .add(n, format!("expected `when | title`, found `{line}`")),
@@ -287,7 +287,7 @@ impl Roadmap {
                         roadmap.end = date(b.trim(), n, &mut problems);
                     }
                     None => {
-                        problems.add(n, "expected `range: <start> .. <end>`")
+                        problems.add(n, "expected `range: <start> .. <end>`");
                     }
                 }
                 continue;
@@ -531,7 +531,7 @@ fn csv_row(line: &str) -> Vec<String> {
             }
             '"' => quoted = !quoted,
             ',' if !quoted => {
-                cells.push(std::mem::take(&mut cell).trim().to_owned())
+                cells.push(std::mem::take(&mut cell).trim().to_owned());
             }
             c => cell.push(c),
         }

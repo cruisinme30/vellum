@@ -210,7 +210,7 @@ pub fn parse_manifest(text: &str) -> Manifest {
         {
             match field.strip_prefix("path:") {
                 Some(path) => {
-                    node.path = Some(markdown::unquote(path.trim()).to_owned())
+                    node.path = Some(markdown::unquote(path.trim()).to_owned());
                 }
                 None => node.extra.push(line.to_owned()),
             }

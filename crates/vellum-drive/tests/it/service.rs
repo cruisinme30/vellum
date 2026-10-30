@@ -507,9 +507,11 @@ async fn graphql_reads_and_writes_the_drive() -> TestResult {
         "POST",
         "/api/graphql",
         "alice",
-        gql("mutation { driveCreateSpace(input: {kind: shared_drive, slug: \
+        gql(
+            "mutation { driveCreateSpace(input: {kind: shared_drive, slug: \
             \"eng\", name: \"Engineering\"}) { id name } }"
-        .to_owned()),
+                .to_owned(),
+        ),
     )
     .await?;
     let space_id = field(&space, "/data/driveCreateSpace/id");
@@ -519,9 +521,11 @@ async fn graphql_reads_and_writes_the_drive() -> TestResult {
         "POST",
         "/api/graphql",
         "alice",
-        gql(format!("mutation {{ driveCreatePage(input: {{space_id: \
+        gql(format!(
+            "mutation {{ driveCreatePage(input: {{space_id: \
             \"{space_id}\", title: \"Notes\", body: \"hi\"}}) {{ id title kind \
-            }} }}")),
+            }} }}"
+        )),
     )
     .await?;
     let page_id = field(&page, "/data/driveCreatePage/id");
@@ -531,8 +535,10 @@ async fn graphql_reads_and_writes_the_drive() -> TestResult {
         "POST",
         "/api/graphql",
         "alice",
-        gql(format!("{{ driveRead(input: {{id: \"{page_id}\"}}) {{ content \
-            item {{ title }} }} }}")),
+        gql(format!(
+            "{{ driveRead(input: {{id: \"{page_id}\"}}) {{ content \
+            item {{ title }} }} }}"
+        )),
     )
     .await?;
     assert!(

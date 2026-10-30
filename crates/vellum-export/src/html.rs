@@ -174,7 +174,7 @@ impl Writer<'_> {
                     }
                     Some(_) => self.out.push_str("<ol>\n"),
                     None if tasks => {
-                        self.out.push_str("<ul class=\"tasks\">\n")
+                        self.out.push_str("<ul class=\"tasks\">\n");
                     }
                     None => self.out.push_str("<ul>\n"),
                 }
@@ -354,7 +354,7 @@ impl Writer<'_> {
             }
             Node::Toc { depth } => self.toc(*depth),
             Node::PageBreak => {
-                self.out.push_str("<div class=\"page-break\"></div>\n")
+                self.out.push_str("<div class=\"page-break\"></div>\n");
             }
         }
     }

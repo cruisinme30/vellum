@@ -360,7 +360,7 @@ impl Theme {
         match which {
             BuiltinTheme::Sepia => sepia_surfaces(&mut tokens, seed),
             BuiltinTheme::Dim => {
-                dim_surfaces(&mut tokens, &neutral, &neutral_variant)
+                dim_surfaces(&mut tokens, &neutral, &neutral_variant);
             }
             _ => {}
         }
