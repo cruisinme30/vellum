@@ -10,3 +10,20 @@ LICENSE linguist-generated=true
 LICENSES/** linguist-generated=true
 crates/vellum-contracts/src/blocks.rs linguist-generated=true
 web/src/editor/schema/blocks.gen.ts linguist-generated=true
+
+# Exempt from the 80-character line limit (ADR 0074, D320) because their
+# lines can't be wrapped: lockfiles, generated files, licence texts, and
+# test data whose exact bytes the tests compare. Fluent messages keep their
+# line breaks, so wrapping one would change the text people see.
+Cargo.lock line-length=off
+fuzz/Cargo.lock line-length=off
+**/pnpm-lock.yaml line-length=off
+.github/requirements/*.txt line-length=off
+LICENSE line-length=off
+LICENSES/** line-length=off
+crates/vellum-contracts/src/blocks.rs line-length=off
+**/*.gen.ts line-length=off
+**/*.gen.json line-length=off
+corpus/** line-length=off
+crates/*/tests/fixtures/** line-length=off
+web/src/i18n/*.ftl line-length=off

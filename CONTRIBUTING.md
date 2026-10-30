@@ -90,13 +90,20 @@ cargo xtask install-hooks
 
 This turns on the commit template and three git hooks: `commit-msg`
 checks the commit message, `pre-commit` checks the staged files in
-seconds (format, lint, types and secrets), and `pre-push`
+seconds (format, lint, types, line length and secrets), and `pre-push`
 runs `cargo xtask fast`, which mirrors every **Fast suite** check in CI
 and refuses the push if one fails. Run it by hand at any time:
 
 ```sh
 cargo xtask fast
 ```
+
+Lines stop at 80 characters in every file
+([ADR 0074](docs/adr/0074-line-length-80.md)). rustfmt and Prettier wrap
+code; split long strings and comments yourself.
+`scripts/ci/check-line-length.sh` lists what is still too long, and
+`cargo xtask install-hooks` sets `git blame` to skip the commit that
+reformatted the repo.
 
 A check whose tool is not installed fails the run, because a skipped check
 used to let failures reach CI unnoticed. Install every tool, at the

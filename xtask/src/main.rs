@@ -9,7 +9,7 @@
 //!   title, branch, description and linked-issue checks before a pull
 //!   request is opened.
 //! - `cargo xtask install-hooks` turns on the repository's git hooks and
-//!   commit template.
+//!   commit template, and makes `git blame` skip reformatting commits.
 //! - `cargo xtask relock` resolves `Cargo.lock` and `web/pnpm-lock.yaml`
 //!   conflicts after merging `develop`.
 //! - `cargo xtask boundaries` enforces the crate layering: every workspace
@@ -81,12 +81,14 @@ fn main() -> ExitCode {
     }
 }
 
-/// Points git at `.githooks` (commit-msg, pre-commit, pre-push) and at the
-/// commit template.
+/// Points git at `.githooks` (commit-msg, pre-commit, pre-push), at the
+/// commit template and at `.git-blame-ignore-revs`.
 fn install_hooks() -> Result<(), String> {
     for (key, value) in [
         ("core.hooksPath", ".githooks"),
         ("commit.template", ".gitmessage"),
+        // git blame skips the 80-column reformat (ADR 0074).
+        ("blame.ignoreRevsFile", ".git-blame-ignore-revs"),
     ] {
         let status = Command::new("git")
             .args(["config", key, value])

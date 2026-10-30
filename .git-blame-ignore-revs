@@ -1,0 +1,5 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# Commits that only reformat code. `git blame` skips them: GitHub reads this
+# file itself, and `cargo xtask install-hooks` sets blame.ignoreRevsFile.
