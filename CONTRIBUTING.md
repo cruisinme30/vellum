@@ -154,7 +154,18 @@ a list of what it could not check, and on success stamps the commit's tree. The
 `pre-push` hook refuses a push to those branches without the stamp and
 prints the command to run; rewording a commit keeps the stamp, any other
 change needs a new run. Pushes to other branches run the focused Fast
-suite as before, in the gate's container when cargo is not installed. On
+suite as before, in the gate's container when cargo is not installed.
+Then push with:
+
+```sh
+scripts/dev/push.sh develop          # or another branch; [<commit>] defaults to HEAD
+```
+
+It refuses without the stamp (a `--release` stamp for `main` and
+`chore/release-…`), and for `develop` while a **Fast suite** run is in
+progress there, unless you pass `--supersede`. A release branch is
+replaced with `--force-with-lease` against its current commit on GitHub.
+Claude sessions may push only this way. On
 a Mac without cargo, turn the hooks on with
 `git config core.hooksPath .githooks`.
 

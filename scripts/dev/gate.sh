@@ -613,6 +613,6 @@ if ! grep -qx 'mode=release' "${stamp_dir}/${tree}" 2>/dev/null || ((release)); 
   printf 'mode=%s\ncommit=%s\nbranch=%s\nstarted=%s\nrun=%s\n' \
     "${mode}" "${sha}" "${branch}" "${started_at}" "${run_id}" >"${stamp_dir}/${tree}"
 fi
-echo "Passed. Stamped tree ${tree:0:12} (${mode}); pushes of this tree may go ahead."
+echo "Passed. Stamped tree ${tree:0:12} (${mode}). Push it with: scripts/dev/push.sh <branch> ${sha:0:12}"
 exit 0
 }

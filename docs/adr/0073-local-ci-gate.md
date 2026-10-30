@@ -54,8 +54,11 @@ main or a release branch.
   pushed tree, and to main or `chore/release-*` without a `--release`
   stamp, and prints the command to run. Other branches still run the
   focused Fast suite, in the gate's container when cargo is missing.
-- The pre-commit hook stays at seconds: format, lint and type checks on
-  the staged files, and gitleaks on the staged diff.
+- `scripts/dev/push.sh <branch> [<commit>]` is the one way to push, and
+  the only one Claude sessions may use: it refuses without the stamp, and
+  for develop while a Fast suite run is in progress there (unless
+  `--supersede`); release branches are replaced with `--force-with-lease`
+  against their current SHA. The pre-commit hook checks only staged files.
 
 ## Alternatives
 
