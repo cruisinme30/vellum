@@ -6,7 +6,6 @@
 # and the release drills. Each stack has its own project name, port and
 # generated secrets under $STACK_STATE (default: a temp folder).
 #
-#   stack.sh has-serve IMAGE                 exit 0 if IMAGE has `vellum serve`
 #   stack.sh up IMAGE PROJECT PORT [KEK]     start and wait for /readyz;
 #                                            REPLICAS=2 adds a second
 #                                            Vellum on PORT+1
@@ -69,9 +68,6 @@ wait_ready() {
 command="${1:-}"
 shift || true
 case "${command}" in
-  has-serve)
-    docker run --rm "$1" serve --help >/dev/null 2>&1
-    ;;
   up)
     image="$1" project="$2" port="$3"
     write_env "${project}" "${image}" "${port}" "${4:-}"
@@ -109,7 +105,7 @@ case "${command}" in
     compose "$1" --profile replicas down --volumes --remove-orphans
     ;;
   *)
-    echo "usage: stack.sh has-serve IMAGE | up IMAGE PROJECT PORT [KEK] | up-deps PROJECT PORT [KEK]" >&2
+    echo "usage: stack.sh up IMAGE PROJECT PORT [KEK] | up-deps PROJECT PORT [KEK]" >&2
     echo "       | start-vellum PROJECT IMAGE PORT | compose PROJECT ARGS... | down PROJECT" >&2
     exit 2
     ;;

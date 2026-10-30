@@ -86,7 +86,8 @@ jobs:
     needs: changed
     if: needs.changed.outputs.run == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # Image build (25-30 min), the suites (about 10) and the gate's build.
+    timeout-minutes: 90
     permissions:
       contents: read
       actions: read # downloads the summaries of the last green nights
@@ -97,53 +98,50 @@ jobs:
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build the image
         run: docker buildx build --load -t vellum:ci -f deploy/docker/Dockerfile .
-      - name: Does the binary serve yet?
+      # Fails the job when the image cannot run, with docker's own error,
+      # instead of skipping the steps below and passing.
+      - name: The image runs
         id: serve
-        run: |
-          if deploy/compose/stack.sh has-serve vellum:ci; then
-            echo "ready=true" >>"${GITHUB_OUTPUT}"
-          else
-            echo "::notice::vellum has no serve command yet; the load test starts once it does."
-          fi
+        run: docker run --rm vellum:ci serve --help >/dev/null
       - name: Start the Team stack with two replicas
-        if: steps.serve.outputs.ready == 'true'
+        if: steps.serve.outcome == 'success'
         env:
           REPLICAS: "2"
         run: deploy/compose/stack.sh up vellum:ci nightly 7700
       - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
-        if: steps.serve.outputs.ready == 'true'
+        if: steps.serve.outcome == 'success'
         with:
           k6-version: ${{ env.K6_VERSION }}
       - name: Run the suite over both replicas
-        if: steps.serve.outputs.ready == 'true'
+        if: steps.serve.outcome == 'success'
         run: >-
           k6 run -e BASE_URLS=http://127.0.0.1:7700,http://127.0.0.1:7701
           -e SUMMARY=perf-summary.json deploy/perf/k6/suite.js
       - name: A write on one replica is read on the other
-        if: always() && steps.serve.outputs.ready == 'true'
+        if: always() && steps.serve.outcome == 'success'
         run: >-
           k6 run -e BASE_URLS=http://127.0.0.1:7700,http://127.0.0.1:7701
           -e SUMMARY=replicas-summary.json deploy/perf/k6/replicas.js
       - name: Hold up under attack (hostile k6)
-        if: always() && steps.serve.outputs.ready == 'true'
+        if: always() && steps.serve.outcome == 'success'
         run: >-
           k6 run -e BASE_URL=http://127.0.0.1:7700 -e DURATION=1m
           deploy/perf/k6/hostile.js
       - name: Hold up against slow and idle clients (slowloris, slow bodies, idle HTTP/2)
-        if: always() && steps.serve.outputs.ready == 'true'
+        if: always() && steps.serve.outcome == 'success'
         run: python3 deploy/perf/hostile/slow_clients.py http://127.0.0.1:7700
       - name: Every route within its latency budget
-        if: always() && steps.serve.outputs.ready == 'true'
+        if: always() && steps.serve.outcome == 'success'
         run: |
           token="$(deploy/perf/admin-token.sh http://127.0.0.1:7700)"
           echo "::add-mask::${token}"
           docker run --rm --network host -e VELLUM_TOKEN="${token}" vellum:ci \
             budgets --server http://127.0.0.1:7700
       - name: Install Rust for the gate
-        if: always() && steps.serve.outputs.ready == 'true'
+        if: always() && steps.serve.outcome == 'success'
         run: rustup toolchain install
       - name: Fetch the last five green nights
-        if: always() && steps.serve.outputs.ready == 'true'
+        if: always() && steps.serve.outcome == 'success'
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ github.token }}
@@ -158,13 +156,13 @@ jobs:
           # Only the suite's summary is a baseline; the artifact holds others.
           find perf-history -name '*.json' ! -name perf-summary.json -delete
       - name: No p95 grew 10 % or more over recent nights
-        if: always() && steps.serve.outputs.ready == 'true'
+        if: always() && steps.serve.outcome == 'success'
         run: >-
           cargo run --locked --package xtask -- perf-gate
           --baseline deploy/perf/baseline.json --history perf-history
           --current perf-summary.json
       - name: Keep the result as trend data
-        if: always() && steps.serve.outputs.ready == 'true'
+        if: always() && steps.serve.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: perf-summary-${{ github.run_id }}
@@ -173,7 +171,7 @@ jobs:
             replicas-summary.json
           retention-days: 90
       - name: Server logs
-        if: failure() && steps.serve.outputs.ready == 'true'
+        if: failure() && steps.serve.outcome == 'success'
         run: deploy/compose/stack.sh compose nightly --profile replicas logs --tail 300
 
   scanner:
@@ -232,7 +230,8 @@ jobs:
     needs: changed
     if: needs.changed.outputs.run == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # The image build alone takes 25 to 30 minutes.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -240,19 +239,16 @@ jobs:
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build the image
         run: docker buildx build --load -t vellum:ci -f deploy/docker/Dockerfile .
-      - name: Does the binary serve yet?
+      # Fails the job when the image cannot run, with docker's own error,
+      # instead of skipping the steps below and passing.
+      - name: The image runs
         id: serve
-        run: |
-          if deploy/compose/stack.sh has-serve vellum:ci; then
-            echo "ready=true" >>"${GITHUB_OUTPUT}"
-          else
-            echo "::notice::vellum has no serve command yet; the ZAP scan starts once it does."
-          fi
+        run: docker run --rm vellum:ci serve --help >/dev/null
       - name: Start the Team stack
-        if: steps.serve.outputs.ready == 'true'
+        if: steps.serve.outcome == 'success'
         run: deploy/compose/stack.sh up vellum:ci zap 7700
       - name: ZAP baseline scan
-        if: steps.serve.outputs.ready == 'true'
+        if: steps.serve.outcome == 'success'
         uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
           target: http://localhost:7700
@@ -345,24 +341,21 @@ jobs:
         run: |
           docker buildx build --load -t vellum:ci -f deploy/docker/Dockerfile .
           docker buildx build --load -t vellum-minio:ci deploy/compose/minio
-      - name: Does the binary serve yet?
+      # Fails the job when the image cannot run, with docker's own error,
+      # instead of skipping the steps below and passing.
+      - name: The image runs
         id: serve
-        run: |
-          if deploy/compose/stack.sh has-serve vellum:ci; then
-            echo "ready=true" >>"${GITHUB_OUTPUT}"
-          else
-            echo "::notice::vellum has no serve command yet; the chaos test starts once it does."
-          fi
+        run: docker run --rm vellum:ci serve --help >/dev/null
       - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
-        if: steps.serve.outputs.ready == 'true'
+        if: steps.serve.outcome == 'success'
         with:
           cluster_name: chaos
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-        if: steps.serve.outputs.ready == 'true'
+        if: steps.serve.outcome == 'success'
         with:
           version: v3.19.0
       - name: Install the Postgres Operator and Chaos Mesh
-        if: steps.serve.outputs.ready == 'true'
+        if: steps.serve.outcome == 'success'
         run: |
           kind load docker-image vellum:ci vellum-minio:ci --name chaos
           helm install postgres-operator postgres-operator \
@@ -373,10 +366,10 @@ jobs:
             --set chaosDaemon.runtime=containerd \
             --set chaosDaemon.socketPath=/run/containerd/containerd.sock
       - name: Run the faults under load
-        if: steps.serve.outputs.ready == 'true'
+        if: steps.serve.outcome == 'success'
         run: deploy/chaos/run.sh
       - name: Cluster state
-        if: failure() && steps.serve.outputs.ready == 'true'
+        if: failure() && steps.serve.outcome == 'success'
         run: |
           kubectl get pods -A -o wide
           kubectl get events --sort-by=.lastTimestamp | tail -80

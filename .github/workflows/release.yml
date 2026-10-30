@@ -701,16 +701,15 @@ jobs:
             docker buildx build --load -t "${image}" -f deploy/docker/Dockerfile .
           fi
           echo "image=${image}" >>"${GITHUB_OUTPUT}"
-      - name: Does the binary serve yet?
+      # Fails the job when the image cannot run, with docker's own error,
+      # instead of skipping the steps below and passing.
+      - name: The image runs
         id: serve
-        run: |
-          if deploy/compose/stack.sh has-serve "${{ steps.image.outputs.image }}"; then
-            echo "ready=true" >>"${GITHUB_OUTPUT}"
-          else
-            echo "::notice::vellum has no serve command yet; the drill starts once it does."
-          fi
+        env:
+          IMAGE: ${{ steps.image.outputs.image }}
+        run: docker run --rm "${IMAGE}" serve --help >/dev/null
       - name: Upgrade from each of the previous two releases
-        if: steps.serve.outputs.ready == 'true'
+        if: steps.serve.outcome == 'success'
         env:
           IMAGE: ${{ steps.image.outputs.image }}
           TAG: ${{ github.event_name == 'push' && github.ref_name || '' }}
@@ -724,5 +723,5 @@ jobs:
             deploy/drills/upgrade.sh "ghcr.io/${GITHUB_REPOSITORY}:${tag#v}" "${IMAGE}"
           done
       - name: Restore a backup into a scratch stack
-        if: steps.serve.outputs.ready == 'true'
+        if: steps.serve.outcome == 'success'
         run: deploy/drills/restore.sh "${{ steps.image.outputs.image }}"
