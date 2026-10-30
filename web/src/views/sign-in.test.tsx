@@ -76,6 +76,18 @@ describe("signing in against a server", () => {
     expect(session.signIn).toHaveBeenCalledWith("priya@northstar.dev", "correct horse");
   });
 
+  it("offers every sign-in provider, returning to the page asked for", async () => {
+    const okta = { id: "okta", name: "Okta", startUrl: "/auth/sso/start?provider=okta" };
+    const entra = { id: "entra", name: "Entra ID", startUrl: "/auth/sso/start?provider=entra" };
+    const status: AuthStatus = { ...SIGNED_OUT, sso: okta, providers: [okta, entra] };
+    renderApp("/sign-in?next=%2Fdata", undefined, undefined, fakeAuth(status));
+    const link = await screen.findByRole("link", { name: "Sign in with Okta" });
+    expect(link.getAttribute("href")).toBe("/auth/sso/start?provider=okta&next=%2Fdata");
+    expect(screen.getByRole("link", { name: "Sign in with Entra ID" }).getAttribute("href")).toBe(
+      "/auth/sso/start?provider=entra&next=%2Fdata",
+    );
+  });
+
   it("goes to sign-in without a next for the home page", async () => {
     const app = renderApp("/", undefined, undefined, fakeAuth(SIGNED_OUT));
     await screen.findByRole("heading", { name: "Sign in" });

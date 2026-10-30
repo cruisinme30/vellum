@@ -10,6 +10,7 @@ import { useT } from "../../i18n/i18n";
 
 import type { AdminSignInApi, SignInView } from "./api";
 import { AdminScreen } from "./context";
+import { ProvidersSection } from "./providers-section";
 
 type Submit = NonNullable<ComponentProps<"form">["onSubmit"]>;
 type Policy = SignInView["secondFactor"];
@@ -108,6 +109,14 @@ function SignIn({ api }: { readonly api: AdminSignInApi }) {
         onSaved={(next) => {
           setSaved(next);
           setNotice(t("admin-sign-in-saved"));
+        }}
+      />
+      <ProvidersSection
+        api={api}
+        view={view}
+        onChanged={(next, message) => {
+          setSaved(next);
+          setNotice(message);
         }}
       />
       <section aria-labelledby="admin-sign-in-tokens">

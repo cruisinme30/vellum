@@ -26,6 +26,8 @@ import type {
   GroupList,
   GroupMembersView,
   GroupView,
+  ProviderInput,
+  ProviderView,
   UsageCounts,
   SettingsView,
   SignInView,
@@ -109,6 +111,12 @@ export interface AdminSignInApi {
   resetFactors(userId: string): Promise<UserView>;
   /** Ends every session of one person. */
   signOutEverywhere(userId: string): Promise<number>;
+  /** Adds an OpenID Connect provider (ADR 0069, D292). */
+  addProvider(input: ProviderInput): Promise<ProviderView>;
+  /** Changes a provider; an absent client secret keeps the stored one. */
+  updateProvider(id: string, input: ProviderInput): Promise<ProviderView>;
+  /** Removes a provider and answers with the settings as they now are. */
+  removeProvider(id: string): Promise<SignInView>;
 }
 
 /** What an admin changes about an account; unset fields stay as they are. */
@@ -116,6 +124,8 @@ export interface UserChange {
   readonly name?: string;
   readonly admin?: boolean;
   readonly disabled?: boolean;
+  /** Lets an admin keep using a password while single sign-on is required. */
+  readonly breakGlass?: boolean;
 }
 
 /** A space's new name (unchanged when absent) and its full settings. */
@@ -208,6 +218,15 @@ export function createHttpAdminConsoleApi(http: Http): AdminConsoleApi {
         );
         return done.sessions;
       },
+      addProvider: (input) => http.send<ProviderView>("POST", `${ADMIN}/sign-in/providers`, input),
+      updateProvider: (id, input) =>
+        http.send<ProviderView>(
+          "PUT",
+          `${ADMIN}/sign-in/providers/${encodeURIComponent(id)}`,
+          input,
+        ),
+      removeProvider: (id) =>
+        http.send<SignInView>("DELETE", `${ADMIN}/sign-in/providers/${encodeURIComponent(id)}`),
     },
     tokens: {
       list: () => http.get<AdminTokenView[]>(`${ADMIN}/tokens`),
@@ -239,6 +258,8 @@ export function isConflict(error: unknown): boolean {
 
 export {
   type SignInView,
+  type ProviderInput,
+  type ProviderView,
   type AdminTokenView,
   type TokenPolicy,
   type GroupMembersView,

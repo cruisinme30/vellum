@@ -16,7 +16,8 @@
 //!   app ([`oauth`]).
 //! - **Break-glass**: a one-time code written to the data directory by
 //!   `vellum admin break-glass` opens a 15-minute administrator session.
-//! - **Single sign-on** with one `OpenID Connect` provider ([`sso`]):
+//! - **Single sign-on** with `OpenID Connect` providers ([`sso`]), set
+//!   in Admin → Sign-in ([`providers`]):
 //!   accounts link by provider user ID or verified email, and SSO
 //!   sessions are ordinary sessions, so they outlive a provider outage.
 //!
@@ -35,6 +36,7 @@ mod lockout;
 pub mod mfa;
 pub mod oauth;
 pub mod password;
+pub mod providers;
 pub mod seal;
 pub mod secret;
 pub mod service;

@@ -159,16 +159,21 @@ export function SignInView() {
   }
 
   const sso = session.status.sso ?? undefined;
+  const buttons = session.status.providers ?? (sso === undefined ? [] : [sso]);
+  const query = new URLSearchParams({ next }).toString();
   return (
     <AuthCard title={t("sign-in-title")} intro={t("sign-in-intro")}>
-      {sso !== undefined && (
+      {buttons.length > 0 && (
         <div className="vl-auth-sso">
-          <a
-            className="vl-filled-button"
-            href={`${sso.startUrl}${sso.startUrl.includes("?") ? "&" : "?"}${new URLSearchParams({ next }).toString()}`}
-          >
-            {t("sign-in-sso", { name: sso.name })}
-          </a>
+          {buttons.map((button) => (
+            <a
+              key={button.id ?? button.startUrl}
+              className="vl-filled-button"
+              href={`${button.startUrl}${button.startUrl.includes("?") ? "&" : "?"}${query}`}
+            >
+              {t("sign-in-sso", { name: button.name })}
+            </a>
+          ))}
           <p className="vl-muted vl-auth-or">{t("sign-in-or")}</p>
         </div>
       )}

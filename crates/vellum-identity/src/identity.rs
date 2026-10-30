@@ -19,6 +19,7 @@ use crate::lockout::{Key, Lockouts};
 use crate::mfa::{Proof, SignIn};
 use crate::oauth::{ClientMetadataFetcher, NoMetadataFetch, OAuthState};
 use crate::password;
+use crate::providers::{SsoCache, SsoHttpFactory};
 use crate::seal::Sealer;
 use crate::secret::{self, Kind, SecretHash};
 use crate::sso::{Sso, SsoIdentity};
@@ -167,6 +168,10 @@ pub struct UserView {
     /// Whether the account has an authenticator app or passkey.
     #[serde(default)]
     pub second_factor: bool,
+    /// Whether this admin may use a password when single sign-on is
+    /// required.
+    #[serde(default)]
+    pub break_glass: bool,
     /// When the account was created.
     pub created_at: Timestamp,
 }
@@ -182,6 +187,7 @@ impl From<&User> for UserView {
             disabled: user.disabled,
             has_password: user.password_hash.is_some(),
             second_factor: user.factors.any(),
+            break_glass: user.break_glass,
             created_at: user.created_at,
         }
     }
@@ -218,6 +224,8 @@ pub struct Identity {
     pub(crate) oauth: OAuthState,
     pub(crate) fetcher: Arc<dyn ClientMetadataFetcher>,
     sso: Option<Arc<Sso>>,
+    sso_http: Option<SsoHttpFactory>,
+    sso_cache: SsoCache,
 }
 
 impl std::fmt::Debug for Identity {
@@ -307,6 +315,8 @@ impl Identity {
             oauth: OAuthState::default(),
             fetcher: Arc::new(NoMetadataFetch),
             sso: None,
+            sso_http: None,
+            sso_cache: SsoCache::default(),
         }
     }
 
@@ -337,7 +347,22 @@ impl Identity {
         self
     }
 
-    /// The single sign-on provider, when one is configured.
+    /// Lets providers added in Admin → Sign-in call out, through `factory`.
+    #[must_use]
+    pub fn with_sso_http(mut self, factory: SsoHttpFactory) -> Self {
+        self.sso_http = Some(factory);
+        self
+    }
+
+    pub(crate) fn sso_http_factory(&self) -> Option<&SsoHttpFactory> {
+        self.sso_http.as_ref()
+    }
+
+    pub(crate) const fn sso_cache(&self) -> &SsoCache {
+        &self.sso_cache
+    }
+
+    /// The provider set by `VELLUM_OIDC_*`, when one is configured.
     #[must_use]
     pub const fn sso(&self) -> Option<&Arc<Sso>> {
         self.sso.as_ref()
@@ -363,6 +388,21 @@ impl Identity {
         let sso = self.sso.as_ref().ok_or_else(|| {
             Error::new(ErrorKind::Unavailable, "single sign-on is not configured")
         })?;
+        self.sso_sign_in_with(sso, found, user_agent)
+    }
+
+    /// [`Identity::sso_sign_in`] for a sign-in through `sso`, whose
+    /// settings decide who gets a new account.
+    ///
+    /// # Errors
+    ///
+    /// As [`Identity::sso_sign_in`].
+    pub fn sso_sign_in_with(
+        &self,
+        sso: &Sso,
+        found: &SsoIdentity,
+        user_agent: Option<&str>,
+    ) -> Result<NewSession, Error> {
         if self.needs_setup() {
             return Err(Error::new(
                 ErrorKind::Conflict,
@@ -430,6 +470,7 @@ impl Identity {
                 created_at: Timestamp::now(),
                 sso: vec![link.clone()],
                 factors: SecondFactors::default(),
+                break_glass: false,
             };
             let _ = s.users.insert(user.id, user.clone());
             Ok((user, true))
@@ -532,6 +573,7 @@ impl Identity {
             created_at: Timestamp::now(),
             sso: Vec::new(),
             factors: SecondFactors::default(),
+            break_glass: false,
         };
         self.store.write(|s| {
             if s.user_by_email(&user.email).is_some() {
@@ -650,6 +692,7 @@ impl Identity {
             }
             if let Some(admin) = admin {
                 user.admin = admin;
+                user.break_glass &= admin;
             }
             if let Some(disabled) = disabled {
                 user.disabled = disabled;
@@ -659,6 +702,31 @@ impl Identity {
                 s.revoke_user(id);
             }
             Ok(view)
+        })?
+    }
+
+    /// Makes an admin a break-glass admin, or not: one who may still sign
+    /// in with a password and a second factor when single sign-on is
+    /// required (D292).
+    ///
+    /// # Errors
+    ///
+    /// [`ErrorKind::NotFound`] for an unknown user, and
+    /// [`ErrorKind::InvalidInput`] for someone who is not an admin.
+    pub fn set_break_glass(&self, id: UserId, on: bool) -> Result<UserView, Error> {
+        self.store.write(|s| {
+            let user = s
+                .users
+                .get_mut(&id)
+                .ok_or_else(|| Error::new(ErrorKind::NotFound, "user not found"))?;
+            if on && !user.admin {
+                return Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    "only admins can be break-glass admins",
+                ));
+            }
+            user.break_glass = on;
+            Ok(UserView::from(&*user))
         })?
     }
 
@@ -759,6 +827,12 @@ impl Identity {
             return Err(Error::new(
                 ErrorKind::PermissionDenied,
                 "this account is disabled; ask an administrator",
+            ));
+        }
+        if self.store.read(|s| s.sign_in.require_sso) && !(user.admin && user.break_glass) {
+            return Err(Error::new(
+                ErrorKind::PermissionDenied,
+                "this workspace signs in with single sign-on; use the sign-in button",
             ));
         }
         if user
@@ -1377,6 +1451,7 @@ impl Identity {
                 created_at: Timestamp::now(),
                 sso: Vec::new(),
                 factors: SecondFactors::default(),
+                break_glass: false,
             };
             let id = user.id;
             let _ = s.users.insert(id, user);

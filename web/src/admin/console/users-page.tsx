@@ -170,6 +170,26 @@ function RowActions({ user, self, busy, onChange, onSignInHelp }: RowProperties)
       >
         {user.admin ? t("admin-users-demote") : t("admin-users-promote")}
       </button>
+      {user.admin && (
+        <button
+          type="button"
+          className="vl-text-button"
+          disabled={busy}
+          aria-label={t(
+            user.breakGlass === true
+              ? "admin-users-break-glass-off-label"
+              : "admin-users-break-glass-on-label",
+            { name: user.name },
+          )}
+          onClick={() => {
+            onChange({ breakGlass: user.breakGlass !== true });
+          }}
+        >
+          {user.breakGlass === true
+            ? t("admin-users-break-glass-off")
+            : t("admin-users-break-glass-on")}
+        </button>
+      )}
       <button
         type="button"
         className="vl-text-button"
@@ -217,6 +237,7 @@ function UserRow(properties: RowProperties) {
       <td>
         {user.hasPassword ? t("admin-users-by-password") : t("admin-users-by-sso")}
         {user.secondFactor === true && <div className="vl-muted">{t("admin-users-with-2fa")}</div>}
+        {user.breakGlass === true && <div className="vl-muted">{t("admin-users-break-glass")}</div>}
       </td>
       <td>{DAY.format(new Date(user.createdAt))}</td>
       <td>

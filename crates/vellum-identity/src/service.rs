@@ -19,7 +19,8 @@ use vellum_contracts::{
 use vellum_kernel::{Error, ErrorKind, Timestamp, UserId};
 
 use crate::identity::{Identity, UserView};
-use crate::store::{SecondFactorPolicy, SessionMethod};
+use crate::providers::SsoButton;
+use crate::store::SessionMethod;
 use crate::webauthn::Registration;
 
 /// How recent a sign-in admin actions and token creation need.
@@ -64,18 +65,10 @@ pub struct AuthStatus {
     pub credential: String,
     /// The caller's scopes.
     pub scopes: Vec<Scope>,
-    /// The single sign-on button, when a provider is configured.
+    /// The first single sign-on button, when a provider is configured.
     pub sso: Option<SsoButton>,
-}
-
-/// How the sign-in page offers single sign-on.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct SsoButton {
-    /// The provider's name, for "Sign in with {name}".
-    pub name: String,
-    /// Where the button goes; append `?next=<path>` to return there.
-    pub start_url: String,
+    /// Every single sign-on button, in order.
+    pub providers: Vec<SsoButton>,
 }
 
 /// The first administrator's details.
@@ -240,24 +233,6 @@ pub struct SignedOut {
     pub sessions: usize,
 }
 
-/// The workspace's sign-in rules, as Admin → Sign-in shows them.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct SignInView {
-    /// Who must use a second factor with a password.
-    pub second_factor: SecondFactorPolicy,
-    /// The longest expiry of new API tokens, in days, if capped.
-    pub max_token_days: Option<u32>,
-}
-
-/// Changes to the sign-in rules; absent fields stay as they are.
-#[derive(Debug, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct UpdateSignIn {
-    /// Who must use a second factor with a password.
-    pub second_factor: Option<SecondFactorPolicy>,
-}
-
 /// A connected `OAuth` app.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -303,6 +278,10 @@ pub struct UpdateUser {
     pub admin: Option<bool>,
     /// Block or allow sign-in. Blocking ends every session and token.
     pub disabled: Option<bool>,
+    /// Let an administrator keep signing in with a password while single
+    /// sign-on is required (break-glass).
+    #[serde(default, rename = "breakGlass")]
+    pub break_glass: Option<bool>,
 }
 
 /// An acknowledgement.
@@ -334,13 +313,6 @@ const fn credential_name(kind: CredentialKind) -> &'static str {
         CredentialKind::ApiToken => "api_token",
         CredentialKind::BreakGlass => "break_glass",
         CredentialKind::ShareLink => "share_link",
-    }
-}
-
-fn sign_in_view(identity: &Identity) -> SignInView {
-    SignInView {
-        second_factor: identity.second_factor_policy(),
-        max_token_days: identity.max_token_days(),
     }
 }
 
@@ -376,15 +348,14 @@ impl Service for IdentityService {
                 let id = Arc::clone(&id);
                 async move {
                     let user = ctx.principal.user_id().and_then(|u| id.user(u).ok());
+                    let buttons = id.sign_in_buttons();
                     Ok(AuthStatus {
                         needs_setup: id.needs_setup(),
                         user,
                         credential: credential_name(ctx.principal.kind()).to_owned(),
                         scopes: ctx.principal.scopes().iter().collect(),
-                        sso: id.sso().map(|sso| SsoButton {
-                            name: sso.config().display_name.clone(),
-                            start_url: "/auth/sso/start".to_owned(),
-                        }),
+                        sso: buttons.first().cloned(),
+                        providers: buttons,
                     })
                 }
             }
@@ -621,25 +592,6 @@ impl Service for IdentityService {
                 }
             }
         };
-        let admin_sign_in = {
-            let id = Arc::clone(id);
-            move |_: RequestContext, _: Empty| {
-                let id = Arc::clone(&id);
-                async move { Ok(sign_in_view(&id)) }
-            }
-        };
-        let admin_update_sign_in = {
-            let id = Arc::clone(id);
-            move |_: RequestContext, input: UpdateSignIn| {
-                let id = Arc::clone(&id);
-                async move {
-                    if let Some(policy) = input.second_factor {
-                        let _ = id.set_second_factor_policy(policy)?;
-                    }
-                    Ok(sign_in_view(&id))
-                }
-            }
-        };
         let apps = {
             let id = Arc::clone(id);
             move |ctx: RequestContext, _: Empty| {
@@ -697,7 +649,16 @@ impl Service for IdentityService {
             move |_: RequestContext, input: UpdateUser| {
                 let id = Arc::clone(&id);
                 async move {
-                    id.update_user(input.id, input.name.as_deref(), input.admin, input.disabled)
+                    let user = id.update_user(
+                        input.id,
+                        input.name.as_deref(),
+                        input.admin,
+                        input.disabled,
+                    )?;
+                    match input.break_glass {
+                        Some(on) => id.set_break_glass(input.id, on),
+                        None => Ok(user),
+                    }
                 }
             }
         };
@@ -877,23 +838,6 @@ impl Service for IdentityService {
             )
             .fresh_auth(FRESH_AUTH)
             .summary("End every session of one person"),
-            Operation::query(
-                "identity.admin_sign_in",
-                "/v1/admin/sign-in",
-                Scope::Admin,
-                admin_sign_in,
-            )
-            .fresh_auth(FRESH_AUTH)
-            .summary("The workspace's sign-in rules"),
-            Operation::mutation(
-                "identity.admin_update_sign_in",
-                HttpMethod::Patch,
-                "/v1/admin/sign-in",
-                Scope::Admin,
-                admin_update_sign_in,
-            )
-            .fresh_auth(FRESH_AUTH)
-            .summary("Change the workspace's sign-in rules"),
             Operation::query("identity.apps", "/v1/me/apps", Scope::Read, apps)
                 .summary("List apps you connected with OAuth"),
             Operation::mutation(
@@ -926,6 +870,9 @@ impl Service for IdentityService {
             .fresh_auth(FRESH_AUTH)
             .summary("Rename, promote, demote, block or unblock a user"),
         ]
+        .into_iter()
+        .chain(crate::providers::operations(id))
+        .collect()
     }
 
     fn readiness(&self) -> BoxFuture<'_, Readiness> {

@@ -249,7 +249,12 @@ enum Checked {
 impl Identity {
     /// Whether the workspace requires `user` to use a second factor.
     pub(crate) fn factor_required(&self, user: &User) -> bool {
-        self.store().read(|s| s.sign_in.second_factor).covers(user)
+        // Break-glass admins always need one while single sign-on is
+        // required: their password alone must not open the workspace.
+        self.store().read(|s| {
+            s.sign_in.second_factor.covers(user)
+                || (s.sign_in.require_sso && user.admin && user.break_glass)
+        })
     }
 
     /// The step after a correct password: a session, or a ticket for a

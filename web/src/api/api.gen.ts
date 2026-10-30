@@ -767,11 +767,15 @@ export interface AuthStatus {
    */
   needsSetup: boolean;
   /**
+   * Every single sign-on button, in order.
+   */
+  providers: SsoButton[];
+  /**
    * The caller's scopes.
    */
   scopes: Scope[];
   /**
-   * The single sign-on button, when a provider is configured.
+   * The first single sign-on button, when a provider is configured.
    */
   sso?: SsoButton | null;
   /**
@@ -4017,6 +4021,56 @@ export interface IdentityAddPasskeyFactorsView {
 }
 
 /**
+ * A provider as Admin → Sign-in shows it. Secrets are never returned.
+ */
+export interface IdentityAdminAddProviderProviderView {
+  /**
+   * Email domains whose people get an account on first sign-in.
+   */
+  allowedDomains: string[];
+  /**
+   * Whether a verified address with no account gets one.
+   */
+  autoCreate: boolean;
+  /**
+   * For OIDC, the client ID.
+   */
+  clientId?: string | null;
+  /**
+   * Whether the sign-in page offers it.
+   */
+  enabled: boolean;
+  /**
+   * For OIDC, whether a client secret is stored.
+   */
+  hasClientSecret: boolean;
+  /**
+   * The provider's ID.
+   */
+  id: string;
+  /**
+   * For OIDC, the issuer URL.
+   */
+  issuer?: string | null;
+  /**
+   * `oidc` or `saml`.
+   */
+  kind: string;
+  /**
+   * The button label.
+   */
+  name: string;
+  /**
+   * Set by environment variables: shown, not changed here.
+   */
+  readOnly: boolean;
+  /**
+   * Where its sign-in button goes.
+   */
+  startUrl: string;
+}
+
+/**
  * A user as the API shows it.
  */
 export interface IdentityAdminResetFactorsUserView {
@@ -4024,6 +4078,11 @@ export interface IdentityAdminResetFactorsUserView {
    * Whether the user administers the workspace.
    */
   admin: boolean;
+  /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
   /**
    * When the account was created.
    */
@@ -4059,6 +4118,90 @@ export interface IdentityAdminResetFactorsUserView {
 }
 
 /**
+ * A provider an admin adds or changes.
+ */
+export interface IdentityAdminUpdateProviderProviderInput {
+  /**
+   * Email domains whose people get an account on first sign-in.
+   */
+  allowedDomains?: string[];
+  /**
+   * Whether a verified address with no account gets one.
+   */
+  autoCreate?: boolean;
+  /**
+   * The client ID registered with the provider.
+   */
+  clientId: string;
+  /**
+   * A new client secret; absent keeps the stored one, empty removes it.
+   */
+  clientSecret?: string | null;
+  /**
+   * Whether the sign-in page offers it.
+   */
+  enabled?: boolean;
+  /**
+   * The issuer URL (`https`, or `http` on this machine for testing).
+   */
+  issuer: string;
+  /**
+   * The button label, 1 to 60 characters.
+   */
+  name: string;
+}
+
+/**
+ * A provider as Admin → Sign-in shows it. Secrets are never returned.
+ */
+export interface IdentityAdminUpdateProviderProviderView {
+  /**
+   * Email domains whose people get an account on first sign-in.
+   */
+  allowedDomains: string[];
+  /**
+   * Whether a verified address with no account gets one.
+   */
+  autoCreate: boolean;
+  /**
+   * For OIDC, the client ID.
+   */
+  clientId?: string | null;
+  /**
+   * Whether the sign-in page offers it.
+   */
+  enabled: boolean;
+  /**
+   * For OIDC, whether a client secret is stored.
+   */
+  hasClientSecret: boolean;
+  /**
+   * The provider's ID.
+   */
+  id: string;
+  /**
+   * For OIDC, the issuer URL.
+   */
+  issuer?: string | null;
+  /**
+   * `oidc` or `saml`.
+   */
+  kind: string;
+  /**
+   * The button label.
+   */
+  name: string;
+  /**
+   * Set by environment variables: shown, not changed here.
+   */
+  readOnly: boolean;
+  /**
+   * Where its sign-in button goes.
+   */
+  startUrl: string;
+}
+
+/**
  * A person's factors, as their settings page shows them.
  */
 export interface IdentityConfirmTotpFactorsView {
@@ -4088,6 +4231,11 @@ export interface IdentityCreateUserUserView {
    * Whether the user administers the workspace.
    */
   admin: boolean;
+  /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
   /**
    * When the account was created.
    */
@@ -4131,6 +4279,11 @@ export interface IdentitySetupUserView {
    */
   admin: boolean;
   /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
+  /**
    * When the account was created.
    */
   createdAt: Timestamp;
@@ -4173,6 +4326,11 @@ export interface IdentityUpdateMeUserView {
    */
   admin: boolean;
   /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
+  /**
    * When the account was created.
    */
   createdAt: Timestamp;
@@ -4214,6 +4372,11 @@ export interface IdentityUpdateUserUserView {
    * Whether the user administers the workspace.
    */
   admin: boolean;
+  /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
   /**
    * When the account was created.
    */
@@ -5390,6 +5553,100 @@ export interface PropertyKey {
    * The property's key.
    */
   key: string;
+}
+
+/**
+ * A provider, by ID in the path.
+ */
+export interface ProviderId {
+  /**
+   * The provider's ID.
+   */
+  id: string;
+}
+
+/**
+ * A provider an admin adds or changes.
+ */
+export interface ProviderInput {
+  /**
+   * Email domains whose people get an account on first sign-in.
+   */
+  allowedDomains?: string[];
+  /**
+   * Whether a verified address with no account gets one.
+   */
+  autoCreate?: boolean;
+  /**
+   * The client ID registered with the provider.
+   */
+  clientId: string;
+  /**
+   * A new client secret; absent keeps the stored one, empty removes it.
+   */
+  clientSecret?: string | null;
+  /**
+   * Whether the sign-in page offers it.
+   */
+  enabled?: boolean;
+  /**
+   * The issuer URL (`https`, or `http` on this machine for testing).
+   */
+  issuer: string;
+  /**
+   * The button label, 1 to 60 characters.
+   */
+  name: string;
+}
+
+/**
+ * A provider as Admin → Sign-in shows it. Secrets are never returned.
+ */
+export interface ProviderView {
+  /**
+   * Email domains whose people get an account on first sign-in.
+   */
+  allowedDomains: string[];
+  /**
+   * Whether a verified address with no account gets one.
+   */
+  autoCreate: boolean;
+  /**
+   * For OIDC, the client ID.
+   */
+  clientId?: string | null;
+  /**
+   * Whether the sign-in page offers it.
+   */
+  enabled: boolean;
+  /**
+   * For OIDC, whether a client secret is stored.
+   */
+  hasClientSecret: boolean;
+  /**
+   * The provider's ID.
+   */
+  id: string;
+  /**
+   * For OIDC, the issuer URL.
+   */
+  issuer?: string | null;
+  /**
+   * `oidc` or `saml`.
+   */
+  kind: string;
+  /**
+   * The button label.
+   */
+  name: string;
+  /**
+   * Set by environment variables: shown, not changed here.
+   */
+  readOnly: boolean;
+  /**
+   * Where its sign-in button goes.
+   */
+  startUrl: string;
 }
 
 /**
@@ -6601,9 +6858,25 @@ export type Severity = "warning" | "error";
  */
 export interface SignInView {
   /**
+   * How many enabled admins may still use a password (break-glass).
+   */
+  breakGlassAdmins: number;
+  /**
    * The longest expiry of new API tokens, in days, if capped.
    */
   maxTokenDays?: number | null;
+  /**
+   * The redirect URI to register with OIDC providers.
+   */
+  oidcCallbackUrl: string;
+  /**
+   * The identity providers, the environment's first.
+   */
+  providers: ProviderView[];
+  /**
+   * Whether passwords are refused, except for break-glass admins.
+   */
+  requireSso: boolean;
   /**
    * Who must use a second factor with a password.
    */
@@ -6822,15 +7095,19 @@ export interface Span {
 }
 
 /**
- * How the sign-in page offers single sign-on.
+ * A sign-in button.
  */
 export interface SsoButton {
+  /**
+   * The provider's ID.
+   */
+  id: string;
   /**
    * The provider's name, for "Sign in with {name}".
    */
   name: string;
   /**
-   * Where the button goes; append `?next=<path>` to return there.
+   * Where the button goes; append `&next=<path>` to return there.
    */
   startUrl: string;
 }
@@ -8188,6 +8465,20 @@ export interface UpdatePropertyInput {
 }
 
 /**
+ * A changed provider, with its ID in the path.
+ */
+export interface UpdateProvider {
+  /**
+   * The provider's ID.
+   */
+  id: string;
+  /**
+   * Its new settings.
+   */
+  provider: IdentityAdminUpdateProviderProviderInput;
+}
+
+/**
  * Changes some values of a row, and optionally its body.
  */
 export interface UpdateRowInput {
@@ -8236,6 +8527,10 @@ export interface UpdateSection {
  */
 export interface UpdateSignIn {
   /**
+   * Refuse passwords, except for break-glass admins.
+   */
+  requireSso?: boolean | null;
+  /**
    * Who must use a second factor with a password.
    */
   secondFactor?: SecondFactorPolicy | null;
@@ -8267,6 +8562,11 @@ export interface UpdateUser {
    * Grant or remove administrator rights.
    */
   admin?: boolean | null;
+  /**
+   * Let an administrator keep signing in with a password while single
+   * sign-on is required (break-glass).
+   */
+  breakGlass?: boolean | null;
   /**
    * Block or allow sign-in. Blocking ends every session and token.
    */
@@ -8466,6 +8766,11 @@ export interface UserView {
    * Whether the user administers the workspace.
    */
   admin: boolean;
+  /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
   /**
    * When the account was created.
    */
@@ -10599,6 +10904,20 @@ export interface Operations {
     input: AddPasskey;
     output: IdentityAddPasskeyFactorAdded;
   };
+  /** Add an OpenID Connect sign-in provider */
+  "identity.admin_add_provider": {
+    method: "POST";
+    path: "/v1/admin/sign-in/providers";
+    input: ProviderInput;
+    output: IdentityAdminAddProviderProviderView;
+  };
+  /** Remove a sign-in provider */
+  "identity.admin_remove_provider": {
+    method: "DELETE";
+    path: "/v1/admin/sign-in/providers/{id}";
+    input: ProviderId;
+    output: SignInView;
+  };
   /** Remove someone's second factors and end their sessions */
   "identity.admin_reset_factors": {
     method: "POST";
@@ -10613,7 +10932,7 @@ export interface Operations {
     input: ById;
     output: Done;
   };
-  /** The workspace's sign-in rules */
+  /** The workspace's sign-in rules and providers */
   "identity.admin_sign_in": {
     method: "GET";
     path: "/v1/admin/sign-in";
@@ -10640,6 +10959,13 @@ export interface Operations {
     path: "/v1/admin/tokens";
     input: Empty;
     output: Array_of_AdminTokenView;
+  };
+  /** Change a sign-in provider */
+  "identity.admin_update_provider": {
+    method: "PUT";
+    path: "/v1/admin/sign-in/providers/{id}";
+    input: UpdateProvider;
+    output: IdentityAdminUpdateProviderProviderView;
   };
   /** Change the workspace's sign-in rules */
   "identity.admin_update_sign_in": {
@@ -11435,12 +11761,15 @@ export const OPERATIONS = {
   "groups.search": { method: "GET", path: "/v1/directory/groups", mutation: false },
   "groups.update": { method: "PATCH", path: "/v1/admin/groups/{id}", mutation: true },
   "identity.add_passkey": { method: "POST", path: "/v1/me/second-factors/passkeys", mutation: true },
+  "identity.admin_add_provider": { method: "POST", path: "/v1/admin/sign-in/providers", mutation: true },
+  "identity.admin_remove_provider": { method: "DELETE", path: "/v1/admin/sign-in/providers/{id}", mutation: true },
   "identity.admin_reset_factors": { method: "POST", path: "/v1/admin/users/{id}/second-factors/reset", mutation: true },
   "identity.admin_revoke_token": { method: "DELETE", path: "/v1/admin/tokens/{id}", mutation: true },
   "identity.admin_sign_in": { method: "GET", path: "/v1/admin/sign-in", mutation: false },
   "identity.admin_sign_out": { method: "POST", path: "/v1/admin/users/{id}/sign-out", mutation: true },
   "identity.admin_token_policy": { method: "PUT", path: "/v1/admin/token-policy", mutation: true },
   "identity.admin_tokens": { method: "GET", path: "/v1/admin/tokens", mutation: false },
+  "identity.admin_update_provider": { method: "PUT", path: "/v1/admin/sign-in/providers/{id}", mutation: true },
   "identity.admin_update_sign_in": { method: "PATCH", path: "/v1/admin/sign-in", mutation: true },
   "identity.apps": { method: "GET", path: "/v1/me/apps", mutation: false },
   "identity.confirm_totp": { method: "POST", path: "/v1/me/second-factors/totp/confirm", mutation: true },

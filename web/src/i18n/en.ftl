@@ -903,6 +903,43 @@ admin-sign-in-tokens-uncapped = Personal API tokens may last as long as people c
 admin-sign-in-tokens-capped = Personal API tokens last at most { $days } days.
 admin-sign-in-tokens-link = Manage API tokens
 admin-users-with-2fa = With two-step verification
+admin-users-break-glass = Break-glass: may use a password while single sign-on is required
+admin-users-break-glass-on = Allow password
+admin-users-break-glass-off = Require SSO
+admin-users-break-glass-on-label = Let { $name } keep signing in with a password and a second factor while single sign-on is required
+admin-users-break-glass-off-label = Make { $name } sign in with single sign-on like everyone else
+admin-sso = Single sign-on
+admin-sso-callback = Register this redirect URI with each OpenID Connect provider:
+admin-sso-none = No sign-in providers yet. Add one below.
+admin-sso-caption = { $count ->
+    [one] One sign-in provider
+   *[other] { $count } sign-in providers
+}
+admin-sso-name = Name
+admin-sso-issuer = Issuer URL
+admin-sso-status = Status
+admin-sso-off = Off
+admin-sso-from-env = Set by the server's environment
+admin-sso-add = Add an OpenID Connect provider
+admin-sso-edit = Change { $name }
+admin-sso-edit-short = Change
+admin-sso-remove-label = Remove { $name }
+admin-sso-client-id = Client ID
+admin-sso-client-secret = Client secret
+admin-sso-secret-kept = Stored. Leave blank to keep it.
+admin-sso-domains = Email domains that get an account on first sign-in
+admin-sso-auto-create = Create accounts for verified addresses in these domains
+admin-sso-enabled = Show on the sign-in page
+admin-sso-saved = { $name } saved.
+admin-sso-removed = { $name } removed. People who used it keep their accounts.
+admin-sso-require-title = Require single sign-on
+admin-sso-require = Refuse passwords: everyone signs in through a provider
+admin-sso-require-hint = { $count ->
+    [0] No admin is marked break-glass, so nobody could sign in with a password if the provider is down.
+    [one] One break-glass admin can still sign in with a password and a second factor.
+   *[other] { $count } break-glass admins can still sign in with a password and a second factor.
+}
+admin-sso-require-users = Choose break-glass admins
 admin-users-sign-out = Sign out everywhere
 admin-users-sign-out-label = Sign { $name } out everywhere
 admin-users-sign-out-confirm = Sign { $name } out of every browser?
