@@ -113,10 +113,13 @@ versions CI uses, with:
 scripts/dev/install-tools.sh
 ```
 
-Cloud sessions get them from the environment's setup script, which runs
-`curl -sSfL
-https://raw.githubusercontent.com/cruisinme30/vellum/develop/scripts/dev/install-tools.sh |
-bash`. Set `VELLUM_ALLOW_MISSING_TOOLS=1` to skip a missing tool instead. The
+Cloud sessions get them from the environment's setup script, which runs:
+
+```sh
+curl -sSfL https://raw.githubusercontent.com/cruisinme30/vellum/develop/scripts/dev/install-tools.sh | bash
+```
+
+Set `VELLUM_ALLOW_MISSING_TOOLS=1` to skip a missing tool instead. The
 local run is focused: clippy, rustdoc and the Rust tests cover only the crates
 your branch changed, and the web and desktop unit tests only the files related
 to your changes, without the coverage gate. The batch pull request into develop
