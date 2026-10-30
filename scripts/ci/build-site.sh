@@ -147,16 +147,16 @@ html_escape() {
 #   - the sidebar toggle is a <label> carrying button ARIA: give it the role;
 #   - code blocks and tables that scroll sideways become focusable;
 #   - task-list checkboxes get a name;
-#   - mdBook's web fonts are dropped: they load without font-display, so
-#     text appears late and the page shifts (book.css uses the site's own
-#     fonts, which never swap in late);
+#   - mdBook's web fonts are dropped, on every page however deep: they
+#     load without font-display, so text appears late and the page shifts,
+#     and book.css uses the site's own fonts anyway (D307);
 #   - headings named like a JavaScript module global (exports, module,
 #     define, require) get a suffix: the browser exposes an element id as
 #     a window property, and mdBook's search and copy libraries then take
 #     the page for CommonJS and fail.
 fix_html() {
   find "$1" -name '*.html' -exec sed -i -E \
-    -e '/<link rel="stylesheet" href="fonts\/fonts-[0-9a-f]*\.css">/d' \
+    -e '/<link rel="stylesheet" href="([^"]*\/)?fonts\/fonts-[0-9a-f]*\.css">/d' \
     -e 's/<label id="mdbook-sidebar-toggle" /<label id="mdbook-sidebar-toggle" role="button" /' \
     -e 's/<pre([^>]*)><code( |>)/<pre\1><code tabindex="0"\2/g' \
     -e 's/<div class="table-wrapper">/<div class="table-wrapper" tabindex="0">/g' \
@@ -211,7 +211,9 @@ build_book() {
     mv "${page}" "${page%README.md}index.md"
   done
   mkdir -p "${dir}/theme"
-  cp "${root}/site/book.css" "${dir}/theme/vellum.css"
+  # book.css lands in <dest>/theme/, one folder below the book.
+  sed "s#@FONTS@#../${up}fonts/#g" "${root}/site/book.css" >"${dir}/theme/vellum.css"
+  sed "s#@ROOT@#${up}#g" "${root}/site/book-head.hbs" >"${dir}/theme/head.hbs"
   version_links "${name}" "${version}" >"${dir}/versions.html"
   awk -v links="${dir}/versions.html" '
     /@VERSIONS@/ { while ((getline line < links) > 0) print line; close(links); next }
@@ -273,7 +275,7 @@ build_guides() {
 
 rm -rf "${out}"
 mkdir -p "${out}/docs"
-cp "${root}/site/style.css" "${root}/site/favicon.svg" "${root}/site/install.sh" "${out}/"
+cp "${root}/site/style.css" "${root}/site/theme.js" "${root}/site/favicon.svg" "${root}/site/install.sh" "${out}/"
 cp -R "${root}/site/fonts" "${root}/site/img" "${root}/site/media" "${out}/"
 
 # build_decisions <adr-dir> <version>: the architecture decision records,

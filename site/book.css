@@ -4,29 +4,33 @@
  *
  * The look of the help books on the website (ADR 0027): Google Sans and
  * Google's Material 3 colours, matching the landing page. "light" is the
- * default theme and "navy" the dark one; both are recoloured. The fonts
- * are the site's own copies, three folders up from each book's theme/.
+ * default theme and "navy" the dark one; both are recoloured, and the
+ * site's light and dark toggle switches between them (D308). The fonts are
+ * the site's own copies; build-site.sh puts their path in for @FONTS@.
+ *
+ * mdBook sets html { font-size: 62.5% }, so 1rem is 10 px inside a book:
+ * sizes here are in those rems (1.7rem is 17 px), never in 16 px rems (D307).
  */
 
 @font-face {
   font-family: "Google Sans Flex";
   font-weight: 400 700;
-  font-display: optional;
-  src: url("../../../fonts/google-sans-flex-latin.woff2") format("woff2");
+  font-display: swap;
+  src: url("@FONTS@google-sans-flex-latin.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "Google Sans Flex";
   font-weight: 400 700;
-  font-display: optional;
-  src: url("../../../fonts/google-sans-flex-latin-ext.woff2") format("woff2");
+  font-display: swap;
+  src: url("@FONTS@google-sans-flex-latin-ext.woff2") format("woff2");
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
   font-family: "Google Sans Code";
   font-weight: 400 600;
-  font-display: optional;
-  src: url("../../../fonts/google-sans-code-latin.woff2") format("woff2");
+  font-display: swap;
+  src: url("@FONTS@google-sans-code-latin.woff2") format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
@@ -40,7 +44,7 @@ html {
 }
 
 body {
-  font-size: 1.0625rem;
+  font-size: 1.7rem;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
@@ -54,7 +58,7 @@ body {
 }
 
 .content h1 {
-  font-size: 2.4rem;
+  font-size: 3.6rem;
   line-height: 1.15;
 }
 
@@ -151,6 +155,10 @@ body {
   display: none;
 }
 .vellum-site {
+  /* Above mdBook's full-height previous and next arrows on wide screens,
+     which otherwise cover the end of the bar and swallow its clicks. */
+  position: relative;
+  z-index: 1;
   margin-block-start: var(--menu-bar-height);
   margin-inline: calc(0px - var(--page-padding));
   display: flex;
@@ -160,7 +168,7 @@ body {
   padding: 10px var(--page-padding);
   border-bottom: 1px solid var(--sidebar-spacer);
   background: var(--sidebar-bg);
-  font-size: 0.875rem;
+  font-size: 1.4rem;
 }
 .vellum-site a {
   color: var(--sidebar-fg);
@@ -176,7 +184,7 @@ body {
   gap: 8px;
   margin-inline-end: 8px;
   color: var(--fg);
-  font-size: 1rem;
+  font-size: 1.6rem;
   font-weight: 500;
 }
 .vellum-site img {
@@ -217,10 +225,19 @@ body {
 
 /* Site bar and sidebar links are at least 24 px tall, so stacked links
    keep the minimum target size (SC 2.5.8). */
-.vellum-site a,
-.chapter li a {
+.vellum-site a {
   display: inline-flex;
   align-items: center;
+  min-height: 24px;
+}
+
+/* A chapter link is the number and the title side by side. As a flex box
+   it would drop the space between them ("1.1.The editor"), so the gap
+   puts it back. */
+.chapter li a {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
   min-height: 24px;
 }
 
@@ -273,8 +290,52 @@ pre > code:focus-visible,
   margin-block: 3em 1em;
   padding-block-start: 1em;
   border-top: 1px solid var(--sidebar-spacer);
-  font-size: 0.875rem;
+  font-size: 1.4rem;
 }
 .vellum-feedback .vellum-edit {
   margin-inline-start: auto;
+}
+
+/* The book title in the menu bar: mdBook's weight 200 is too faint in
+   Google Sans Flex (D307). */
+.menu-title {
+  font-weight: 500;
+}
+
+/* One light and dark toggle for the whole site (D308) replaces mdBook's
+   menu of five themes, three of which were never recoloured. */
+#mdbook-menu-bar #mdbook-theme-toggle {
+  display: none;
+}
+.vellum-site .theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--searchbar-border-color);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--icons);
+  cursor: pointer;
+}
+/* At the end of the bar, after the version links when there are any. */
+.vellum-site .theme-toggle {
+  margin-inline-start: auto;
+}
+.vellum-site .vellum-versions + .theme-toggle {
+  margin-inline-start: 0;
+}
+:root:not([data-theme-toggle]) .vellum-site .theme-toggle,
+.theme-toggle[aria-pressed="true"] .theme-moon,
+.theme-toggle:not([aria-pressed="true"]) .theme-sun {
+  display: none;
+}
+.vellum-site .theme-toggle:hover {
+  color: var(--icons-hover);
+  background: var(--theme-hover);
+}
+.vellum-site .theme-toggle:focus-visible {
+  outline: 3px solid var(--links);
+  outline-offset: 2px;
 }

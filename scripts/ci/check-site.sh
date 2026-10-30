@@ -4,11 +4,14 @@
 #
 # Checks a built website (ADR 0027) before it is published:
 #   - the landing page and the docs home carry the Content Security Policy,
-#     run no scripts and use no inline styles, which that policy would block;
+#     run no script but the site's theme.js (the light and dark toggle,
+#     D308) and use no inline scripts or styles, which that policy blocks;
 #   - every image on them has alt text;
 #   - every local link and file they point to exists, and so does every
 #     link in the site bar at the top of each help book page;
 #   - the build left no placeholder unfilled, on any page;
+#   - every help book page has the light and dark toggle and loads only the
+#     site's own fonts, not mdBook's (D307, D308);
 #   - every help book page ends with the feedback and edit links (D257).
 #
 # Usage: scripts/ci/check-site.sh [site-dir] (default: _site)
@@ -57,7 +60,10 @@ for page in "${site}/index.html" "${site}/docs/index.html"; do
   fi
   html="$(cat "${page}")"
   grep -q 'http-equiv="Content-Security-Policy"' <<<"${html}" || fail "${name} has no Content-Security-Policy"
-  grep -qi '<script' <<<"${html}" && fail "${name} contains a script"
+  grep -qiE "script-src 'self'" <<<"${html}" || fail "${name} does not allow its theme script"
+  while IFS= read -r script; do
+    grep -qE '^<script src="(\.\./)?theme\.js"></script>$' <<<"${script}" || fail "${name} has a script other than theme.js: ${script}"
+  done < <(grep -oiE '<script[^>]*>(</script>)?' <<<"${html}")
   grep -qE '[[:space:]]style="' <<<"${html}" && fail "${name} has an inline style attribute"
   grep -qE '<!-- (BOOKS|COUNT:[a-z]+) -->' <<<"${html}" && fail "${name} has an unfilled placeholder"
   while IFS= read -r img; do
@@ -74,7 +80,9 @@ while IFS= read -r -d '' page; do
     continue
   fi
   check_links "${page}" "${bar}"
-  grep -qE '@(ROOT|DOCS|VERSIONS)@' "${page}" && fail "${page#"${site}"/} has an unfilled placeholder"
+  grep -qE '@(ROOT|DOCS|VERSIONS|FONTS)@' "${page}" && fail "${page#"${site}"/} has an unfilled placeholder"
+  grep -q 'class="theme-toggle"' <<<"${bar}" || fail "${page#"${site}"/} has no light and dark toggle"
+  grep -qE 'href="[^"]*fonts/fonts-[0-9a-f]+\.css"' "${page}" && fail "${page#"${site}"/} still loads mdBook's own fonts"
   case "${page}" in
     */decisions/*) ;;
     *) grep -q 'class="vellum-feedback"' "${page}" || fail "${page#"${site}"/} has no feedback links" ;;
