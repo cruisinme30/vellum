@@ -52,8 +52,12 @@ function Chart({
   const t = useT();
   const value = (r: Row) => (counting ? r.count : (r.p85 ?? 0));
   const max = Math.max(1, ...rows.map((r) => value(r)));
+  // The table scrolls sideways when zoomed or on a narrow screen. A region
+  // that scrolls must take keyboard focus, or keyboard users cannot reach
+  // the columns it hides (WCAG 2.1.1, axe `scrollable-region-focusable`).
   return (
-    <figure className="vl-plan-chart">
+    // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- see above
+    <figure className="vl-plan-chart" tabIndex={0}>
       <figcaption>{title}</figcaption>
       <table>
         <thead>
