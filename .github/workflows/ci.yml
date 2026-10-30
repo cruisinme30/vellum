@@ -23,6 +23,20 @@ on:
         type: boolean
         default: false
 
+# A newer run on the same pull request into develop cancels the older one
+# (Gourav, 2026-10-29), so a batch pull request has one live run. Edits to
+# the title or description wait instead, then check only the description.
+# Pushes to develop, release pull requests into main, the merge queue and
+# the full suite never cancel: each gets a group of its own.
+concurrency:
+  group: >-
+    ${{ github.event_name == 'pull_request' && github.base_ref == 'develop'
+    && format('fast-suite-pr-{0}', github.event.pull_request.number)
+    || format('fast-suite-{0}', github.run_id) }}
+  cancel-in-progress: >-
+    ${{ github.event_name == 'pull_request' && github.base_ref == 'develop'
+    && github.event.action != 'edited' }}
+
 permissions:
   contents: read
 

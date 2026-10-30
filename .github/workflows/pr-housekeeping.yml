@@ -21,6 +21,19 @@ on:
   # The pull request was already labelled; the merge group passes.
   merge_group:
 
+# A new push to a pull request into develop cancels its older Labels run.
+# Closing never cancels, so the Tracker always records it, and release
+# pull requests into main keep every run.
+concurrency:
+  group: >-
+    ${{ github.event_name == 'pull_request_target' && github.base_ref == 'develop'
+    && github.event.action != 'closed'
+    && format('housekeeping-pr-{0}', github.event.pull_request.number)
+    || format('housekeeping-{0}', github.run_id) }}
+  cancel-in-progress: >-
+    ${{ github.event_name == 'pull_request_target' && github.base_ref == 'develop'
+    && github.event.action == 'synchronize' }}
+
 permissions:
   contents: read
 
