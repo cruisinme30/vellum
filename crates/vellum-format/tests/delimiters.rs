@@ -226,3 +226,48 @@ fn delimiter_sources_round_trip() {
         }
     }
 }
+
+#[test]
+fn emphasis_soups_settle_to_what_their_text_reads() {
+    // Fuzzer finding (`format_roundtrip`): long `*` runs paired into bold
+    // around emphasis around bold, whose delimiters run together when
+    // written (`**?***-tle*****r`) and pair differently. The parser now
+    // keeps such markup as its canonical text reads.
+    let src = format!(
+        "{}?{}-tle{}r separately.\n",
+        "*".repeat(29),
+        "*".repeat(7),
+        "*".repeat(9)
+    );
+    let parsed = parse(&src);
+    assert!(
+        parsed
+            .diagnostics
+            .iter()
+            .any(|d| d.code == vellum_format::DiagnosticCode::AmbiguousMarkup)
+    );
+    let _ = assert_fixed_point(&src);
+}
+
+#[test]
+fn emphasis_delimiter_sources_round_trip() {
+    // Every short source built from `*` and `_` runs, word characters,
+    // punctuation and spaces.
+    let tokens = ["a", "?", " ", "*", "**", "***", "_", "__", "\\*"];
+    let mut src = String::new();
+    for &t1 in &tokens {
+        for &t2 in &tokens {
+            for &t3 in &tokens {
+                for &t4 in &tokens {
+                    for &t5 in &tokens {
+                        src.clear();
+                        for t in [t1, t2, t3, t4, t5] {
+                            src.push_str(t);
+                        }
+                        let _ = assert_fixed_point(&src);
+                    }
+                }
+            }
+        }
+    }
+}
