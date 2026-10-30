@@ -479,6 +479,25 @@ impl WorkService {
             .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("unknown team {}", i.team)))
     }
 
+    pub(crate) async fn get_team_settings(
+        &self,
+        _rc: RequestContext,
+        i: TeamRef,
+    ) -> Result<crate::api::TeamSettingsOut, Error> {
+        let st = self.read_state().await;
+        let key = Self::team_key(&st.graph, &i.team)?;
+        let team = st
+            .graph
+            .team(&key)
+            .ok_or_else(|| Error::new(ErrorKind::NotFound, format!("unknown team {}", i.team)))?;
+        let settings = serde_json::to_value(team)
+            .map_err(|e| Error::new(ErrorKind::Internal, format!("team {key}: {e}")))?;
+        Ok(crate::api::TeamSettingsOut {
+            settings,
+            yaml: team.to_yaml()?,
+        })
+    }
+
     pub(crate) async fn get_issue(
         &self,
         _rc: RequestContext,

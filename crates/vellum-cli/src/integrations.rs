@@ -343,6 +343,12 @@ impl WorkCommands for ServiceWork {
         self.work.read(|graph, _| steps::states(graph, team)).await
     }
 
+    async fn git_mapping(&self, team: &str) -> Result<Option<Mapping>, WorkError> {
+        self.work
+            .read(|graph, _| steps::git_mapping(graph, team))
+            .await
+    }
+
     async fn set_state(
         &self,
         key: &IssueKey,

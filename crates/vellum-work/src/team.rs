@@ -16,7 +16,7 @@ use crate::scale::EstimateScale;
 use crate::sla::SlaPolicy;
 use crate::template::Template;
 use crate::triage::TriageRule;
-use crate::workflow::Workflow;
+use crate::workflow::{StatusKey, Workflow};
 
 /// A team's key prefix, such as `ENG`.
 ///
@@ -111,6 +111,46 @@ impl Default for EstimateSettings {
     }
 }
 
+/// Which status each Git moment moves an issue to.
+///
+/// This is `git:` in `team.yaml` (R-WK-10). A moment left out does not move
+/// issues. When the whole block is absent, the integration's own mapping or
+/// its default applies.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GitMapping {
+    /// A branch naming the issue is pushed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch_pushed: Option<StatusKey>,
+    /// A pull request naming the issue is opened.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_opened: Option<StatusKey>,
+    /// Every open pull request is approved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_approved: Option<StatusKey>,
+    /// The closing pull request merged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_merged: Option<StatusKey>,
+    /// A pull request closed without merging.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_closed_unmerged: Option<StatusKey>,
+}
+
+impl GitMapping {
+    /// Every mapped status, with the moment's name.
+    pub fn statuses(&self) -> impl Iterator<Item = (&'static str, &StatusKey)> {
+        [
+            ("branch_pushed", &self.branch_pushed),
+            ("pr_opened", &self.pr_opened),
+            ("pr_approved", &self.pr_approved),
+            ("pr_merged", &self.pr_merged),
+            ("pr_closed_unmerged", &self.pr_closed_unmerged),
+        ]
+        .into_iter()
+        .filter_map(|(name, status)| status.as_ref().map(|s| (name, s)))
+    }
+}
+
 /// A team and everything it owns, stored as `teams/KEY/team.yaml`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -161,6 +201,9 @@ pub struct Team {
     /// Intake forms that let anyone file a well-formed triage issue.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub forms: Vec<crate::intake::IntakeForm>,
+    /// The Git automation mapping; `None` leaves it to the integration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git: Option<GitMapping>,
 }
 
 fn utc() -> String {
@@ -196,6 +239,7 @@ impl Team {
             labels: Vec::new(),
             templates: Vec::new(),
             forms: Vec::new(),
+            git: None,
         })
     }
 
@@ -224,6 +268,11 @@ impl Team {
         }
         if let Some(c) = &self.cycles {
             c.check().map_err(|r| fail(r.to_owned()))?;
+        }
+        for (moment, status) in self.git.iter().flat_map(GitMapping::statuses) {
+            if self.workflow.get(status).is_none() {
+                return Err(fail(format!("git {moment} names unknown status {status}")));
+            }
         }
         for (i, l) in self.labels.iter().enumerate() {
             if self.labels.iter().skip(i + 1).any(|m| m.same_name(l)) {

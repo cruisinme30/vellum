@@ -56,6 +56,9 @@ function fakeWork() {
     createView: notUsed,
     updateView: notUsed,
     deleteView: notUsed,
+    teamSettings: notUsed,
+    saveTeamSettings: notUsed,
+    createTeam: notUsed,
   };
 }
 
