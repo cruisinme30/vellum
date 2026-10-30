@@ -8,6 +8,7 @@ import { failureText } from "../data/failure";
 import { Ready, ServerScreen } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import { AccessPanel } from "./access-panel";
 import type { BookInfo, BooksApi, BookSummary, Place, TocLine } from "./api";
@@ -312,6 +313,7 @@ function Book({
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
       <div className="vl-book">

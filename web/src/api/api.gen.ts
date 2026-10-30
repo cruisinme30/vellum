@@ -937,6 +937,24 @@ export interface BackupSettings {
 export type BlockId = string;
 
 /**
+ * One fenced block to draw, as the editor holds it (ADR 0068, D286).
+ */
+export interface BlockInput {
+  /**
+   * The rest of the fence's opening line, such as `title="Launch"`.
+   */
+  args?: string;
+  /**
+   * The fence language, such as `mermaid` or `roadmap`.
+   */
+  lang: string;
+  /**
+   * The fence body.
+   */
+  source: string;
+}
+
+/**
  * The kind of a block, which shapes how its hit is shown.
  */
 export type BlockKind = "heading" | "paragraph" | "list_item" | "task" | "quote" | "code" | "table" | "callout" | "caption" | "property" | "other";
@@ -5959,6 +5977,30 @@ export interface RenameInput {
 }
 
 /**
+ * The stylesheet for rendered HTML inside the app.
+ */
+export interface RenderStylesheet {
+  /**
+   * CSS scoped to [`RENDER_SCOPE`]; the theme follows the app's
+   * `<html data-theme>`.
+   */
+  css: string;
+  /**
+   * The renderer version it matches.
+   */
+  render_version: number;
+  /**
+   * The class the app puts on the element that holds rendered HTML.
+   */
+  scope: string;
+}
+
+/**
+ * No input.
+ */
+export type RenderStylesheetNoInput = Record<string, never>;
+
+/**
  * Something on the page that rendered with a fallback.
  */
 export interface RenderWarning {
@@ -5970,6 +6012,29 @@ export interface RenderWarning {
    * What happened, for the author.
    */
   message: string;
+}
+
+/**
+ * One block drawn for the editor.
+ */
+export interface RenderedBlockView {
+  /**
+   * Sanitised HTML: one `<article class="vl-doc">` holding the block.
+   */
+  html: string;
+  /**
+   * The renderer version that produced it.
+   */
+  render_version: number;
+  /**
+   * Whether a diagram shows its last good picture because the diagram
+   * server was unavailable.
+   */
+  stale: boolean;
+  /**
+   * What fell back, for the author; empty when the block drew cleanly.
+   */
+  warnings: string[];
 }
 
 /**
@@ -11207,12 +11272,26 @@ export interface Operations {
     input: PreferencesView;
     output: PreferencesView;
   };
+  /** Draws one fenced block, such as a diagram, for the editor */
+  "render.block": {
+    method: "POST";
+    path: "/v1/render/block";
+    input: BlockInput;
+    output: RenderedBlockView;
+  };
   /** Renders a page as sanitised HTML for the reader */
   "render.page": {
     method: "GET";
     path: "/v1/pages/{id}/render";
     input: PageKey;
     output: RenderedPageView;
+  };
+  /** The theme stylesheet for rendered HTML shown inside the app */
+  "render.stylesheet": {
+    method: "GET";
+    path: "/v1/render/stylesheet";
+    input: RenderStylesheetNoInput;
+    output: RenderStylesheet;
   };
   /** A block with the heading section around it, for quoting and citations */
   "search.context": {
@@ -11862,7 +11941,9 @@ export const OPERATIONS = {
   "notify.push_unsubscribe": { method: "DELETE", path: "/v1/push/subscriptions", mutation: true },
   "notify.read": { method: "POST", path: "/v1/notifications/read", mutation: true },
   "notify.set_preferences": { method: "PUT", path: "/v1/notifications/preferences", mutation: true },
+  "render.block": { method: "POST", path: "/v1/render/block", mutation: true },
   "render.page": { method: "GET", path: "/v1/pages/{id}/render", mutation: false },
+  "render.stylesheet": { method: "GET", path: "/v1/render/stylesheet", mutation: false },
   "search.context": { method: "GET", path: "/v1/search/context/{doc_id}/{block_id}", mutation: false },
   "search.query": { method: "GET", path: "/v1/search", mutation: false },
   "search.titles": { method: "GET", path: "/v1/search/titles", mutation: false },

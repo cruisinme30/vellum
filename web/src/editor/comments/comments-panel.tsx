@@ -8,6 +8,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import type { ThreadOut } from "../../api/api.gen";
 import { failureText } from "../../data/failure";
 import { useT, type Translate } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 import { Icon } from "../../shell/icon";
 import type { CommentsApi } from "../../work/api";
 
@@ -151,6 +152,7 @@ export function CommentsPanel({
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
       <div className="vl-segmented" role="group" aria-label={t("comments-filter")}>
@@ -209,6 +211,7 @@ function ThreadsState({
     return (
       <p className="vl-field-error" role="alert">
         {loadError}
+        <CopyDiagnostic message={loadError} />
       </p>
     );
   }

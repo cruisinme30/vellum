@@ -7,6 +7,7 @@ import { useState, type ComponentProps } from "react";
 import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 import { Popover } from "../../shell/popover";
 import type { WorkApi } from "../../work/api";
 
@@ -112,6 +113,7 @@ export function FileIssue({
         {teams.state === "failed" && (
           <p className="vl-field-error" role="alert">
             {teams.message}
+            <CopyDiagnostic message={teams.message} />
           </p>
         )}
         {teams.state === "ready" && teams.value.length === 0 && (
@@ -141,6 +143,7 @@ export function FileIssue({
         {error !== undefined && (
           <p className="vl-field-error" role="alert">
             {error}
+            <CopyDiagnostic message={error} />
           </p>
         )}
       </form>

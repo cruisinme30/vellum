@@ -35,7 +35,9 @@ const VARIABLES: &[(&str, &str)] = &[
     ("titleColor", "on-surface"),
     ("clusterBkg", "surface-container-low"),
     ("clusterBorder", "outline-variant"),
-    ("edgeLabelBackground", "surface-container"),
+    // Edge labels take the node text colour, so they sit on the node fill:
+    // on-primary-container on surface-container fails in high contrast.
+    ("edgeLabelBackground", "primary-container"),
     ("noteBkgColor", "warn-container"),
     ("noteTextColor", "on-warn-container"),
     ("noteBorderColor", "warn"),
@@ -173,6 +175,32 @@ mod tests {
     use crate::sanitize::xml::sanitize_island;
 
     const DEADLINE: Duration = Duration::from_secs(10);
+
+    /// Mermaid draws every label in `primaryTextColor`, edge labels too, so
+    /// the edge label background must be a surface that colour is readable
+    /// on, in every theme. It was `surface-container`, which failed in High
+    /// contrast (white on light grey), found by the app's UI tests (#522).
+    #[test]
+    fn edge_labels_are_readable_in_every_theme() {
+        let token = |var: &str| {
+            VARIABLES
+                .iter()
+                .find(|(v, _)| *v == var)
+                .map(|(_, t)| *t)
+                .unwrap()
+        };
+        let text = token("primaryTextColor");
+        let behind = token("edgeLabelBackground");
+        for which in BuiltinTheme::ALL {
+            let theme = Theme::builtin(which);
+            let ratio = theme.get(text).contrast(theme.get(behind));
+            assert!(
+                ratio >= 4.5,
+                "{}: {text} on {behind} is {ratio:.2}",
+                which.id()
+            );
+        }
+    }
 
     #[test]
     fn renders_and_rethemes_a_flowchart() {

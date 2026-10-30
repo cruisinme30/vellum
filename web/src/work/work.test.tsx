@@ -405,6 +405,7 @@ describe("issues", () => {
     const { api } = fakeApi({ issue: () => Promise.reject(new Error("not found")) });
     renderAt("/issues/ENG-9", api, <Route path="issues/:issueKey" element={<IssuePage />} />);
     const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toBe("not found");
+    expect(alert.textContent).toContain("not found");
+    expect(screen.getByRole("button", { name: "Copy diagnostic" })).toBeDefined();
   });
 });

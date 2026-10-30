@@ -14,6 +14,7 @@ import { failureText } from "../data/failure";
 import { Ready, ServerScreen } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import type { GroupOut, IssueOut, IssueQuery, TeamOut, ViewOut, WorkApi } from "./api";
 import { IssueResults } from "./board";
@@ -69,6 +70,7 @@ function NewIssueForm({
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
     </form>

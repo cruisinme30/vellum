@@ -8,6 +8,7 @@ import { failureText } from "../data/failure";
 import { Ready } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import { Failure, formText, useAction, type Submit } from "./actions";
 import type { BookInfo, BooksApi, SectionDocument } from "./api";
@@ -307,6 +308,7 @@ export function FirstSection({
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
     </form>

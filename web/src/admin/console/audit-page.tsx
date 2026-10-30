@@ -6,6 +6,7 @@ import { useState, type ComponentProps } from "react";
 import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import { formText, type AdminConsoleApi, type AuditRecord, type ChainReport } from "./api";
 import { AdminScreen } from "./context";
@@ -143,6 +144,7 @@ function ChainTools({ api }: { readonly api: AdminConsoleApi }) {
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
     </div>
@@ -178,6 +180,7 @@ function AuditRecords({
     return (
       <p className="vl-field-error" role="alert">
         {loaded.message}
+        <CopyDiagnostic message={loaded.message} />
       </p>
     );
   }

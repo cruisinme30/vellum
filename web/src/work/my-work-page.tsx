@@ -8,6 +8,7 @@ import { failureText } from "../data/failure";
 import { Ready, ServerScreen } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
 import { useT } from "../i18n/i18n";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import type { MyWorkSettingsView, MyWorkView, TaskView, WorkApi } from "./api";
 
@@ -208,6 +209,7 @@ function SettingsForm({
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
     </form>
@@ -286,6 +288,7 @@ function SlackLink({ api }: { readonly api: WorkApi }) {
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
     </div>
@@ -331,6 +334,7 @@ function MyWork({ api }: { readonly api: WorkApi }) {
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
       <Ready loaded={loaded}>
