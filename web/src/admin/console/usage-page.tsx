@@ -7,6 +7,7 @@ import { failureText } from "../../data/failure";
 import { formatSize } from "../../data/format";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
 import type { AdminConsoleApi, UsageCounts } from "./api";
 import { AdminScreen } from "./context";
@@ -116,6 +117,7 @@ function Overview({ api }: { readonly api: AdminConsoleApi }) {
       {loaded.state === "failed" && (
         <p className="vl-field-error" role="alert">
           {loaded.message}
+          <CopyDiagnostic message={loaded.message} />
         </p>
       )}
       {counts !== undefined &&

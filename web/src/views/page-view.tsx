@@ -18,6 +18,7 @@ import { issueChipStatus } from "../work/api";
 import { HistoryPanel } from "./history-panel";
 import { NotFoundView } from "./info";
 import { PageList } from "./page-list";
+import { ReadingView, usePageViewMode } from "./reading-view";
 
 const CARET_COLORS = ["#b3261e", "#00658f", "#386a20", "#7d5260", "#4f5b92"];
 
@@ -112,6 +113,7 @@ export function PageView() {
   const workspace = useWorkspace();
   const pageHistory = usePageHistory(pageId);
   const { work } = useServerApis();
+  const view = usePageViewMode();
   const chips = useChipSources();
   const page = workspace.pages.find((p) => p.id === pageId);
   const trail = useMemo(() => ancestors(workspace.pages, pageId), [workspace.pages, pageId]);
@@ -229,20 +231,25 @@ export function PageView() {
               </dd>
             </div>
           </dl>
-          <PageEditor
-            pageId={page.id}
-            spaceId={page.spaceId}
-            seed={store.seedFor(page.id)}
-            connector={collab}
-            user={user}
-            resolvePage={resolvePage}
-            onOpenPage={onOpenPage}
-            onControls={pageHistory.setControls}
-            actions={pageHistory.button}
-            work={work}
-            me={workspace.me.handle}
-            chips={chips}
-          />
+          {view.toggle}
+          {view.reading && view.render !== undefined ? (
+            <ReadingView pageId={page.id} api={view.render} />
+          ) : (
+            <PageEditor
+              pageId={page.id}
+              spaceId={page.spaceId}
+              seed={store.seedFor(page.id)}
+              connector={collab}
+              user={user}
+              resolvePage={resolvePage}
+              onOpenPage={onOpenPage}
+              onControls={pageHistory.setControls}
+              actions={pageHistory.button}
+              work={work}
+              me={workspace.me.handle}
+              chips={chips}
+            />
+          )}
           {pageHistory.panel}
         </>
       )}

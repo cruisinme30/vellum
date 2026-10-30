@@ -9,6 +9,8 @@ import { ViewTitle } from "../help/help-link";
 import type { HelpTopic } from "../help/topics.gen";
 import { useT } from "../i18n/i18n";
 import type { PrivateSpacesApi } from "../platform/private/api";
+import type { RenderApi } from "../render/api";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 import type { WorkApi } from "../work/api";
 
 import type { Loaded } from "./use-loaded";
@@ -19,6 +21,8 @@ export interface ServerApis {
   readonly books?: BooksApi | undefined;
   readonly drive?: DriveApi | undefined;
   readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** The server's renderer: rendered pages and blocks. */
+  readonly render?: RenderApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});
@@ -29,7 +33,7 @@ export function ServerApisProvider({
   children,
 }: {
   readonly apis: ServerApis;
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
 }) {
   return <ServerApisContext value={apis}>{children}</ServerApisContext>;
 }
@@ -88,6 +92,7 @@ export function Ready<T>({
     return (
       <p className="vl-field-error" role="alert">
         {loaded.message}
+        <CopyDiagnostic message={loaded.message} />
       </p>
     );
   }

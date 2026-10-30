@@ -6,6 +6,7 @@
 import { useState, type ComponentProps } from "react";
 
 import { failureText } from "../data/failure";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 /** A form's submit handler. */
 export type Submit = NonNullable<ComponentProps<"form">["onSubmit"]>;
@@ -51,6 +52,7 @@ export function Failure({ error }: { readonly error: string | undefined }) {
   return (
     <p className="vl-field-error" role="alert">
       {error}
+      <CopyDiagnostic message={error} />
     </p>
   );
 }

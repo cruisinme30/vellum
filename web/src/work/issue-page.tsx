@@ -9,6 +9,7 @@ import { Ready, ServerScreen } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
 import { useServices, useWorkspace } from "../data/workspace-context";
 import { useT } from "../i18n/i18n";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import type { CommentOut, IssueOut, TeamOut, WorkApi } from "./api";
 import { stateName } from "./issues-page";
@@ -103,6 +104,7 @@ function Comments({ api, issueKey }: { readonly api: WorkApi; readonly issueKey:
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
     </section>
@@ -204,6 +206,7 @@ function Issue({ api, issueKey }: { readonly api: WorkApi; readonly issueKey: st
           {error !== undefined && (
             <p className="vl-field-error" role="alert">
               {error}
+              <CopyDiagnostic message={error} />
             </p>
           )}
           {found.issue.description != undefined && found.issue.description !== "" ? (

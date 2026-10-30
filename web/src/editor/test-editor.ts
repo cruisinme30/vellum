@@ -9,8 +9,10 @@ import { DecorationSet } from "@tiptap/pm/view";
 import { EditorContent, useEditor, type ReactNodeViewProps } from "@tiptap/react";
 import { createElement, createRef, useEffect } from "react";
 
+import { ServerApisProvider } from "../data/server-apis";
 import en from "../i18n/en.ftl?raw";
 import { createTranslator } from "../i18n/i18n";
+import type { RenderApi } from "../render/api";
 
 import type { ChipSources } from "./chips/items";
 import type { ChannelFactory } from "./collab/local-connector";
@@ -86,18 +88,26 @@ function EditorHarness({ content, editable = true, onEditor, chips }: EditorHarn
 /** Renders a React editor, waits for its node views and hands back the Tiptap instance. */
 export async function renderEditor(
   content: JSONContent | string,
-  options: { readonly editable?: boolean; readonly chips?: ChipSources } = {},
+  options: {
+    readonly editable?: boolean;
+    readonly chips?: ChipSources;
+    /** A server renderer, for blocks drawn by the server. */
+    readonly render?: RenderApi;
+  } = {},
 ): Promise<{ editor: Editor; unmount: () => void }> {
   let current: Editor | undefined;
+  const harness = createElement(EditorHarness, {
+    content,
+    editable: options.editable ?? true,
+    chips: options.chips,
+    onEditor: (editor: Editor) => {
+      current = editor;
+    },
+  });
   const { unmount } = render(
-    createElement(EditorHarness, {
-      content,
-      editable: options.editable ?? true,
-      chips: options.chips,
-      onEditor: (editor: Editor) => {
-        current = editor;
-      },
-    }),
+    options.render === undefined
+      ? harness
+      : createElement(ServerApisProvider, { apis: { render: options.render } }, harness),
   );
   // React node views render in a microtask after the editor mounts.
   await act(async () => {

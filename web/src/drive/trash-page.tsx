@@ -7,6 +7,7 @@ import { Link, useParams } from "react-router";
 import { failureText } from "../data/failure";
 import { Ready } from "../data/server-apis";
 import { useT } from "../i18n/i18n";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import type { DriveApi, NodeView, SpaceView } from "./api";
 import { DriveFrame } from "./drive-page";
@@ -96,6 +97,7 @@ function TrashTable({
       {problem !== undefined && (
         <p className="vl-field-error" role="alert">
           {problem}
+          <CopyDiagnostic message={problem} />
         </p>
       )}
       {items.length > 0 && (

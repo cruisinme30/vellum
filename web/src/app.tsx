@@ -45,6 +45,7 @@ import { NotificationSettingsView } from "./notifications/notification-settings"
 import { createMockNotificationPreferencesStore } from "./notifications/preferences";
 import type { PrivateSpacesApi } from "./platform/private/api";
 import { PrivateSpacesView } from "./platform/private/private-spaces-view";
+import type { RenderApi } from "./render/api";
 import { AppShell } from "./shell/app-shell";
 import { AppearanceProvider, type OrganisationAppearance } from "./theme/appearance-context";
 import { AppearancePage } from "./theme/appearance-page";
@@ -155,6 +156,8 @@ export interface AppServices {
   readonly drive?: DriveApi | undefined;
   /** Private spaces' device keys, from a Vellum server; absent in demo mode. */
   readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** Rendered pages and blocks, from a Vellum server; absent in demo mode. */
+  readonly render?: RenderApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
   readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
@@ -209,6 +212,7 @@ export function AppProviders({
   books,
   drive,
   privateSpaces,
+  render,
   collections,
   session,
   notifications,
@@ -216,8 +220,8 @@ export function AppProviders({
   children,
 }: AppServices & { readonly children: ReactNode }) {
   const serverApis = useMemo(
-    () => ({ work, books, drive, privateSpaces }),
-    [work, books, drive, privateSpaces],
+    () => ({ work, books, drive, privateSpaces, render }),
+    [work, books, drive, privateSpaces, render],
   );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),
