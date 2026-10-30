@@ -143,3 +143,7 @@ holder = "red team round 6 (#529)"
 adrs = "0073"
 decisions = "D318"
 holder = "local CI gate (#532), reserved by the coordinator"
+
+[[reservation]]
+decisions = "D319"
+holder = "local gate reuses stages that passed on the same inputs, ADR 0073"
