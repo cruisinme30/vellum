@@ -68,6 +68,10 @@ pub struct User {
     /// factor when single sign-on is required (D292).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub break_glass: bool,
+    /// The identity provider's ID for the account, when SCIM manages it
+    /// (D294).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<String>,
 }
 
 /// A person's second factors (ADR 0069, D290).
@@ -182,6 +186,9 @@ pub struct Group {
     pub description: String,
     /// When it was created.
     pub created_at: Timestamp,
+    /// The identity provider's ID for it, when SCIM manages it (D294).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_id: Option<String>,
 }
 
 /// A provider's user, linked to a Vellum account on first sign-in.
@@ -409,6 +416,17 @@ pub struct SignInSettings {
     pub require_sso: bool,
     /// Identity providers added in Admin → Sign-in (D292).
     pub providers: Vec<Provider>,
+    /// The SCIM provisioning token, when provisioning is on (D294).
+    pub scim: Option<ScimToken>,
+}
+
+/// The SCIM provisioning token, kept as a hash.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScimToken {
+    /// The base64url SHA-256 of the token.
+    pub hash: String,
+    /// When it was made; rotating makes a new one.
+    pub created_at: Timestamp,
 }
 
 /// An identity provider people sign in with (ADR 0069, D292).
@@ -844,6 +862,7 @@ mod tests {
                         sso: Vec::new(),
                         factors: SecondFactors::default(),
                         break_glass: false,
+                        external_id: None,
                     },
                 );
                 let _ = s.sessions.insert(

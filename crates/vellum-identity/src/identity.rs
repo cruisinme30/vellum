@@ -249,7 +249,7 @@ fn elapsed(since: Timestamp, now: Timestamp) -> Duration {
     Duration::from_millis(u64::try_from(now.unix_ms() - since.unix_ms()).unwrap_or(0))
 }
 
-fn normalise_email(email: &str) -> Result<String, Error> {
+pub(crate) fn normalise_email(email: &str) -> Result<String, Error> {
     let email = email.trim().to_lowercase();
     let valid = email.len() <= 254
         && email
@@ -266,7 +266,7 @@ fn normalise_email(email: &str) -> Result<String, Error> {
     }
 }
 
-fn check_name(name: &str) -> Result<String, Error> {
+pub(crate) fn check_name(name: &str) -> Result<String, Error> {
     let name = name.trim();
     if name.is_empty() || name.chars().count() > 120 {
         return Err(Error::new(
@@ -482,6 +482,7 @@ impl Identity {
                 sso: vec![link.clone()],
                 factors: SecondFactors::default(),
                 break_glass: false,
+                external_id: None,
             };
             let _ = s.users.insert(user.id, user.clone());
             Ok((user, true))
@@ -585,6 +586,7 @@ impl Identity {
             sso: Vec::new(),
             factors: SecondFactors::default(),
             break_glass: false,
+            external_id: None,
         };
         self.store.write(|s| {
             if s.user_by_email(&user.email).is_some() {
@@ -1494,6 +1496,7 @@ impl Identity {
                 sso: Vec::new(),
                 factors: SecondFactors::default(),
                 break_glass: false,
+                external_id: None,
             };
             let id = user.id;
             let _ = s.users.insert(id, user);

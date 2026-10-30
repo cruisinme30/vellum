@@ -35,6 +35,12 @@ impl IdentityAuthenticator {
 }
 
 /// Whether `path` is the MCP endpoint or below it.
+/// SCIM checks its own token (ADR 0069, D294), which is no API token.
+fn is_scim(path: &str) -> bool {
+    path.strip_prefix(vellum_identity::scim::SCIM_PREFIX)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
+}
+
 fn is_mcp(path: &str) -> bool {
     path.strip_prefix("/mcp")
         .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
@@ -54,6 +60,9 @@ impl Authenticator for IdentityAuthenticator {
                     v.strip_prefix("Bearer ")
                         .or_else(|| v.strip_prefix("bearer "))
                 });
+            if bearer.is_some() && is_scim(&request.path) {
+                return Ok(Authenticated::anonymous());
+            }
             if let Some(token) = bearer {
                 let resolved = match self.identity.bearer(token.trim()) {
                     Ok(resolved) => resolved,
@@ -281,6 +290,14 @@ mod oidc_tests {
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
             .collect();
         oidc_config(|k| vars.get(k).cloned())
+    }
+
+    #[test]
+    fn only_scim_paths_skip_the_api_token_check() {
+        assert!(is_scim("/scim/v2"));
+        assert!(is_scim("/scim/v2/Users"));
+        assert!(!is_scim("/scim/v2x"));
+        assert!(!is_scim("/api/v1/scim/v2"));
     }
 
     #[test]

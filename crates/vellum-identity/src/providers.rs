@@ -213,6 +213,8 @@ pub struct SignInView {
     pub oidc_callback_url: String,
     /// What to register with SAML providers.
     pub saml: SamlServiceView,
+    /// SCIM provisioning (D294).
+    pub scim: crate::scim::ScimView,
     /// How many enabled admins may still use a password (break-glass).
     pub break_glass_admins: usize,
 }
@@ -608,6 +610,7 @@ impl Identity {
                 self.config().base(),
                 crate::http::SSO_CALLBACK_PATH
             ),
+            scim: self.scim_status(),
             saml: {
                 let sp = self.saml_service();
                 SamlServiceView {
@@ -820,6 +823,10 @@ impl Identity {
     clippy::literal_string_with_formatting_args,
     reason = "`{id}` is a path template, not a format string"
 )]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one declaration per operation reads best as a list"
+)]
 pub(crate) fn operations(identity: &Arc<Identity>) -> Vec<Operation> {
     let settings = {
         let id = Arc::clone(identity);
@@ -864,6 +871,23 @@ pub(crate) fn operations(identity: &Arc<Identity>) -> Vec<Operation> {
         move |_: RequestContext, input: MetadataUrl| {
             let id = Arc::clone(&id);
             async move { id.read_saml_metadata(&input).await }
+        }
+    };
+    let rotate_scim = {
+        let id = Arc::clone(identity);
+        move |_: RequestContext, _: crate::service::Empty| {
+            let id = Arc::clone(&id);
+            async move { id.rotate_scim_token() }
+        }
+    };
+    let revoke_scim = {
+        let id = Arc::clone(identity);
+        move |_: RequestContext, _: crate::service::Empty| {
+            let id = Arc::clone(&id);
+            async move {
+                let _ = id.revoke_scim_token()?;
+                Ok(id.sign_in_settings())
+            }
         }
     };
     vec![
@@ -920,6 +944,24 @@ pub(crate) fn operations(identity: &Arc<Identity>) -> Vec<Operation> {
         )
         .fresh_auth(FRESH_AUTH)
         .summary("Read a SAML provider's metadata to fill in its settings"),
+        Operation::mutation(
+            "identity.admin_rotate_scim",
+            HttpMethod::Post,
+            "/v1/admin/sign-in/scim/token",
+            Scope::Admin,
+            rotate_scim,
+        )
+        .fresh_auth(FRESH_AUTH)
+        .summary("Make a new SCIM provisioning token; the old one stops working"),
+        Operation::mutation(
+            "identity.admin_revoke_scim",
+            HttpMethod::Delete,
+            "/v1/admin/sign-in/scim/token",
+            Scope::Admin,
+            revoke_scim,
+        )
+        .fresh_auth(FRESH_AUTH)
+        .summary("Turn SCIM provisioning off"),
     ]
 }
 

@@ -1680,6 +1680,22 @@ admin-sso-require-hint = { $count ->
    *[other] { $count } break-glass admins can still sign in with a password and a second factor.
 }
 admin-sso-require-users = Choose break-glass admins
+admin-scim = Provisioning (SCIM)
+admin-scim-intro = Your identity provider can create, change and block accounts and groups here. Accounts it creates have no password and are never admins; break-glass admins stay out of its reach.
+admin-scim-url = SCIM base URL:
+admin-scim-on = On, with a token made on { $date }.
+admin-scim-off = Off. Turn it on to make a token for your identity provider.
+admin-scim-turn-on = Turn on and make a token
+admin-scim-rotate = Make a new token
+admin-scim-rotate-confirm = The current token stops working at once. Make a new one?
+admin-scim-turn-off = Turn off
+admin-scim-made = A new SCIM token was made.
+admin-scim-turned-off = SCIM provisioning is off. Accounts and groups it made stay.
+admin-scim-token-label = New SCIM token
+admin-scim-token-title = Copy this token now.
+admin-scim-token-hint = Paste it into your identity provider's provisioning settings. It is not shown again.
+admin-scim-copy = Copy token
+admin-scim-done = Done
 admin-users-sign-out = Sign out everywhere
 admin-users-sign-out-label = Sign { $name } out everywhere
 admin-users-sign-out-confirm = Sign { $name } out of every browser?

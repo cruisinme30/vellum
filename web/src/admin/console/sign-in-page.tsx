@@ -11,6 +11,7 @@ import { useT } from "../../i18n/i18n";
 import type { AdminSignInApi, SignInView } from "./api";
 import { AdminScreen } from "./context";
 import { ProvidersSection } from "./providers-section";
+import { ScimSection } from "./scim-section";
 
 type Submit = NonNullable<ComponentProps<"form">["onSubmit"]>;
 type Policy = SignInView["secondFactor"];
@@ -112,6 +113,14 @@ function SignIn({ api }: { readonly api: AdminSignInApi }) {
         }}
       />
       <ProvidersSection
+        api={api}
+        view={view}
+        onChanged={(next, message) => {
+          setSaved(next);
+          setNotice(message);
+        }}
+      />
+      <ScimSection
         api={api}
         view={view}
         onChanged={(next, message) => {

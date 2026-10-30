@@ -33,10 +33,12 @@ pub enum Kind {
     Consent,
     /// A second-factor ticket or passkey ceremony (ADR 0069, D290).
     MfaTicket,
+    /// The SCIM provisioning token (ADR 0069, D294).
+    ScimToken,
 }
 
 impl Kind {
-    const ALL: [Self; 8] = [
+    const ALL: [Self; 9] = [
         Self::Session,
         Self::ApiToken,
         Self::AuthCode,
@@ -45,6 +47,7 @@ impl Kind {
         Self::BreakGlass,
         Self::Consent,
         Self::MfaTicket,
+        Self::ScimToken,
     ];
 
     /// The prefix, including its underscore.
@@ -59,6 +62,7 @@ impl Kind {
             Self::BreakGlass => "vbg_",
             Self::Consent => "vcn_",
             Self::MfaTicket => "vmt_",
+            Self::ScimToken => "vsc_",
         }
     }
 

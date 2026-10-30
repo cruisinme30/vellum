@@ -39,6 +39,7 @@ pub mod password;
 pub mod providers;
 pub mod saml;
 pub mod saml_sign_in;
+pub mod scim;
 pub mod seal;
 pub mod secret;
 pub mod service;

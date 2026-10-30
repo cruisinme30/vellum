@@ -53,6 +53,7 @@ const BASE: SignInView = {
     entityId: "https://vellum.northstar.dev/saml/metadata",
     acsUrl: "https://vellum.northstar.dev/saml/acs",
   },
+  scim: { enabled: false, baseUrl: "https://vellum.northstar.dev/scim/v2" },
 };
 
 function fakeSignIn(initial: SignInView) {
@@ -90,6 +91,19 @@ function fakeSignIn(initial: SignInView) {
     addProvider,
     updateProvider,
     removeProvider,
+    rotateScim: vi.fn<AdminSignInApi["rotateScim"]>(() => {
+      const scim = {
+        enabled: true,
+        tokenCreatedAt: "2026-10-30T08:00:00Z",
+        baseUrl: "https://vellum.northstar.dev/scim/v2",
+      };
+      view = { ...view, scim };
+      return Promise.resolve({ token: "vsc_new-token", scim });
+    }),
+    revokeScim: vi.fn<AdminSignInApi["revokeScim"]>(() => {
+      view = { ...view, scim: { enabled: false, baseUrl: view.scim.baseUrl } };
+      return Promise.resolve(view);
+    }),
     samlMetadata: vi.fn<AdminSignInApi["samlMetadata"]>(() =>
       Promise.resolve({
         entityId: "https://sts.windows.net/tenant/",
@@ -217,6 +231,25 @@ describe("Admin → Sign-in", () => {
     await user.click(within(form).getByRole("checkbox"));
     await user.click(within(form).getByRole("button", { name: "Save" }));
     expect(update).toHaveBeenCalledWith({ requireSso: true });
+  });
+
+  it("turns SCIM on, shows the token once, rotates and turns it off", async () => {
+    const { api } = fakeSignIn(BASE);
+    const user = renderPage(api);
+    expect(await screen.findByText("https://vellum.northstar.dev/scim/v2")).toBeDefined();
+    await user.click(screen.getByRole("button", { name: "Turn on and make a token" }));
+    const shown = await screen.findByTestId("scim-token");
+    expect(shown.textContent).toBe("vsc_new-token");
+    expect(screen.getByText(/On, with a token made on Oct 30, 2026/)).toBeDefined();
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.queryByTestId("scim-token")).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Make a new token" }));
+    expect(screen.getByText(/stops working at once/)).toBeDefined();
+    await user.click(screen.getByRole("button", { name: "Make a new token" }));
+    expect(await screen.findByTestId("scim-token")).toBeDefined();
+    await user.click(screen.getByRole("button", { name: "Turn off" }));
+    expect(await screen.findByText(/Off\. Turn it on/)).toBeDefined();
+    expect(screen.queryByTestId("scim-token")).toBeNull();
   });
 
   it("marks environment providers read-only", async () => {
