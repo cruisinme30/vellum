@@ -889,3 +889,85 @@ async fn templates_are_listed_and_read() {
     let (_, _, missing) = call_tool(&h, "read", "get_template", json!({ "name": "nope" })).await;
     assert_eq!(missing["result"]["isError"], true, "{missing}");
 }
+
+/// A token that can be revoked mid-test.
+struct Revocable {
+    token: VerifiedToken,
+    revoked: std::sync::atomic::AtomicBool,
+}
+
+#[async_trait::async_trait]
+impl vellum_mcp::auth::TokenVerifier for Revocable {
+    async fn verify(&self, _token: &str) -> Result<VerifiedToken, vellum_mcp::auth::TokenError> {
+        if self.revoked.load(std::sync::atomic::Ordering::SeqCst) {
+            Err(vellum_mcp::auth::TokenError::Invalid)
+        } else {
+            Ok(self.token.clone())
+        }
+    }
+}
+
+/// RT-047 (#552): a listen stream ends once its token stops verifying,
+/// instead of reporting changes for ever.
+#[tokio::test]
+async fn listen_streams_close_when_the_token_is_revoked() {
+    let ws = Arc::new(MemoryWorkspace::northstar());
+    let server = Arc::new(McpServer::new(
+        ws,
+        Arc::new(MemoryAudit::default()),
+        ServerConfig::default(),
+    ));
+    let notifier = server.notifier();
+    let verifier = Arc::new(Revocable {
+        token: token("tok_read", "read", &format!("{BASE}/mcp")),
+        revoked: std::sync::atomic::AtomicBool::new(false),
+    });
+    let mut config = HttpConfig::new(BASE);
+    config.keep_alive = Duration::from_millis(50);
+    let app = router(Arc::new(McpHttp {
+        server,
+        verifier: verifier.clone(),
+        config,
+    }));
+    let body = request_body(
+        7,
+        "subscriptions/listen",
+        json!({ "notifications": {
+            "resourceSubscriptions": ["vellum://doc/01JDLAUNCH0000000000000000"]
+        } }),
+    );
+    let resp = app
+        .oneshot(post(Some("read"), "subscriptions/listen", None, &body))
+        .await
+        .unwrap_or_default();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let mut stream = resp.into_body();
+    let mut next = async || -> Option<String> {
+        let frame = tokio::time::timeout(Duration::from_secs(2), stream.frame())
+            .await
+            .ok()??;
+        frame
+            .ok()
+            .and_then(|f| f.into_data().ok())
+            .map(|d| String::from_utf8_lossy(&d).into_owned())
+    };
+    let ack = next().await.unwrap_or_default();
+    assert!(ack.contains("acknowledged"), "{ack}");
+
+    verifier
+        .revoked
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    notifier.resource_updated("vellum://doc/01JDLAUNCH0000000000000000");
+    let mut seen = Vec::new();
+    while let Some(frame) = next().await {
+        seen.push(frame);
+    }
+    assert!(
+        !seen.iter().any(|f| f.contains("resources/updated")),
+        "no update after revocation: {seen:?}"
+    );
+    assert!(
+        seen.last().is_some_and(|f| f.contains("\"id\":7")),
+        "the stream ends with its closing result: {seen:?}"
+    );
+}

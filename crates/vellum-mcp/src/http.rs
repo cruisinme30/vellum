@@ -356,7 +356,7 @@ async fn handle_post(
 }
 
 async fn post_inner(
-    state: &McpHttp,
+    state: &Arc<McpHttp>,
     headers: &HeaderMap,
     body: &[u8],
     request_id: &str,
@@ -446,7 +446,7 @@ async fn post_inner(
             }
             r
         }
-        Reply::Listen(listener) => sse(listener, state.config.keep_alive),
+        Reply::Listen(listener) => sse(listener, Arc::clone(state), headers.clone()),
     }
 }
 
@@ -460,23 +460,40 @@ enum Phase {
     Done,
 }
 
-fn sse(listener: Listener, keep_alive: Duration) -> Response {
-    let stream = futures_util::stream::unfold(Phase::Ack(listener), move |phase| async move {
-        match phase {
-            Phase::Ack(l) => Some((
-                Ok::<_, Infallible>(event(&l.acknowledgement())),
-                Phase::Open(l),
-            )),
-            Phase::Open(mut l) => {
-                tokio::select! {
-                    next = l.next() => match next {
-                        Some(n) => Some((Ok(event(&n)), Phase::Open(l))),
-                        None => Some((Ok(event(&l.closing())), Phase::Done)),
-                    },
-                    () = tokio::time::sleep(keep_alive) => Some((Ok(Bytes::from_static(b":\n\n")), Phase::Open(l))),
+/// The listen stream. Its token is checked again at every keep-alive and
+/// before each notification, and the stream closes once the token no
+/// longer verifies (revoked, expired, account blocked): RT-047.
+fn sse(listener: Listener, state: Arc<McpHttp>, headers: HeaderMap) -> Response {
+    let keep_alive = state.config.keep_alive;
+    let still_valid = move || {
+        let state = Arc::clone(&state);
+        let headers = headers.clone();
+        async move { state.authenticate(&headers).await.is_ok() }
+    };
+    let stream = futures_util::stream::unfold(Phase::Ack(listener), move |phase| {
+        let still_valid = still_valid.clone();
+        async move {
+            match phase {
+                Phase::Ack(l) => Some((
+                    Ok::<_, Infallible>(event(&l.acknowledgement())),
+                    Phase::Open(l),
+                )),
+                Phase::Open(mut l) => {
+                    let next = tokio::select! {
+                        next = l.next() => Some(next),
+                        () = tokio::time::sleep(keep_alive) => None,
+                    };
+                    if !still_valid().await {
+                        return Some((Ok(event(&l.closing())), Phase::Done));
+                    }
+                    match next {
+                        Some(Some(n)) => Some((Ok(event(&n)), Phase::Open(l))),
+                        Some(None) => Some((Ok(event(&l.closing())), Phase::Done)),
+                        None => Some((Ok(Bytes::from_static(b":\n\n")), Phase::Open(l))),
+                    }
                 }
+                Phase::Done => None,
             }
-            Phase::Done => None,
         }
     });
     let mut r = Response::new(Body::from_stream(stream));
