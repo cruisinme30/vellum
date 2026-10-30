@@ -211,21 +211,25 @@ function TeamTemplates({ api, team }: { readonly api: WorkApi; readonly team: Te
       <p role="status" className="vl-visually-hidden">
         {said}
       </p>
+      {/* Recurring issues come with the templates, not before them, so the
+          section doesn't jump down the page when the templates load. */}
       <Ready loaded={loaded}>
         {({ file, projects }) => (
-          <Templates
-            key={version}
-            api={api}
-            team={team}
-            file={file}
-            projects={projects}
-            onSaved={done}
-          />
+          <>
+            <Templates
+              key={version}
+              api={api}
+              team={team}
+              file={file}
+              projects={projects}
+              onSaved={done}
+            />
+            {planning !== undefined && (
+              <Recurring planning={planning} team={team} version={version} onChanged={done} />
+            )}
+          </>
         )}
       </Ready>
-      {planning !== undefined && (
-        <Recurring planning={planning} team={team} version={version} onChanged={done} />
-      )}
     </>
   );
 }

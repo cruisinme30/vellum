@@ -261,6 +261,27 @@ describe("templates screen", () => {
     expect(alert.textContent).toContain("unknown status gone");
   });
 
+  it("shows repeating issues only once the templates have loaded", async () => {
+    // Regression: the section rendered first and jumped down the page.
+    const settle: { resolve?: (file: TeamFile) => void } = {};
+    const work = fakeApi({
+      teamSettings: vi.fn(
+        () =>
+          new Promise<TeamFile>((resolve) => {
+            settle.resolve = resolve;
+          }),
+      ),
+    });
+    const planning = fakePlanning();
+    renderScreen("/issues/templates", work, planning);
+    await waitFor(() => {
+      expect(work.teamSettings).toHaveBeenCalled();
+    });
+    expect(screen.queryByRole("link", { name: "ENG-4" })).toBeNull();
+    settle.resolve?.(FILE);
+    expect(await screen.findByRole("link", { name: "ENG-4" })).toBeDefined();
+  });
+
   it("lists repeating issues and changes or stops their repeat", async () => {
     const work = fakeApi({ teamSettings: vi.fn(() => Promise.resolve(FILE)) });
     const planning = fakePlanning();
