@@ -138,6 +138,7 @@ impl Identity {
             request_id: request_id.clone(),
             next: safe_next(next),
             expires: after(now, SAML_PENDING),
+            reauth: force,
         };
         self.store().write(|s| {
             if s.saml_requests.len() >= MAX_PENDING {
@@ -212,6 +213,16 @@ impl Identity {
                 "a SAML response was refused"
             );
         })?;
+        if request.reauth {
+            saml::check_fresh(&asserted, now).inspect_err(|e| {
+                tracing::info!(
+                    event = "identity.saml_refused",
+                    provider = %record.id,
+                    error = %e,
+                    "a SAML re-authentication was not fresh"
+                );
+            })?;
+        }
         let seen = hashed(&[&record.id, &asserted.id]);
         self.store().write(|s| {
             if s.saml_seen.get(&seen).is_some_and(|until| *until > now) {

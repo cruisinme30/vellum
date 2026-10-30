@@ -113,6 +113,7 @@ struct Claims {
     name_id: String,
     email: String,
     status: String,
+    authn_instant: Option<String>,
 }
 
 impl Default for Claims {
@@ -128,13 +129,14 @@ impl Default for Claims {
             name_id: "00u1priya".into(),
             email: "priya@northstar.dev".into(),
             status: "urn:oasis:names:tc:SAML:2.0:status:Success".into(),
+            authn_instant: None,
         }
     }
 }
 
 fn assertion_xml(c: &Claims) -> String {
     format!(
-        r#"<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{id}" Version="2.0" IssueInstant="2026-10-30T12:00:00Z"><saml:Issuer>{issuer}</saml:Issuer><saml:Subject><saml:NameID>{name_id}</saml:NameID><saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData InResponseTo="{irt}" NotOnOrAfter="{nooa}" Recipient="{recipient}"/></saml:SubjectConfirmation></saml:Subject><saml:Conditions NotBefore="{nb}" NotOnOrAfter="{nooa}"><saml:AudienceRestriction><saml:Audience>{audience}</saml:Audience></saml:AudienceRestriction></saml:Conditions><saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue>{email}</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion>"#,
+        r#"<saml:Assertion xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{id}" Version="2.0" IssueInstant="2026-10-30T12:00:00Z"><saml:Issuer>{issuer}</saml:Issuer><saml:Subject><saml:NameID>{name_id}</saml:NameID><saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer"><saml:SubjectConfirmationData InResponseTo="{irt}" NotOnOrAfter="{nooa}" Recipient="{recipient}"/></saml:SubjectConfirmation></saml:Subject><saml:Conditions NotBefore="{nb}" NotOnOrAfter="{nooa}"><saml:AudienceRestriction><saml:Audience>{audience}</saml:Audience></saml:AudienceRestriction></saml:Conditions>{authn}<saml:AttributeStatement><saml:Attribute Name="email"><saml:AttributeValue>{email}</saml:AttributeValue></saml:Attribute></saml:AttributeStatement></saml:Assertion>"#,
         id = c.assertion_id,
         issuer = c.issuer,
         name_id = c.name_id,
@@ -144,6 +146,9 @@ fn assertion_xml(c: &Claims) -> String {
         nb = c.not_before,
         audience = c.audience,
         email = c.email,
+        authn = c.authn_instant.as_deref().map_or_else(String::new, |at| format!(
+            r#"<saml:AuthnStatement AuthnInstant="{at}"><saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef></saml:AuthnContext></saml:AuthnStatement>"#
+        )),
     )
 }
 
@@ -702,5 +707,34 @@ mod flows {
             "application/samlmetadata+xml"
         );
         assert!(xml.contains("Location=\"https://vellum.northstar.dev/saml/acs\""));
+    }
+}
+
+/// RT-046 (#551): a re-authentication needs an `AuthnInstant` from the
+/// last five minutes; a remembered provider sign-in is not enough.
+#[test]
+fn reauthentication_needs_a_recent_authn_instant() {
+    use vellum_identity::saml::check_fresh;
+    let idp = TestIdp::new();
+    let now = at(NOW);
+    for (instant, fresh) in [
+        (None, false),
+        (Some("2026-10-30T09:00:00Z"), false),
+        (Some("2026-10-30T11:50:00Z"), false),
+        (Some("2026-10-30T12:00:30Z"), true),
+        (Some("2026-10-30T12:30:00Z"), false),
+    ] {
+        let claims = Claims {
+            authn_instant: instant.map(str::to_owned),
+            ..Claims::default()
+        };
+        // A plain sign-in takes the assertion either way.
+        let asserted = check(&idp, &idp.response(&claims)).unwrap();
+        assert_eq!(asserted.authn_instant, instant.map(at));
+        let result = check_fresh(&asserted, now);
+        assert_eq!(result.is_ok(), fresh, "{instant:?}");
+        if let Err(e) = result {
+            assert_eq!(e.kind(), ErrorKind::Unauthenticated);
+        }
     }
 }
