@@ -18,9 +18,10 @@
 use vellum_kernel::UserId;
 use yrs::encoding::read::Read as _;
 use yrs::encoding::read::{Cursor, Error as ReadError};
+use yrs::encoding::varint::VarInt;
 use yrs::encoding::write::Write as _;
 use yrs::sync::{Message, MessageReader};
-use yrs::updates::decoder::DecoderV1;
+use yrs::updates::decoder::{Decoder, DecoderV1};
 use yrs::updates::encoder::{Encode as _, Encoder as _, EncoderV1};
 
 /// Client → server: the `traceparent` that parents the spans of the
@@ -92,7 +93,125 @@ pub fn decode_update(bytes: &[u8]) -> Result<yrs::Update, ReadError> {
     if !count_fits(bytes) {
         return Err(ReadError::UnexpectedValue);
     }
-    contain(|| yrs::Update::decode_v1(bytes)).ok_or(ReadError::UnexpectedValue)?
+    contain(|| yrs::Update::decode(&mut BlockCountGuard::new(bytes)))
+        .ok_or(ReadError::UnexpectedValue)?
+}
+
+/// A v1 decoder that refuses a client's block count larger than the bytes
+/// left in the update.
+///
+/// yrs reads each client's block count and reserves room for that many
+/// blocks before it reads a single one, so ten bytes claiming 2^28 blocks
+/// once made the server ask for 5.6 GB. Every block takes at least one
+/// byte, so a count larger than the bytes after it is a lie. The counts
+/// sit between blocks of the previous client, so [`count_fits`] cannot
+/// find them without decoding those blocks; this decoder checks each one
+/// while yrs decodes.
+///
+/// yrs reads a client's block count with `read_var` and then calls
+/// `read_client`, which nothing else calls, so the last `read_var` before
+/// `read_client` is the count.
+struct BlockCountGuard<'a> {
+    bytes: &'a [u8],
+    inner: DecoderV1<'a>,
+    /// Where the most recent `read_var` started.
+    last_var: usize,
+}
+
+impl<'a> BlockCountGuard<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        Self {
+            bytes,
+            inner: DecoderV1::new(Cursor::new(bytes)),
+            last_var: 0,
+        }
+    }
+
+    /// How many bytes are left to read.
+    fn remaining(&mut self) -> usize {
+        self.inner.read_to_end().map_or(0, <[u8]>::len)
+    }
+}
+
+impl yrs::encoding::read::Read for BlockCountGuard<'_> {
+    fn read_exact(&mut self, len: usize) -> Result<&[u8], ReadError> {
+        self.inner.read_exact(len)
+    }
+
+    fn read_u8(&mut self) -> Result<u8, ReadError> {
+        self.inner.read_u8()
+    }
+
+    fn read_var<T: VarInt>(&mut self) -> Result<T, ReadError> {
+        self.last_var = self.bytes.len() - self.remaining();
+        T::read(self)
+    }
+}
+
+impl Decoder for BlockCountGuard<'_> {
+    fn reset_ds_cur_val(&mut self) {
+        self.inner.reset_ds_cur_val();
+    }
+
+    fn read_ds_clock(&mut self) -> Result<u32, ReadError> {
+        self.inner.read_ds_clock()
+    }
+
+    fn read_ds_len(&mut self) -> Result<u32, ReadError> {
+        self.inner.read_ds_len()
+    }
+
+    fn read_left_id(&mut self) -> Result<yrs::ID, ReadError> {
+        self.inner.read_left_id()
+    }
+
+    fn read_right_id(&mut self) -> Result<yrs::ID, ReadError> {
+        self.inner.read_right_id()
+    }
+
+    fn read_client(&mut self) -> Result<yrs::ClientID, ReadError> {
+        let blocks = self
+            .bytes
+            .get(self.last_var..)
+            .map(|from| Cursor::new(from).read_var::<u64>());
+        let rest = u64::try_from(self.remaining()).unwrap_or(u64::MAX);
+        match blocks {
+            Some(Ok(blocks)) if blocks <= rest => self.inner.read_client(),
+            _ => Err(ReadError::UnexpectedValue),
+        }
+    }
+
+    fn read_info(&mut self) -> Result<u8, ReadError> {
+        self.inner.read_info()
+    }
+
+    fn read_parent_info(&mut self) -> Result<bool, ReadError> {
+        self.inner.read_parent_info()
+    }
+
+    fn read_type_ref(&mut self) -> Result<u8, ReadError> {
+        self.inner.read_type_ref()
+    }
+
+    fn read_len(&mut self) -> Result<u32, ReadError> {
+        self.inner.read_len()
+    }
+
+    fn read_any(&mut self) -> Result<yrs::Any, ReadError> {
+        self.inner.read_any()
+    }
+
+    fn read_json(&mut self) -> Result<yrs::Any, ReadError> {
+        self.inner.read_json()
+    }
+
+    fn read_key(&mut self) -> Result<std::sync::Arc<str>, ReadError> {
+        self.inner.read_key()
+    }
+
+    fn read_to_end(&mut self) -> Result<&[u8], ReadError> {
+        self.inner.read_to_end()
+    }
 }
 
 /// Whether the count that opens `payload` could be honest.
@@ -248,6 +367,41 @@ mod tests {
         update.extend([0xff; 9]);
         update.extend([0x01, 0]);
         assert!(decode_update(&update).is_err());
+    }
+
+    #[test]
+    fn lying_block_counts_are_rejected_before_allocating() {
+        // Fuzzer reproducer (collab_frames oom-4b9b3b46): five clients, the
+        // first claiming 234,880,895 blocks in the four bytes left. yrs
+        // reserved 5.6 GB for them before reading one.
+        let update = [0x85, 0x00, 0xff, 0xfe, 0xff, 0x6f, 0xdf, 0xff, 0x00, 0x04];
+        let started = std::time::Instant::now();
+        assert!(decode_update(&update).is_err());
+        assert!(decode(&update).is_err());
+        assert!(decode_peers(&update).is_err());
+        assert!(started.elapsed() < std::time::Duration::from_secs(1));
+    }
+
+    #[test]
+    fn honest_updates_still_decode() {
+        use yrs::{GetString as _, Text as _, Transact as _};
+        let doc = yrs::Doc::new();
+        let text = doc.get_or_insert_text("body");
+        let mut txn = doc.transact_mut();
+        text.insert(&mut txn, 0, "hello");
+        text.insert(&mut txn, 5, " world");
+        text.remove_range(&mut txn, 0, 1);
+        let bytes = txn.encode_update_v1();
+        drop(txn);
+        let update = decode_update(&bytes).unwrap_or_else(|e| unreachable!("{e}"));
+        let copy = yrs::Doc::new();
+        let copied = copy.get_or_insert_text("body");
+        let mut txn = copy.transact_mut();
+        txn.apply_update(update)
+            .unwrap_or_else(|e| unreachable!("{e}"));
+        let decoded = copied.get_string(&txn);
+        drop(txn);
+        assert_eq!(decoded, "ello world");
     }
 
     #[test]
