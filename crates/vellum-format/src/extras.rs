@@ -21,9 +21,15 @@ pub fn merge_text(inlines: Vec<Inline>) -> Vec<Inline> {
         match (out.last_mut(), inline) {
             (_, Inline::Text { text }) if text.is_empty() => {}
             (Some(Inline::Text { text: last }), Inline::Text { text }) => last.push_str(&text),
-            // `<em>a</em><em>b</em>` reads as `<em>ab</em>`.
+            // `<em>a</em><em>b</em>` reads as `<em>ab</em>`, and the
+            // delimiters of two adjacent marks of a kind would run together
+            // when written (`^a^^b^` is one superscript).
             (Some(Inline::Emphasis { content: last }), Inline::Emphasis { content })
-            | (Some(Inline::Strong { content: last }), Inline::Strong { content }) => {
+            | (Some(Inline::Strong { content: last }), Inline::Strong { content })
+            | (Some(Inline::Strikethrough { content: last }), Inline::Strikethrough { content })
+            | (Some(Inline::Highlight { content: last }), Inline::Highlight { content })
+            | (Some(Inline::Subscript { content: last }), Inline::Subscript { content })
+            | (Some(Inline::Superscript { content: last }), Inline::Superscript { content }) => {
                 last.extend(content);
                 *last = merge_text(std::mem::take(last));
             }
