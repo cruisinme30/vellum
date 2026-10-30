@@ -456,14 +456,13 @@ fn record_view(p: &Provider) -> ProviderView {
 
 /// Whether a provider record creates an account for `email`.
 pub(crate) fn may_create(p: &Provider, email: &str) -> bool {
-    if !p.auto_create {
-        return false;
-    }
-    let domain = email.rsplit_once('@').map_or("", |(_, d)| d);
-    p.allowed_domains.is_empty()
-        || p.allowed_domains
-            .iter()
-            .any(|d| d.eq_ignore_ascii_case(domain))
+    p.auto_create && may_link(p, email)
+}
+
+/// Whether `p` may sign in to an existing account with `email`: only
+/// addresses in its domains when it lists any (RT-043, D307).
+pub(crate) fn may_link(p: &Provider, email: &str) -> bool {
+    crate::sso::in_domains(&p.allowed_domains, email)
 }
 
 impl Identity {

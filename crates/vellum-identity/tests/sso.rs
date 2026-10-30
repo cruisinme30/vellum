@@ -437,3 +437,36 @@ fn without_auto_create_only_existing_accounts_sign_in() {
             .is_ok()
     );
 }
+
+/// RT-043 (#547): a provider limited to some domains cannot take over an
+/// account in another domain by asserting its address.
+#[test]
+fn a_provider_cannot_link_accounts_outside_its_domains() {
+    let mut partner = config();
+    partner.allowed_domains = vec!["partner.example".into()];
+    let id = identity(partner);
+    let admin = id
+        .setup("priya@northstar.dev", "Priya", "correct horse battery")
+        .unwrap();
+    let err = id
+        .sso_sign_in(&found("evil", Some("priya@northstar.dev"), true), None)
+        .unwrap_err();
+    assert_eq!(err.kind(), ErrorKind::PermissionDenied);
+    assert!(id.user(admin.id).unwrap().admin);
+    // Its own people still sign in and get accounts.
+    let made = id
+        .sso_sign_in(&found("p1", Some("lee@partner.example"), true), None)
+        .unwrap();
+    assert_ne!(made.session.user, admin.id);
+    // Without a domain list, linking works as before.
+    let mut open = config();
+    open.allowed_domains = Vec::new();
+    let id = identity(open);
+    let admin = id
+        .setup("priya@northstar.dev", "Priya", "correct horse battery")
+        .unwrap();
+    let linked = id
+        .sso_sign_in(&found("s", Some("priya@northstar.dev"), true), None)
+        .unwrap();
+    assert_eq!(linked.session.user, admin.id);
+}

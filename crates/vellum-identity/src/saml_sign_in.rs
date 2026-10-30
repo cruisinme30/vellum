@@ -16,7 +16,7 @@ use subtle::ConstantTimeEq as _;
 use vellum_kernel::{Error, ErrorKind, Timestamp};
 
 use crate::identity::{Identity, NewSession, after};
-use crate::providers::{MetadataUrl, SamlMetadataView, check_issuer, may_create};
+use crate::providers::{MetadataUrl, SamlMetadataView, check_issuer, may_create, may_link};
 use crate::saml::{self, Expected, IdentityProvider, ServiceProvider};
 use crate::sso::{SsoIdentity, safe_next};
 use crate::store::{Protocol, Provider, SamlRequest};
@@ -227,8 +227,12 @@ impl Identity {
             email: asserted.email.clone(),
             name: asserted.name,
         };
-        let session =
-            self.federated_sign_in(&found, &|email| may_create(&record, email), user_agent)?;
+        let session = self.federated_sign_in(
+            &found,
+            &|email| may_create(&record, email),
+            &|email| may_link(&record, email),
+            user_agent,
+        )?;
         Ok((session, request.next))
     }
 
