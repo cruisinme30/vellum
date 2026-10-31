@@ -46,6 +46,10 @@ export function createBrowserPushDevice(baseUrl = "", http?: Http): PushDevice {
     supported,
     subscribed: async () => {
       if (!supported) return false;
+      // A subscription needs notification permission, so without it there
+      // is none to look up. Asking anyway is not free: WebKit builds with
+      // no push service block the page in getSubscription().
+      if (Notification.permission !== "granted") return false;
       const registration = await navigator.serviceWorker.ready;
       return (await registration.pushManager.getSubscription()) !== null;
     },
