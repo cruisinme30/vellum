@@ -6,7 +6,9 @@
 use std::f64::consts::{PI, TAU};
 use std::fmt::Write as _;
 
-use super::svg::{Drawing, GRID, INK, MUTED, Svg, fit, series_colour, text_width};
+use super::svg::{
+    Drawing, GRID, INK, MUTED, Svg, fit, series_colour, text_width,
+};
 use crate::html::num;
 use crate::model::{Chart, ChartKind};
 
@@ -249,15 +251,21 @@ fn cartesian(chart: &Chart) -> Drawing {
                         num(zero)
                     );
                     svg.raw(&format!(
-                        "<path d=\"{area}\" style=\"fill:{colour};fill-opacity:0.2;stroke:none\"/>"
+                        "<path d=\"{area}\" \
+                            style=\"fill:{colour};fill-opacity:0.2;stroke:none\
+                            \"/>"
                     ));
                 }
                 svg.path(&d, "none", &colour, 2.5, None);
                 for (i, (x, y)) in pts.iter().enumerate() {
-                    let label = chart.labels.get(i).cloned().unwrap_or_default();
+                    let label =
+                        chart.labels.get(i).cloned().unwrap_or_default();
                     let tip = format!(
                         "{label}: {}",
-                        format_value(s.values.get(i).copied().unwrap_or(0.0), &chart.unit)
+                        format_value(
+                            s.values.get(i).copied().unwrap_or(0.0),
+                            &chart.unit
+                        )
                     );
                     svg.circle(*x, *y, 3.5, &colour, Some(&tip));
                 }
@@ -270,9 +278,14 @@ fn cartesian(chart: &Chart) -> Drawing {
             for (si, s) in chart.series.iter().enumerate() {
                 let colour = series_colour(si);
                 for (i, v) in s.values.iter().enumerate() {
-                    let label = chart.labels.get(i).cloned().unwrap_or_default();
+                    let label =
+                        chart.labels.get(i).cloned().unwrap_or_default();
                     let tip = if chart.series.len() > 1 {
-                        format!("{label} · {}: {}", s.name, format_value(*v, &chart.unit))
+                        format!(
+                            "{label} · {}: {}",
+                            s.name,
+                            format_value(*v, &chart.unit)
+                        )
                     } else {
                         format!("{label}: {}", format_value(*v, &chart.unit))
                     };
@@ -284,7 +297,9 @@ fn cartesian(chart: &Chart) -> Drawing {
                             *t = next;
                         }
                         (x0, inner, y_of(next), y_of(base))
-                    } else if chart.kind == ChartKind::Grouped || chart.series.len() > 1 {
+                    } else if chart.kind == ChartKind::Grouped
+                        || chart.series.len() > 1
+                    {
                         let w = inner / k;
                         (
                             x0 + w * si as f64,
@@ -382,7 +397,11 @@ fn scatter(chart: &Chart) -> Drawing {
     for (si, s) in chart.series.iter().enumerate() {
         for (i, y) in s.values.iter().enumerate() {
             let x = s.xs.get(i).copied().unwrap_or(i as f64);
-            let tip = format!("{}, {}", format_value(x, ""), format_value(*y, &chart.unit));
+            let tip = format!(
+                "{}, {}",
+                format_value(x, ""),
+                format_value(*y, &chart.unit)
+            );
             svg.circle(x_of(x), y_of(*y), 4.0, &series_colour(si), Some(&tip));
         }
     }
@@ -434,7 +453,8 @@ fn radial(chart: &Chart) -> Drawing {
                 let (ix1, iy1) = (cx + inner * a1.cos(), cy + inner * a1.sin());
                 let (ix0, iy0) = (cx + inner * a0.cos(), cy + inner * a0.sin());
                 format!(
-                    "M{} {}A{} {} 0 {large} 1 {} {}L{} {}A{} {} 0 {large} 0 {} {}Z",
+                    "M{} {}A{} {} 0 {large} 1 {} {}L{} {}A{} {} 0 {large} 0 {} \
+                        {}Z",
                     num(x0),
                     num(y0),
                     num(r),
@@ -461,12 +481,19 @@ fn radial(chart: &Chart) -> Drawing {
                     num(y1)
                 )
             };
-            svg.path(&d, &series_colour(i), "var(--vl-surface)", 1.5, Some(&tip));
+            svg.path(
+                &d,
+                &series_colour(i),
+                "var(--vl-surface)",
+                1.5,
+                Some(&tip),
+            );
             a0 = a1;
         }
         // Legend row.
         #[allow(clippy::cast_precision_loss)]
-        let y = 24.0 + i as f64 * 22.0 + (height - 24.0 - rows as f64 * 22.0) / 2.0;
+        let y =
+            24.0 + i as f64 * 22.0 + (height - 24.0 - rows as f64 * 22.0) / 2.0;
         svg.rect(270.0, y - 10.0, 12.0, 12.0, 3.0, &series_colour(i), None);
         let text = format!(
             "{} · {}%",
@@ -495,7 +522,9 @@ mod tests {
     use crate::model;
 
     fn chart(src: &str) -> Chart {
-        let vellum_format::blocks::Data::Chart(c) = model::fence_data("chart", src) else {
+        let vellum_format::blocks::Data::Chart(c) =
+            model::fence_data("chart", src)
+        else {
             panic!()
         };
         model::chart(&c).unwrap()
@@ -518,7 +547,8 @@ mod tests {
     fn draws_every_kind() {
         for kind in ["bar", "line", "area", "grouped", "stacked"] {
             let d = draw(&chart(&format!(
-                "title: T\ntype: {kind}\nlabels: [A, B]\nOne: [1, 2]\nTwo: [3, -1]\n"
+                "title: T\ntype: {kind}\nlabels: [A, B]\nOne: [1, 2]\n\
+                    Two: [3, -1]\n"
             )));
             assert!(d.svg.starts_with("<svg"), "{kind}");
             assert!(d.svg.contains("var(--vl-chart-2)"), "{kind}");
@@ -537,7 +567,8 @@ mod tests {
         let d = draw(&chart(
             "title: \"<script>\"\ntype: bar\nlabels: [\"<b>\"]\nvalues: [1]\n",
         ));
-        let clean = crate::sanitize::xml::sanitize_island(&d.svg, "f0").unwrap();
+        let clean =
+            crate::sanitize::xml::sanitize_island(&d.svg, "f0").unwrap();
         assert!(!clean.contains("<script"));
         assert!(clean.contains("&lt;b&gt;"));
         assert!(clean.contains("aria-labelledby=\"f0-title\""), "{clean}");

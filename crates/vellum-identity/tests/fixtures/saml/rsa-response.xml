@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ID="_resp-rsa" Version="2.0" IssueInstant="2026-10-30T12:00:00Z" Destination="https://vellum.northstar.dev/saml/acs" InResponseTo="_python-request">
+  <saml:Issuer>https://idp.northstar.dev</saml:Issuer>
+  <samlp:Status><samlp:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/></samlp:Status>
+  <saml:Assertion ID="_assert-rsa" Version="2.0" IssueInstant="2026-10-30T12:00:00Z">
+    <saml:Issuer>https://idp.northstar.dev</saml:Issuer>
+    <ds:Signature xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"/><ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/><ds:Reference URI="#_assert-rsa"><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><ds:Transform Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#"><ec:InclusiveNamespaces xmlns:ec="http://www.w3.org/2001/10/xml-exc-c14n#" PrefixList="xs"/></ds:Transform></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><ds:DigestValue>RP/4mG7VTKTPhra/xqi6zBSC1R+YZgWfMlGQZ7T0EFw=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>
+JDLkPgNZ4/eOFtgbyR6AFmYMx1UytNqEWAhLsWdhgprBr4xYRq4Y09A7HgRTOvKPzQpvWZu4Yn3L
+Qthinvwsj4kTCQ8ixhyZ91HihyYa5jQHpRMPI/ymedpLM6EtzpqCARjD87CTl0CyR7Z5Hl0oSXQU
+aO6qeDrhhWCbAvd+uy+jLzh2+4J3TDFfIwVXKkYLPZxsNU4/CsMZRTUr+jlCmaJVXfauF1wecQZw
+xP2jdVnJlziBRrGMGbltGLbsjdzhmbowPQpUaT4faunf0Gb3bI9EsyDsYFR3HfKbLFvG6EZMl3qP
+y0H9HYV7dcvR74HvUrPr7058rXdL/14MlpYc9A==
+</ds:SignatureValue></ds:Signature><saml:Subject>
+      <saml:NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified">00u1priya</saml:NameID>
+      <saml:SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+        <saml:SubjectConfirmationData InResponseTo="_python-request" NotOnOrAfter="2026-10-30T12:05:00Z" Recipient="https://vellum.northstar.dev/saml/acs"/>
+      </saml:SubjectConfirmation>
+    </saml:Subject>
+    <saml:Conditions NotBefore="2026-10-30T11:59:00Z" NotOnOrAfter="2026-10-30T12:05:00Z">
+      <saml:AudienceRestriction><saml:Audience>https://vellum.northstar.dev/saml/metadata</saml:Audience></saml:AudienceRestriction>
+    </saml:Conditions>
+    <saml:AuthnStatement AuthnInstant="2026-10-30T12:00:00Z" SessionIndex="_s1">
+      <saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport</saml:AuthnContextClassRef></saml:AuthnContext>
+    </saml:AuthnStatement>
+    <saml:AttributeStatement>
+      <saml:Attribute Name="email" NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic">
+        <saml:AttributeValue xsi:type="xs:string">Priya@Northstar.dev</saml:AttributeValue>
+      </saml:Attribute>
+      <saml:Attribute Name="displayName"><saml:AttributeValue xsi:type="xs:string">Priya Raman &amp; co</saml:AttributeValue></saml:Attribute>
+    </saml:AttributeStatement>
+  </saml:Assertion>
+</samlp:Response>

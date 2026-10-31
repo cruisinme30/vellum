@@ -73,7 +73,9 @@ mod tests {
         assert_eq!(ciphertext.len(), b"northstar".len() + TAG_LEN);
         assert_eq!(open(&key, &nonce, b"aad", &ciphertext)?, b"northstar");
         assert!(open(&key, &nonce, b"other", &ciphertext).is_err());
-        assert!(open(&SecretKey::generate()?, &nonce, b"aad", &ciphertext).is_err());
+        assert!(
+            open(&SecretKey::generate()?, &nonce, b"aad", &ciphertext).is_err()
+        );
         Ok(())
     }
 }

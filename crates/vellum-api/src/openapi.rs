@@ -30,7 +30,11 @@ fn pascal(id: &str) -> String {
 /// Replaces `#/$defs/<name>` references using `names`. A bare `#` is the
 /// root schema itself (a recursive type such as a task's subtasks), stored
 /// under `root`.
-fn rewrite_refs(value: &Value, names: &BTreeMap<String, String>, root: &str) -> Value {
+fn rewrite_refs(
+    value: &Value,
+    names: &BTreeMap<String, String>,
+    root: &str,
+) -> Value {
     match value {
         Value::Object(map) => Value::Object(
             map.iter()
@@ -46,19 +50,22 @@ fn rewrite_refs(value: &Value, names: &BTreeMap<String, String>, root: &str) -> 
                         })
                         .filter(|_| k == "$ref")
                     {
-                        let target = names.get(name).map_or(name, String::as_str);
+                        let target =
+                            names.get(name).map_or(name, String::as_str);
                         return (
                             k.clone(),
-                            Value::String(format!("#/components/schemas/{target}")),
+                            Value::String(format!(
+                                "#/components/schemas/{target}"
+                            )),
                         );
                     }
                     (k.clone(), rewrite_refs(v, names, root))
                 })
                 .collect(),
         ),
-        Value::Array(items) => {
-            Value::Array(items.iter().map(|v| rewrite_refs(v, names, root)).collect())
-        }
+        Value::Array(items) => Value::Array(
+            items.iter().map(|v| rewrite_refs(v, names, root)).collect(),
+        ),
         other => other.clone(),
     }
 }
@@ -73,7 +80,12 @@ impl Components {
     /// Adds a root schema from `schemars` and its `$defs`, returning a
     /// schema for the root that references the components. The root is
     /// stored under its `title` (or `fallback`).
-    pub fn add_root(&mut self, root: &Value, fallback: &str, owner: &str) -> Value {
+    pub fn add_root(
+        &mut self,
+        root: &Value,
+        fallback: &str,
+        owner: &str,
+    ) -> Value {
         let mut root = root.as_object().cloned().unwrap_or_default();
         let defs = root
             .remove("$defs")
@@ -83,7 +95,9 @@ impl Components {
         let title = root
             .get("title")
             .and_then(Value::as_str)
-            .filter(|t| t.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+            .filter(|t| {
+                t.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            })
             .map_or_else(|| fallback.to_owned(), str::to_owned);
         let mut all: Map<String, Value> = defs;
         let _ = all.insert(title.clone(), Value::Object(root));
@@ -94,7 +108,8 @@ impl Components {
             let mut changed = false;
             for (name, schema) in &all {
                 let rewritten = rewrite_refs(schema, &names, &title);
-                let current = names.get(name).cloned().unwrap_or_else(|| name.clone());
+                let current =
+                    names.get(name).cloned().unwrap_or_else(|| name.clone());
                 if self
                     .schemas
                     .get(&current)
@@ -117,7 +132,8 @@ impl Components {
             }
         }
         for (name, schema) in &all {
-            let target = names.get(name).cloned().unwrap_or_else(|| name.clone());
+            let target =
+                names.get(name).cloned().unwrap_or_else(|| name.clone());
             let rewritten = rewrite_refs(schema, &names, &title);
             let _ = self.schemas.entry(target).or_insert(rewritten);
         }
@@ -143,8 +159,18 @@ impl Components {
     }
 }
 
-fn parameter(name: &str, location: &str, required: bool, schema: &Value) -> Value {
-    json!({ "name": name, "in": location, "required": required, "schema": schema })
+fn parameter(
+    name: &str,
+    location: &str,
+    required: bool,
+    schema: &Value,
+) -> Value {
+    json!({
+        "name": name,
+        "in": location,
+        "required": required,
+        "schema": schema
+    })
 }
 
 /// Builds the OpenAPI 3.1 document for every registered operation.
@@ -155,9 +181,12 @@ fn parameter(name: &str, location: &str, required: bool, schema: &Value) -> Valu
 )]
 pub fn document(registry: &Registry, version: &str) -> Value {
     let mut components = Components::default();
-    let error = schemars::SchemaGenerator::new(schemars::generate::SchemaSettings::draft2020_12())
-        .into_root_schema_for::<ApiError>();
-    let error_ref = components.add_root(&Value::from(error), ERROR_SCHEMA, "Gateway");
+    let error = schemars::SchemaGenerator::new(
+        schemars::generate::SchemaSettings::draft2020_12(),
+    )
+    .into_root_schema_for::<ApiError>();
+    let error_ref =
+        components.add_root(&Value::from(error), ERROR_SCHEMA, "Gateway");
     let mut paths: BTreeMap<String, Map<String, Value>> = BTreeMap::new();
     let mut tags = std::collections::BTreeSet::new();
     for registered in registry.operations() {
@@ -201,7 +230,10 @@ pub fn document(registry: &Registry, version: &str) -> Value {
         if op.method().has_body() {
             let _ = operation.insert(
                 "requestBody".into(),
-                json!({ "required": true, "content": { "application/json": { "schema": input_ref } } }),
+                json!({
+                    "required": true,
+                    "content": { "application/json": { "schema": input_ref } }
+                }),
             );
         } else {
             for (name, schema) in &properties {
@@ -218,8 +250,12 @@ pub fn document(registry: &Registry, version: &str) -> Value {
         if op.kind() == OperationKind::Mutation {
             parameters.push(json!({
                 "name": "Idempotency-Key", "in": "header", "required": false,
-                "description": "A unique key that makes retries of this write safe.",
-                "schema": { "type": "string", "maxLength": crate::idempotency::MAX_KEY_LEN }
+                "description": "A unique key that makes retries of this write \
+                    safe.",
+                "schema": {
+                    "type": "string",
+                    "maxLength": crate::idempotency::MAX_KEY_LEN
+                }
             }));
         }
         let security = if op.allows_anonymous() {
@@ -244,7 +280,8 @@ pub fn document(registry: &Registry, version: &str) -> Value {
             (
                 "responses",
                 json!({
-                    "200": { "description": "Success", "content": { "application/json": { "schema": output_ref } } },
+                    "200": { "description": "Success", "content": { "applicatio\
+                        n/json": { "schema": output_ref } } },
                     "default": { "$ref": "#/components/responses/Error" }
                 }),
             ),
@@ -274,8 +311,12 @@ pub fn document(registry: &Registry, version: &str) -> Value {
         "info": {
             "title": "Vellum API",
             "version": version,
-            "summary": "Every Vellum service over REST. The same operations are served over GraphQL at /api/graphql.",
-            "license": { "name": "AGPL-3.0-only", "identifier": "AGPL-3.0-only" }
+            "summary": "Every Vellum service over REST. The same operations \
+                are served over GraphQL at /api/graphql.",
+            "license": {
+                "name": "AGPL-3.0-only",
+                "identifier": "AGPL-3.0-only"
+            }
         },
         "jsonSchemaDialect": "https://json-schema.org/draft/2020-12/schema",
         "servers": [{ "url": "/api" }],
@@ -285,7 +326,8 @@ pub fn document(registry: &Registry, version: &str) -> Value {
             "schemas": components.schemas(),
             "responses": {
                 "Error": {
-                    "description": "An error. `code` is stable; `message` is safe to show; quote `request_id` when reporting it.",
+                    "description": "An error. `code` is stable; `message` is \
+                        safe to show; quote `request_id` when reporting it.",
                     "headers": {
                         "X-Request-Id": { "schema": { "type": "string" } }
                     },
@@ -295,11 +337,13 @@ pub fn document(registry: &Registry, version: &str) -> Value {
             "securitySchemes": {
                 "session": {
                     "type": "apiKey", "in": "cookie", "name": "vellum_session",
-                    "description": "The browser session. Unsafe requests also need the X-CSRF-Token header."
+                    "description": "The browser session. Unsafe requests also \
+                        need the X-CSRF-Token header."
                 },
                 "bearer": {
                     "type": "http", "scheme": "bearer",
-                    "description": "A scoped API token or an OAuth 2.1 access token."
+                    "description": "A scoped API token or an OAuth 2.1 access \
+                        token."
                 }
             }
         }
@@ -313,9 +357,13 @@ mod tests {
     #[test]
     fn components_dedupe_and_rename() {
         let mut c = Components::default();
-        let a = json!({"title": "Page", "type": "object", "properties": {"x": {"$ref": "#/$defs/Kind"}},
+        let a = json!({"title": "Page", "type": "object", "properties": {
+            "x": {"$ref": "#/$defs/Kind"}
+        },
             "$defs": {"Kind": {"type": "string", "enum": ["a"]}}});
-        let b = json!({"title": "Page", "type": "object", "properties": {"x": {"$ref": "#/$defs/Kind"}},
+        let b = json!({"title": "Page", "type": "object", "properties": {
+            "x": {"$ref": "#/$defs/Kind"}
+        },
             "$defs": {"Kind": {"type": "string", "enum": ["b"]}}});
         assert_eq!(
             c.add_root(&a, "F", "One"),
@@ -350,7 +398,9 @@ mod tests {
     fn a_recursive_root_refers_to_its_own_component() {
         let mut c = Components::default();
         let task = json!({"title": "TaskView", "type": "object",
-            "properties": {"subtasks": {"type": "array", "items": {"$ref": "#"}}}});
+        "properties": {
+            "subtasks": {"type": "array", "items": {"$ref": "#"}}
+        }});
         assert_eq!(
             c.add_root(&task, "F", "Tasks"),
             json!({"$ref": "#/components/schemas/TaskView"})

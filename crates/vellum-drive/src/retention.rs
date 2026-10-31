@@ -117,7 +117,8 @@ mod tests {
         let versions: Vec<VersionRecord> = (0..70)
             .map(|d| version(now - (200 + d) * DAY_MS, u128::from(d)))
             .collect();
-        let kept = versions.len() - prunable(&versions, &RetentionPolicy::default(), now).len();
+        let kept = versions.len()
+            - prunable(&versions, &RetentionPolicy::default(), now).len();
         assert!((10..=11).contains(&kept), "kept {kept}");
     }
 }

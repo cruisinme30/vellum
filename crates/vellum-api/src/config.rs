@@ -101,11 +101,15 @@ mod tests {
 
     #[test]
     fn hosts() {
-        let mut c = GatewayConfig::new("https://Vellum.Northstar.dev/", vec![0; 32]);
+        let mut c =
+            GatewayConfig::new("https://Vellum.Northstar.dev/", vec![0; 32]);
         c.public_origin = Some("https://pages.northstar.dev:8443".into());
         assert_eq!(c.app_origin, "https://Vellum.Northstar.dev");
         assert_eq!(c.app_host(), "vellum.northstar.dev");
-        assert_eq!(c.public_host().as_deref(), Some("pages.northstar.dev:8443"));
+        assert_eq!(
+            c.public_host().as_deref(),
+            Some("pages.northstar.dev:8443")
+        );
         assert!(c.https);
         assert!(!format!("{c:?}").contains("[0"));
         assert!(!GatewayConfig::new("http://localhost:7700", vec![]).https);

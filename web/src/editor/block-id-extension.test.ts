@@ -71,7 +71,10 @@ describe("BlockIds", () => {
 
   it("re-assigns a duplicated id, as after a paste of a copied block", () => {
     const target = open(body(withId(p("original"), ID_A)));
-    target.commands.insertContentAt(target.state.doc.content.size, withId(p("copy"), ID_A));
+    target.commands.insertContentAt(
+      target.state.doc.content.size,
+      withId(p("copy"), ID_A),
+    );
     const [first, second] = blockIds(target);
     expect(first).toBe(ID_A);
     expect(isBlockId(second)).toBe(true);
@@ -106,7 +109,9 @@ describe("BlockIds", () => {
     const target = new Editor({
       extensions: [
         StarterKit,
-        BlockIds.configure({ generate: () => sequence.shift() ?? "blk-cccccccc" }),
+        BlockIds.configure({
+          generate: () => sequence.shift() ?? "blk-cccccccc",
+        }),
       ],
       content: body(p("one"), p("two")),
     });

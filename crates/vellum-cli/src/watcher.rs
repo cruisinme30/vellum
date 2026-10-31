@@ -47,7 +47,8 @@ pub async fn start(
     let feed = match LocalFeed::start(data_dir, paths_tx) {
         Ok(feed) => feed,
         Err(error) => {
-            tracing::warn!(%error, "not watching for external edits; restart to pick them up");
+            tracing::warn!(%error, "not watching for external edits; restart \
+                to pick them up");
             return Ok(());
         }
     };
@@ -113,7 +114,9 @@ async fn apply(batch: &[Change], services: &Services) {
     } = services;
     match drive.apply_changes(batch).await {
         Ok(report) => tracing::debug!(?report, "applied external changes"),
-        Err(error) => tracing::warn!(%error, "external changes not applied to the drive"),
+        Err(error) => {
+            tracing::warn!(%error, "external changes not applied to the drive");
+        }
     }
     let touched = book_manifests(batch);
     if touched.is_empty() {
@@ -122,13 +125,17 @@ async fn apply(batch: &[Change], services: &Services) {
     // A book.yaml appeared, moved, changed or went: forget where books
     // are, then re-apply each touched book's section restrictions.
     books.invalidate().await;
-    let located = match vellum_books_service::files::locate(files.as_ref()).await {
-        Ok(located) => located,
-        Err(error) => {
-            tracing::warn!(%error, "books not re-read after a book.yaml change");
-            return;
-        }
-    };
+    let located =
+        match vellum_books_service::files::locate(files.as_ref()).await {
+            Ok(located) => located,
+            Err(error) => {
+                tracing::warn!(
+                    %error,
+                    "books not re-read after a book.yaml change"
+                );
+                return;
+            }
+        };
     for (id, dir) in located {
         if !touched.contains(&dir) {
             continue;
@@ -136,7 +143,13 @@ async fn apply(batch: &[Change], services: &Services) {
         match books.sync_access(id).await {
             Ok(()) => tracing::debug!(book = %dir, "book access re-applied"),
             Err(e) if e.kind() == ErrorKind::NotFound => {}
-            Err(error) => tracing::warn!(%error, book = %dir, "book access not re-applied"),
+            Err(error) => {
+                tracing::warn!(
+                    %error,
+                    book = %dir,
+                    "book access not re-applied"
+                );
+            }
         }
     }
 }

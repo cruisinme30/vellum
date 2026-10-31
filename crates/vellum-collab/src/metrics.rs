@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! OpenTelemetry instruments for rooms (exported by `vellum-kernel::telemetry`).
+//! OpenTelemetry instruments for rooms (exported by
+//! `vellum-kernel::telemetry`).
 
 use opentelemetry::KeyValue;
 use opentelemetry::metrics::{Counter, Histogram, UpDownCounter};
@@ -50,7 +51,9 @@ impl Metrics {
                 .build(),
             rejected: meter
                 .u64_counter("vellum.collab.rejected")
-                .with_description("Messages refused (read-only, malformed, too large)")
+                .with_description(
+                    "Messages refused (read-only, malformed, too large)",
+                )
                 .build(),
             dropped_peers: meter
                 .u64_counter("vellum.collab.peers.dropped")

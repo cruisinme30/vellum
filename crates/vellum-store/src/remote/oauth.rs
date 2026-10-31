@@ -113,7 +113,10 @@ impl RefreshToken {
             )));
         }
         let grant: Grant = response.json().await.map_err(|e| {
-            StoreError::Backend(format!("oauth: bad token response: {}", e.without_url()))
+            StoreError::Backend(format!(
+                "oauth: bad token response: {}",
+                e.without_url()
+            ))
         })?;
         let life = Duration::from_secs(grant.expires_in.unwrap_or(3600));
         let until = Instant::now() + life.saturating_sub(EARLY);

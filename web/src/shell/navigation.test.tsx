@@ -8,6 +8,9 @@ import { matchQueries, renderApp } from "../test/render-app";
 
 import { COMPACT, MEDIUM } from "./use-media";
 
+const rect = (top: number, bottom: number) =>
+  DOMRect.fromRect({ y: top, height: bottom - top });
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -17,7 +20,9 @@ describe("NavigationRail", () => {
     renderApp("/inbox");
     const rail = screen.getByRole("navigation", { name: "Main" });
     const links = within(rail).getAllByRole("link");
-    expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
+    expect(
+      links.map((link) => [link.textContent, link.getAttribute("href")]),
+    ).toEqual([
       ["Home", "/"],
       ["Search", "/search"],
       ["Favorites", "/favorites"],
@@ -26,19 +31,25 @@ describe("NavigationRail", () => {
       ["Help", "/help"],
       ["Admin", "/admin"],
     ]);
-    expect(within(rail).getByRole("link", { name: "Inbox" }).getAttribute("aria-current")).toBe(
-      "page",
-    );
-    expect(within(rail).getByRole("link", { name: "Home" }).hasAttribute("aria-current")).toBe(
-      false,
-    );
+    expect(
+      within(rail)
+        .getByRole("link", { name: "Inbox" })
+        .getAttribute("aria-current"),
+    ).toBe("page");
+    expect(
+      within(rail)
+        .getByRole("link", { name: "Home" })
+        .hasAttribute("aria-current"),
+    ).toBe(false);
   });
 
   it("navigates to a destination", async () => {
     const { user, location } = renderApp("/");
     await user.click(screen.getByRole("link", { name: "Help" }));
     expect(location()).toBe("/help");
-    expect(screen.getByRole("heading", { level: 1, name: "Help" })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Help" }),
+    ).toBeDefined();
   });
 
   it("opens and closes the theme settings", async () => {
@@ -90,7 +101,9 @@ describe("BottomBar", () => {
     await user.click(more);
     expect(more.getAttribute("aria-expanded")).toBe("true");
     const sheet = screen.getByRole("complementary", { name: "Pages" });
-    const links = within(sheet).getByRole("navigation", { name: "More destinations" });
+    const links = within(sheet).getByRole("navigation", {
+      name: "More destinations",
+    });
     expect(
       within(links)
         .getAllByRole("link")
@@ -128,4 +141,34 @@ describe("BottomBar", () => {
       expect(location()).toBe(`/p/${created?.id ?? ""}`);
     });
   });
+
+  it(
+    "scrolls a control focused by keyboard out from under the " + "bar",
+    async () => {
+      vi.stubGlobal("matchMedia", matchQueries(COMPACT, MEDIUM));
+      const { user } = renderApp("/help");
+      const bar = screen.getByRole("navigation", { name: "Main" });
+      const main = screen.getByRole("main");
+      const below = document.createElement("button");
+      const above = document.createElement("button");
+      main.append(above, below);
+      vi.spyOn(bar, "getBoundingClientRect").mockReturnValue(rect(754, 844));
+      vi.spyOn(above, "getBoundingClientRect").mockReturnValue(rect(600, 700));
+      vi.spyOn(below, "getBoundingClientRect").mockReturnValue(rect(719, 825));
+      // jsdom never matches :focus-visible; a browser does after Tab.
+      for (const button of [above, below]) {
+        const matches = button.matches.bind(button);
+        vi.spyOn(button, "matches").mockImplementation(
+          (selector) => selector === ":focus-visible" || matches(selector),
+        );
+      }
+      const aboveScroll = vi.spyOn(above, "scrollIntoView");
+      const belowScroll = vi.spyOn(below, "scrollIntoView");
+      above.focus();
+      await user.tab();
+      expect(document.activeElement).toBe(below);
+      expect(aboveScroll).not.toHaveBeenCalled();
+      expect(belowScroll).toHaveBeenCalledWith({ block: "nearest" });
+    },
+  );
 });

@@ -14,10 +14,19 @@ import {
   type MockWorld,
 } from "./mock-engine";
 import { matches, parseFilter } from "./mock-filter";
-import type { CellView, Column, QueryInput, ViewInfo, ViewResult } from "./types";
+import type {
+  CellView,
+  Column,
+  QueryInput,
+  ViewInfo,
+  ViewResult,
+} from "./types";
 import { dayOf, isEmpty, plain } from "./value";
 
-function viewOf(collection: MockCollection, name: string | undefined): ViewInfo {
+function viewOf(
+  collection: MockCollection,
+  name: string | undefined,
+): ViewInfo {
   const wanted = name?.trim().toLowerCase();
   const view =
     wanted === undefined
@@ -36,16 +45,25 @@ function selectRows(
   view: ViewInfo,
   input: QueryInput,
 ): FullRow[] {
-  const filters = [...view.filters, ...(input.filter ?? [])].map((f) => parseFilter(collection, f));
+  const filters = [...view.filters, ...(input.filter ?? [])].map((f) =>
+    parseFilter(collection, f),
+  );
   const kept = (world.rows.get(collection.id) ?? [])
     .map((row) => computeRow(world, collection, row))
     .filter((row) =>
       filters.every((f) => {
         const property = resolve(collection, f.key);
-        return property !== undefined && matches(world, property, row.values[f.key], f);
+        return (
+          property !== undefined &&
+          matches(world, property, row.values[f.key], f)
+        );
       }),
     );
-  return sortRows(collection, kept, input.sort?.length ? input.sort : view.sorts);
+  return sortRows(
+    collection,
+    kept,
+    input.sort?.length ? input.sort : view.sorts,
+  );
 }
 
 function cellsOf(
@@ -58,15 +76,21 @@ function cellsOf(
     const value = row.values[column.key];
     const property = resolve(collection, column.key);
     const shown = property ? display(world, property, value) : "";
-    return value === undefined || isEmpty(value) ? { display: shown } : { value, display: shown };
+    return value === undefined || isEmpty(value)
+      ? { display: shown }
+      : { value, display: shown };
   });
 }
 
-/** Where a row sits on a calendar or timeline: from its date to its end date. */
+/**
+ * Where a row sits on a calendar or timeline: from its date to its end date.
+ */
 function spanOf(row: FullRow, dateKey: string, endKey: string | undefined) {
   const start = dayOf(row.values[dateKey]);
   const end = dayOf(row.values[endKey ?? ""]);
-  return start === "" ? {} : { span: { start, end: end.localeCompare(start) > 0 ? end : start } };
+  return start === ""
+    ? {}
+    : { span: { start, end: end.localeCompare(start) > 0 ? end : start } };
 }
 
 /** Runs a query the way `collections.query` does, on the mock's data. */
@@ -79,8 +103,14 @@ export function runQuery(
   const kind = input.kind ?? view.kind;
   const sorted = selectRows(world, collection, view, input);
   const limit = input.limit ?? view.limit ?? sorted.length;
-  const columns = columnsOf(collection, input.hide?.length ? input.hide : view.hidden);
-  const dateKey = view.date ?? collection.properties.find((p) => p.type === "date")?.key ?? "";
+  const columns = columnsOf(
+    collection,
+    input.hide?.length ? input.hide : view.hidden,
+  );
+  const dateKey =
+    view.date ??
+    collection.properties.find((p) => p.type === "date")?.key ??
+    "";
   const timed = kind === "calendar" || kind === "timeline";
   const group = resolve(collection, input.group ?? view.group ?? "");
   const rows = sorted.slice(0, limit).map((row): Groupable => ({

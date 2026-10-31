@@ -3,7 +3,15 @@
 
 import { describe, expect, it } from "vitest";
 
-import { contrast, fromLch, luminance, parseHex, toHex, toLch, tone } from "./color";
+import {
+  contrast,
+  fromLch,
+  luminance,
+  parseHex,
+  toHex,
+  toLch,
+  tone,
+} from "./color";
 
 const BLACK = { r: 0, g: 0, b: 0 };
 const WHITE = { r: 1, g: 1, b: 1 };
@@ -16,7 +24,15 @@ describe("parseHex", () => {
   });
 
   it("rejects anything else", () => {
-    for (const value of ["", "#", "#ff", "#ffff", "#ggg", "#1234567", "rgb(0,0,0)"]) {
+    for (const value of [
+      "",
+      "#",
+      "#ff",
+      "#ffff",
+      "#ggg",
+      "#1234567",
+      "rgb(0,0,0)",
+    ]) {
       expect(parseHex(value), value).toBeUndefined();
     }
   });
@@ -32,7 +48,10 @@ describe("luminance and contrast", () => {
   it("spans 0 for black to 1 for white", () => {
     expect(luminance(BLACK)).toBe(0);
     expect(luminance(WHITE)).toBeCloseTo(1, 10);
-    expect(luminance({ r: 0.02, g: 0.02, b: 0.02 })).toBeCloseTo(0.02 / 12.92, 10);
+    expect(luminance({ r: 0.02, g: 0.02, b: 0.02 })).toBeCloseTo(
+      0.02 / 12.92,
+      10,
+    );
   });
 
   it("is symmetric", () => {

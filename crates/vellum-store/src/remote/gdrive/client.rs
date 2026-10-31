@@ -36,8 +36,8 @@ pub(super) const FOLDER_MIME: &str = "application/vnd.google-apps.folder";
 /// no downloadable bytes.
 const NATIVE_PREFIX: &str = "application/vnd.google-apps.";
 /// The file fields every call asks for.
-const FIELDS: &str = "id,name,mimeType,parents,size,modifiedTime,createdTime,version,\
-                      md5Checksum,headRevisionId,trashed";
+const FIELDS: &str = "id,name,mimeType,parents,size,modifiedTime,createdTime,ve\
+                      rsion,md5Checksum,headRevisionId,trashed";
 /// Attempts when Drive answers `403 rateLimitExceeded`, including the first.
 const RATE_LIMIT_ATTEMPTS: u32 = 5;
 /// First delay after a `403` rate limit; doubles on each retry.
@@ -179,9 +179,9 @@ fn checked_id(id: &str) -> StoreResult<&str> {
 /// The content type stored with an upload. Drive converts only when asked,
 /// so this only affects how Drive's own UI previews the file.
 fn mime_for(name: &str) -> &'static str {
-    let markdown = std::path::Path::new(name)
-        .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown"));
+    let markdown = std::path::Path::new(name).extension().is_some_and(|e| {
+        e.eq_ignore_ascii_case("md") || e.eq_ignore_ascii_case("markdown")
+    });
     if markdown {
         "text/markdown"
     } else {
@@ -214,19 +214,30 @@ fn is_rate_limit(body: &[u8]) -> bool {
     inner.errors.iter().chain(&inner.details).any(|r| {
         matches!(
             r.reason.as_str(),
-            "rateLimitExceeded" | "userRateLimitExceeded" | "RATE_LIMIT_EXCEEDED"
+            "rateLimitExceeded"
+                | "userRateLimitExceeded"
+                | "RATE_LIMIT_EXCEEDED"
         )
     })
 }
 
 /// A [`StoreError::Backend`] for a failed call, naming the path when
 /// there is one.
-fn body_error(path: Option<&BlobPath>, what: &str, status: StatusCode, body: &Bytes) -> StoreError {
+fn body_error(
+    path: Option<&BlobPath>,
+    what: &str,
+    status: StatusCode,
+    body: &Bytes,
+) -> StoreError {
     path.map_or_else(
         || {
-            let excerpt =
-                String::from_utf8_lossy(body.get(..body.len().min(300)).unwrap_or_default());
-            StoreError::Backend(format!("{BACKEND}: {status} on {what}: {}", excerpt.trim()))
+            let excerpt = String::from_utf8_lossy(
+                body.get(..body.len().min(300)).unwrap_or_default(),
+            );
+            StoreError::Backend(format!(
+                "{BACKEND}: {status} on {what}: {}",
+                excerpt.trim()
+            ))
         },
         |path| backend_error(BACKEND, path, status, body),
     )
@@ -234,7 +245,11 @@ fn body_error(path: Option<&BlobPath>, what: &str, status: StatusCode, body: &By
 
 /// Turns a non-success response into an error: `404` is `NotFound` when
 /// there is a path to name, everything else is `Backend`.
-async fn failure(response: Response, path: Option<&BlobPath>, what: &str) -> StoreError {
+async fn failure(
+    response: Response,
+    path: Option<&BlobPath>,
+    what: &str,
+) -> StoreError {
     if let Some(path) = path {
         return status_error(BACKEND, path, response).await;
     }
@@ -243,7 +258,11 @@ async fn failure(response: Response, path: Option<&BlobPath>, what: &str) -> Sto
     body_error(None, what, status, &body)
 }
 
-async fn success(response: Response, path: Option<&BlobPath>, what: &str) -> StoreResult<Response> {
+async fn success(
+    response: Response,
+    path: Option<&BlobPath>,
+    what: &str,
+) -> StoreResult<Response> {
     if response.status().is_success() {
         Ok(response)
     } else {
@@ -251,7 +270,10 @@ async fn success(response: Response, path: Option<&BlobPath>, what: &str) -> Sto
     }
 }
 
-async fn json<T: for<'de> Deserialize<'de>>(response: Response, what: &str) -> StoreResult<T> {
+async fn json<T: for<'de> Deserialize<'de>>(
+    response: Response,
+    what: &str,
+) -> StoreResult<T> {
     response.json().await.map_err(|e| {
         StoreError::Backend(format!(
             "{BACKEND}: bad response for {what}: {}",
@@ -261,7 +283,11 @@ async fn json<T: for<'de> Deserialize<'de>>(response: Response, what: &str) -> S
 }
 
 /// A `multipart/related` body: JSON metadata, then the media.
-fn multipart(metadata: &serde_json::Value, media: &[u8], mime: &str) -> (String, Bytes) {
+fn multipart(
+    metadata: &serde_json::Value,
+    media: &[u8],
+    mime: &str,
+) -> (String, Bytes) {
     let mut boundary = String::from("vellum-gdrive-boundary");
     let mut n = 0_u32;
     // The boundary must not occur inside the media.
@@ -275,8 +301,8 @@ fn multipart(metadata: &serde_json::Value, media: &[u8], mime: &str) -> (String,
     }
     let mut body = BytesMut::with_capacity(media.len() + 256);
     let head = format!(
-        "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n\
-         --{boundary}\r\nContent-Type: {mime}\r\n\r\n"
+        "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n\
+         {metadata}\r\n--{boundary}\r\nContent-Type: {mime}\r\n\r\n"
     );
     body.extend_from_slice(head.as_bytes());
     body.extend_from_slice(media);
@@ -340,20 +366,30 @@ impl Client {
                 .await?;
             match response.status() {
                 StatusCode::UNAUTHORIZED if !reauthed => {
-                    tracing::debug!(backend = BACKEND, "access token rejected; refreshing");
+                    tracing::debug!(
+                        backend = BACKEND,
+                        "access token rejected; refreshing"
+                    );
                     self.tokens.invalidate().await;
                     reauthed = true;
                 }
                 StatusCode::UNAUTHORIZED => {
                     return Err(StoreError::Backend(format!(
-                        "{BACKEND}: 401 Unauthorized on {what}: credentials rejected twice"
+                        "{BACKEND}: 401 Unauthorized on {what}: credentials \
+                            rejected twice"
                     )));
                 }
                 StatusCode::FORBIDDEN => {
                     let body = response.bytes().await.unwrap_or_default();
                     throttled += 1;
-                    if !is_rate_limit(&body) || throttled >= RATE_LIMIT_ATTEMPTS {
-                        return Err(body_error(path, what, StatusCode::FORBIDDEN, &body));
+                    if !is_rate_limit(&body) || throttled >= RATE_LIMIT_ATTEMPTS
+                    {
+                        return Err(body_error(
+                            path,
+                            what,
+                            StatusCode::FORBIDDEN,
+                            &body,
+                        ));
                     }
                     tracing::debug!(
                         backend = BACKEND,
@@ -390,7 +426,11 @@ impl Client {
     }
 
     /// `files.get?alt=media`: the file's bytes.
-    pub(super) async fn download(&self, id: &str, path: &BlobPath) -> StoreResult<Bytes> {
+    pub(super) async fn download(
+        &self,
+        id: &str,
+        path: &BlobPath,
+    ) -> StoreResult<Bytes> {
         let url = self.file_url(id)?;
         let response = self
             .call(Some(path), "files.get", |c| {
@@ -403,7 +443,10 @@ impl Client {
             .bytes()
             .await
             .map_err(|e| {
-                StoreError::Backend(format!("{BACKEND}: reading {path}: {}", e.without_url()))
+                StoreError::Backend(format!(
+                    "{BACKEND}: reading {path}: {}",
+                    e.without_url()
+                ))
             })
     }
 
@@ -447,7 +490,10 @@ impl Client {
                     ("includeItemsFromAllDrives", "true"),
                 ]);
                 req = match &self.drive_id {
-                    Some(drive) => req.query(&[("corpora", "drive"), ("driveId", drive.as_str())]),
+                    Some(drive) => req.query(&[
+                        ("corpora", "drive"),
+                        ("driveId", drive.as_str()),
+                    ]),
                     None => req.query(&[("corpora", "user")]),
                 };
                 if let Some(token) = page_token {
@@ -457,7 +503,8 @@ impl Client {
             })
             .await?;
         let page: FileList =
-            json(success(response, None, "files.list").await?, "files.list").await?;
+            json(success(response, None, "files.list").await?, "files.list")
+                .await?;
         if page.incomplete_search {
             tracing::warn!(
                 backend = BACKEND,
@@ -495,9 +542,17 @@ impl Client {
     }
 
     /// `files.create` for a folder.
-    pub(super) async fn create_folder(&self, parent: &str, name: &str) -> StoreResult<DriveFile> {
+    pub(super) async fn create_folder(
+        &self,
+        parent: &str,
+        name: &str,
+    ) -> StoreResult<DriveFile> {
         let url = format!("{}/files", self.api);
-        let body = json!({ "name": name, "mimeType": FOLDER_MIME, "parents": [parent] });
+        let body = json!({
+            "name": name,
+            "mimeType": FOLDER_MIME,
+            "parents": [parent]
+        });
         let response = self
             .call(None, "files.create", |c| {
                 c.post(&url)
@@ -623,7 +678,8 @@ impl Client {
                     .header("X-Upload-Content-Length", &length)
             })
             .await?;
-        let response = success(response, Some(path), "resumable upload").await?;
+        let response =
+            success(response, Some(path), "resumable upload").await?;
         // The session URI authorises uploads by itself: never log it.
         let session = response
             .headers()
@@ -663,7 +719,8 @@ impl Client {
                         stalls += 1;
                         if stalls >= MAX_STALLS {
                             return Err(StoreError::Backend(format!(
-                                "{BACKEND}: resumable upload of {path} stalled at byte {offset}"
+                                "{BACKEND}: resumable upload of {path} stalled \
+                                    at byte {offset}"
                             )));
                         }
                     } else {
@@ -677,7 +734,14 @@ impl Client {
                     );
                     offset = next;
                 }
-                _ => return Err(failure(response, Some(path), "resumable upload").await),
+                _ => {
+                    return Err(failure(
+                        response,
+                        Some(path),
+                        "resumable upload",
+                    )
+                    .await);
+                }
             }
         }
     }

@@ -17,7 +17,8 @@ and contribute.
 - Index: SQLite locally, Postgres in the team and org profiles
 - Editor: TypeScript, React 19, Vite and Tiptap
 - Real time: Yjs on the client, yrs on the server
-- Licence: AGPL-3.0-only, with a Developer Certificate of Origin sign-off on every commit
+- Licence: AGPL-3.0-only, with a Developer Certificate of Origin sign-off on
+  every commit
 
 :::
 
@@ -25,8 +26,10 @@ and contribute.
 
 ::: cards
 
-- 📄 **Files are the truth** Every object is a Vellum Markdown file; the database is a rebuildable index.
-- 🧱 **Ports and adapters** Services own their data behind traits; adapters plug in storage, databases and transports.
+- 📄 **Files are the truth** Every object is a Vellum Markdown file; the database
+  is a rebuildable index.
+- 🧱 **Ports and adapters** Services own their data behind traits; adapters plug
+  in storage, databases and transports.
 - 🚫 **Deny by default** Every read and write passes one authorization check.
 - 🔭 **Observable from the first commit** Every I/O path has a span and metrics.
 

@@ -113,6 +113,97 @@ export interface AddComment {
 }
 
 /**
+ * A new milestone.
+ */
+export interface AddMilestone {
+  /**
+   * Name.
+   */
+  name: string;
+  /**
+   * Project ID.
+   */
+  project_id: string;
+  /**
+   * Target date, `YYYY-MM-DD`.
+   */
+  target_date?: string | null;
+}
+
+/**
+ * A passkey the browser just created.
+ */
+export interface AddPasskey {
+  /**
+   * What `navigator.credentials.create()` returned, binary fields in
+   * base64url.
+   */
+  credential: Registration;
+  /**
+   * A label, such as "Laptop" or "Security key".
+   */
+  name: string;
+  /**
+   * The ticket from the ceremony's options.
+   */
+  ticket: string;
+}
+
+/**
+ * Adds a property (a column) to a collection. The server picks its key
+ * from the name.
+ */
+export interface AddPropertyInput {
+  /**
+   * A rollup's aggregation.
+   */
+  agg?: Aggregation | null;
+  /**
+   * The name of the paired property in the target collection; this
+   * collection's title when absent.
+   */
+  back_name?: string | null;
+  /**
+   * The collection.
+   */
+  collection_id: CollectionId;
+  /**
+   * How numbers show.
+   */
+  format?: NumberFormat | null;
+  /**
+   * A formula's expression (`round(Estimate * 0.5, 1)`).
+   */
+  formula?: string | null;
+  /**
+   * The display name, unique in the collection.
+   */
+  name: string;
+  /**
+   * Options of a select or multi-select, in order.
+   */
+  options?: SelectOption[];
+  /**
+   * A rollup's property on the related rows, by key or name.
+   */
+  prop?: string | null;
+  /**
+   * A relation's target collection. Relations are two-way: the target
+   * gets a paired property too.
+   */
+  to?: CollectionId | null;
+  /**
+   * The type: `text`, `number`, `select`, `multi`, `person`, `date`,
+   * `checkbox`, `url`, `relation`, `rollup`, `formula` or `created`.
+   */
+  type: string;
+  /**
+   * A rollup's relation property, by key or name.
+   */
+  via?: string | null;
+}
+
+/**
  * `books.add_section`.
  */
 export interface AddSection {
@@ -133,6 +224,11 @@ export interface AddSection {
    */
   title: string;
 }
+
+/**
+ * No input.
+ */
+export type AdminAppearanceEmpty = Record<string, unknown>;
 
 /**
  * A finished backup.
@@ -174,9 +270,49 @@ export interface AdminCreateBackupBackupInfo {
 export type AdminCreateBackupEmpty = Record<string, unknown>;
 
 /**
+ * A shared drive an administrator creates.
+ */
+export interface AdminCreateSpace {
+  /**
+   * The display name.
+   */
+  name: string;
+  /**
+   * Who owns it.
+   */
+  owner_id: UserId;
+  /**
+   * The short name in its folder path: lowercase letters, digits and
+   * dashes.
+   */
+  slug: string;
+}
+
+/**
  * No input.
  */
 export type AdminExportAuditEmpty = Record<string, unknown>;
+
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AdminGetSettingsAppearanceSettings {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
+}
 
 /**
  * No input.
@@ -236,6 +372,10 @@ export type AdminRunDrillEmpty = Record<string, unknown>;
  */
 export interface AdminSettings {
   /**
+   * The organisation's seed colour and export and site themes.
+   */
+  appearance?: AdminGetSettingsAppearanceSettings;
+  /**
    * Backups.
    */
   backups?: BackupSettings;
@@ -247,6 +387,10 @@ export interface AdminSettings {
    * The organisation's display name.
    */
   organisation?: string;
+  /**
+   * Hybrid ranking.
+   */
+  search?: SearchSettings;
   /**
    * Admin-session security.
    */
@@ -261,6 +405,34 @@ export interface AdminSettings {
  * No input.
  */
 export type AdminSlosEmpty = Record<string, unknown>;
+
+/**
+ * Every space, for the admin console.
+ */
+export interface AdminSpaceList {
+  /**
+   * Shared drives first, then My Drives, each by name.
+   */
+  spaces: AdminSpaceView[];
+}
+
+/**
+ * A space as the admin console shows it.
+ */
+export interface AdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
+}
 
 /**
  * Persistent scheduler state, kept in `.vellum/admin/state.json`.
@@ -291,9 +463,27 @@ export type AdminStateEmpty = Record<string, unknown>;
 export type AdminTelemetryPreviewEmpty = Record<string, unknown>;
 
 /**
+ * An API token as administrators list it (never the secret).
+ */
+export interface AdminTokenView {
+  /**
+   * Its owner; absent if the account is gone.
+   */
+  owner?: TokenOwner | null;
+  /**
+   * The token's details.
+   */
+  token: TokenView;
+}
+
+/**
  * Every admin setting.
  */
 export interface AdminUpdateSettingsAdminSettings {
+  /**
+   * The organisation's seed colour and export and site themes.
+   */
+  appearance?: AdminUpdateSettingsAppearanceSettings;
   /**
    * Backups.
    */
@@ -306,6 +496,10 @@ export interface AdminUpdateSettingsAdminSettings {
    * The organisation's display name.
    */
   organisation?: string;
+  /**
+   * Hybrid ranking.
+   */
+  search?: SearchSettings;
   /**
    * Admin-session security.
    */
@@ -321,6 +515,10 @@ export interface AdminUpdateSettingsAdminSettings {
  */
 export interface AdminUpdateSettingsAdminSettings2 {
   /**
+   * The organisation's seed colour and export and site themes.
+   */
+  appearance?: AdminUpdateSettingsAppearanceSettings2;
+  /**
    * Backups.
    */
   backups?: BackupSettings;
@@ -333,6 +531,10 @@ export interface AdminUpdateSettingsAdminSettings2 {
    */
   organisation?: string;
   /**
+   * Hybrid ranking.
+   */
+  search?: SearchSettings;
+  /**
    * Admin-session security.
    */
   security?: SecuritySettings;
@@ -340,6 +542,48 @@ export interface AdminUpdateSettingsAdminSettings2 {
    * Anonymous usage reporting.
    */
   telemetry?: AdminUpdateSettingsTelemetrySettings2;
+}
+
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AdminUpdateSettingsAppearanceSettings {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
+}
+
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AdminUpdateSettingsAppearanceSettings2 {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
 }
 
 /**
@@ -410,6 +654,28 @@ export type AdminVerifyAuditEmpty = Record<string, unknown>;
  */
 export type Aggregation = "count" | "sum" | "avg" | "min" | "max" | "checked" | "pct" | "unique" | "show";
 
+/**
+ * A summary or an answer.
+ */
+export interface Answer {
+  /**
+   * The sources cited, in order of first use.
+   */
+  citations: Citation[];
+  /**
+   * The model that answered.
+   */
+  model: string;
+  /**
+   * The text, as Markdown, with `[n]` citation marks.
+   */
+  text: string;
+  /**
+   * The input or the answer was cut short.
+   */
+  truncated: boolean;
+}
+
 export type AnyValue = unknown;
 
 /**
@@ -437,6 +703,12 @@ export interface ApiError {
    */
   retryable: boolean;
 }
+
+/**
+ * A model provider's API key. It is accepted from the request and passed
+ * to the provider; it is never serialised, stored or printed.
+ */
+export type ApiKey = string;
 
 /**
  * A connected `OAuth` app.
@@ -468,6 +740,29 @@ export interface AppView {
   scopes: Scope[];
 }
 
+/**
+ * The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+ */
+export interface AppearanceSettings {
+  /**
+   * The theme exports (PDF, HTML, Word) use: a light theme, since
+   * paper is white.
+   */
+  export_theme?: string;
+  /**
+   * The seed colour every built-in theme is derived from, `#rrggbb`.
+   * People can still pick their own accent in the app.
+   */
+  seed?: string;
+  /**
+   * The theme of published sites; `auto` follows the reader's system
+   * light or dark setting.
+   */
+  site_theme?: string;
+}
+
+export type Array_of_AdminTokenView = AdminTokenView[];
+
 export type Array_of_AppView = AppView[];
 
 export type Array_of_SessionView = SessionView[];
@@ -475,6 +770,24 @@ export type Array_of_SessionView = SessionView[];
 export type Array_of_TokenView = TokenView[];
 
 export type Array_of_UserView = UserView[];
+
+/**
+ * `POST /v1/assist/ask`.
+ */
+export interface AskInput {
+  /**
+   * The model to use.
+   */
+  model: ModelSettings;
+  /**
+   * The question.
+   */
+  question: string;
+  /**
+   * Limit the search to one space (slug).
+   */
+  space?: string | null;
+}
 
 /**
  * Assign a thread.
@@ -631,11 +944,15 @@ export interface AuthStatus {
    */
   needsSetup: boolean;
   /**
+   * Every single sign-on button, in order.
+   */
+  providers: SsoButton[];
+  /**
    * The caller's scopes.
    */
   scopes: Scope[];
   /**
-   * The single sign-on button, when a provider is configured.
+   * The first single sign-on button, when a provider is configured.
    */
   sso?: SsoButton | null;
   /**
@@ -733,6 +1050,24 @@ export interface BackupSettings {
  * A block ID: blk- and 8 Crockford base32 characters.
  */
 export type BlockId = string;
+
+/**
+ * One fenced block to draw, as the editor holds it (ADR 0068, D286).
+ */
+export interface BlockInput {
+  /**
+   * The rest of the fence's opening line, such as `title="Launch"`.
+   */
+  args?: string;
+  /**
+   * The fence language, such as `mermaid` or `roadmap`.
+   */
+  lang: string;
+  /**
+   * The fence body.
+   */
+  source: string;
+}
 
 /**
  * The kind of a block, which shapes how its hit is shown.
@@ -833,6 +1168,44 @@ export interface BooksAddSectionPlaceInput {
 }
 
 /**
+ * A place in the tree: relative to a section, or at either end of a
+ * region.
+ */
+export interface BooksCopySectionPlaceInput {
+  /**
+   * Where.
+   */
+  at: At;
+  /**
+   * The region `start` and `end` refer to; `numbered` by default.
+   */
+  region?: Region | null;
+  /**
+   * The section `before`, `after`, `first_child_of` and
+   * `last_child_of` refer to.
+   */
+  section?: string | null;
+}
+
+/**
+ * A book in a list.
+ */
+export interface BooksCreateBookSummary {
+  /**
+   * The book.
+   */
+  id: BookId;
+  /**
+   * The `.book` folder.
+   */
+  path: string;
+  /**
+   * Its title.
+   */
+  title: string;
+}
+
+/**
  * A snapshot's header.
  */
 export interface BooksCreateSnapshotSnapshotInfo {
@@ -855,6 +1228,16 @@ export interface BooksCreateSnapshotSnapshotInfo {
 }
 
 /**
+ * Sections a removal took out.
+ */
+export interface BooksMergeSectionRemoved {
+  /**
+   * The removed sections, the named one first.
+   */
+  removed: string[];
+}
+
+/**
  * A place in the tree: relative to a section, or at either end of a
  * region.
  */
@@ -872,6 +1255,40 @@ export interface BooksMoveSectionPlaceInput {
    * `last_child_of` refer to.
    */
   section?: string | null;
+}
+
+/**
+ * A publication of the book.
+ */
+export interface BooksPublicationsPublication {
+  /**
+   * When (RFC 3339).
+   */
+  at: string;
+  /**
+   * Who (`user:<id>`).
+   */
+  by: string;
+  /**
+   * How many files it holds.
+   */
+  files: number;
+  /**
+   * Where the files are in the store.
+   */
+  folder: string;
+  /**
+   * What was built.
+   */
+  format: PublishFormat;
+  /**
+   * Whether it is for everyone.
+   */
+  public: boolean;
+  /**
+   * Where a public site is served, relative to the app origin.
+   */
+  url?: string | null;
 }
 
 /**
@@ -909,6 +1326,26 @@ export interface BooksSetSectionAccessSectionAccessInfo {
    * Effective reviewers.
    */
   reviewers: string[];
+}
+
+/**
+ * A place in the tree: relative to a section, or at either end of a
+ * region.
+ */
+export interface BooksTransferSectionPlaceInput {
+  /**
+   * Where.
+   */
+  at: At;
+  /**
+   * The region `start` and `end` refer to; `numbered` by default.
+   */
+  region?: Region | null;
+  /**
+   * The section `before`, `after`, `first_child_of` and
+   * `last_child_of` refer to.
+   */
+  section?: string | null;
 }
 
 /**
@@ -1092,6 +1529,24 @@ export interface ChainReport {
 }
 
 /**
+ * People to add to and remove from a group.
+ */
+export interface ChangeMembers {
+  /**
+   * People to add.
+   */
+  add?: UserId[];
+  /**
+   * The group.
+   */
+  id: ObjectId;
+  /**
+   * People to remove.
+   */
+  remove?: UserId[];
+}
+
+/**
  * What an edit touched.
  */
 export interface Changeset {
@@ -1175,6 +1630,32 @@ export interface ChipOut {
    * The key to write.
    */
   key: string;
+}
+
+/**
+ * One source an answer cites.
+ */
+export interface Citation {
+  /**
+   * The page's id.
+   */
+  doc_id: string;
+  /**
+   * The number the answer uses, `[n]`.
+   */
+  n: number;
+  /**
+   * The quoted text.
+   */
+  snippet: string;
+  /**
+   * Page title and headings above the block.
+   */
+  title: string;
+  /**
+   * Opens the block in the app.
+   */
+  url: string;
 }
 
 /**
@@ -1625,6 +2106,29 @@ export interface ComputedRow {
 }
 
 /**
+ * How the person's tasks reach other apps, for My Work's settings (D298).
+ */
+export interface ConnectionsView {
+  /**
+   * The CalDAV account URL to give a task app (it signs in with an API
+   * token).
+   */
+  caldav_url: string;
+  /**
+   * Whether the server receives capture e-mail (a mail domain is set).
+   */
+  email: boolean;
+  /**
+   * Whether Slack capture is set up on the server.
+   */
+  slack: boolean;
+  /**
+   * Whether this person is linked to a Slack user.
+   */
+  slack_linked: boolean;
+}
+
+/**
  * A page's content.
  */
 export interface ContentView {
@@ -1675,6 +2179,40 @@ export interface ContextInput {
 }
 
 /**
+ * `books.copy_section`: copies a section and everything under it within
+ * its book, with fresh IDs.
+ */
+export interface CopySection {
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * Where the copy goes.
+   */
+  place: BooksCopySectionPlaceInput;
+  /**
+   * The section.
+   */
+  section_id: string;
+}
+
+/**
+ * `books.create`: a new, empty book (D322).
+ */
+export interface CreateBook {
+  /**
+   * The drive folder to make it in: a space's root folder, such as
+   * `drives/users/priya`, or a folder of one.
+   */
+  folder: string;
+  /**
+   * Its title, which also names its `.book` folder.
+   */
+  title: string;
+}
+
+/**
  * A new folder.
  */
 export interface CreateFolder {
@@ -1710,6 +2248,46 @@ export interface CreateFromCsvInput {
   folder: string;
   /**
    * The collection's title.
+   */
+  title: string;
+}
+
+/**
+ * A new group.
+ */
+export interface CreateGroup {
+  /**
+   * What the group is for.
+   */
+  description?: string;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
+}
+
+/**
+ * A new initiative.
+ */
+export interface CreateInitiative {
+  /**
+   * The description, in Vellum Markdown.
+   */
+  description?: string;
+  /**
+   * Owner handle.
+   */
+  owner?: string | null;
+  /**
+   * Project IDs, in display order.
+   */
+  projects?: string[];
+  /**
+   * Target date, `YYYY-MM-DD`.
+   */
+  target_date?: string | null;
+  /**
+   * Title.
    */
   title: string;
 }
@@ -1762,6 +2340,10 @@ export interface CreateIssue {
    */
   labels?: string[];
   /**
+   * Milestone ID within the project.
+   */
+  milestone?: string | null;
+  /**
    * Parent issue key.
    */
   parent?: string | null;
@@ -1777,6 +2359,10 @@ export interface CreateIssue {
    * The selected text, for a block.
    */
   quote?: string | null;
+  /**
+   * Repeat after the due date passes: `3d`, `1w`, `2w`, `1m`.
+   */
+  repeat?: string | null;
   /**
    * `<doc id>#blk-…` when filed from a page.
    */
@@ -1797,6 +2383,24 @@ export interface CreateIssue {
    * Title.
    */
   title: string;
+}
+
+/**
+ * A share link to make.
+ */
+export interface CreateLinkInput {
+  /**
+   * When it stops working; leave unset for no end.
+   */
+  expires_at?: Timestamp | null;
+  /**
+   * The page.
+   */
+  id: ObjectId;
+  /**
+   * A password the visitor must give, 8 characters or more.
+   */
+  password?: string | null;
 }
 
 /**
@@ -1829,6 +2433,44 @@ export interface CreatePage {
    * Its title.
    */
   title: string;
+}
+
+/**
+ * A new project.
+ */
+export interface CreateProject {
+  /**
+   * The spec, in Vellum Markdown.
+   */
+  description?: string;
+  /**
+   * Lead handle.
+   */
+  lead?: string | null;
+  /**
+   * Start date, `YYYY-MM-DD`.
+   */
+  start_date?: string | null;
+  /**
+   * backlog (default), planned, in-progress, completed or canceled.
+   */
+  status?: string | null;
+  /**
+   * Target date, `YYYY-MM-DD`.
+   */
+  target_date?: string | null;
+  /**
+   * Team keys; at least one.
+   */
+  teams: string[];
+  /**
+   * Title.
+   */
+  title: string;
+  /**
+   * weekly (default), biweekly, monthly or never.
+   */
+  update_cadence?: string | null;
 }
 
 /**
@@ -1967,6 +2609,25 @@ export interface CreateUser {
 }
 
 /**
+ * Sections a split, copy or transfer created.
+ */
+export interface Created {
+  /**
+   * The book they are in.
+   */
+  book_id: BookId;
+  /**
+   * New section IDs, in reading order.
+   */
+  created: string[];
+  /**
+   * The section that now holds the named content (the copy's root for
+   * a copy, the section itself for a move or split).
+   */
+  section_id: string;
+}
+
+/**
  * The result of creating an issue.
  */
 export interface CreatedIssue {
@@ -1979,6 +2640,24 @@ export interface CreatedIssue {
    * The new issue.
    */
   issue: IssueOut;
+}
+
+/**
+ * A new share link, with the only copy of its token.
+ */
+export interface CreatedLink {
+  /**
+   * The link.
+   */
+  link: LinkView;
+  /**
+   * The token. It is not stored and cannot be shown again.
+   */
+  token: string;
+  /**
+   * The link to hand out, on the public origin.
+   */
+  url: string;
 }
 
 /**
@@ -2105,6 +2784,34 @@ export interface DateSpan {
 export type DateValue = string;
 
 /**
+ * Deletes one object.
+ */
+export interface DeleteObject {
+  /**
+   * The version being deleted.
+   */
+  if_match: string;
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
+ * A deleted object.
+ */
+export interface Deleted {
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+}
+
+/**
  * A removed task.
  */
 export interface DeletedView {
@@ -2112,6 +2819,93 @@ export interface DeletedView {
    * Its ID.
    */
   id: string;
+}
+
+/**
+ * A hook's recent attempts.
+ */
+export interface DeliveryList {
+  /**
+   * Newest first.
+   */
+  deliveries: DeliveryView[];
+}
+
+/**
+ * One delivery attempt, as the admin sees it.
+ */
+export interface DeliveryView {
+  /**
+   * When it was sent (RFC 3339).
+   */
+  at: string;
+  /**
+   * 1 for the first attempt.
+   */
+  attempt: number;
+  /**
+   * The delivery ID, as sent in `Vellum-Delivery`.
+   */
+  delivery_id: string;
+  /**
+   * How long it took.
+   */
+  duration_ms: number;
+  /**
+   * Why there was no answer.
+   */
+  error?: string | null;
+  /**
+   * `issue.create`, `comment.update`, … or `ping`.
+   */
+  event: string;
+  /**
+   * The event ID, as in the payload's `id`.
+   */
+  event_id: string;
+  /**
+   * When it will be tried again (RFC 3339).
+   */
+  next_attempt?: string | null;
+  /**
+   * `delivered`, `retry`, `rejected` or `gone`.
+   */
+  outcome: string;
+  /**
+   * The receiver's status code, when it answered.
+   */
+  status?: number | null;
+}
+
+/**
+ * One enrolled device.
+ */
+export interface DeviceKeyInfo {
+  /**
+   * When it was enrolled.
+   */
+  added_at: Timestamp;
+  /**
+   * The first 16 bytes of SHA-256 of the key, 32 hex digits, as stored
+   * in envelope stanzas.
+   */
+  fingerprint: string;
+  /**
+   * The device's name.
+   */
+  label: string;
+  /**
+   * True for the caller's own devices.
+   */
+  mine: boolean;
+  /**
+   * The X25519 public key, 64 hex digits.
+   */
+  public_key: string;
+  /**
+   * The member the device belongs to.
+   */
+  user_id: UserId;
 }
 
 /**
@@ -2254,6 +3048,53 @@ export interface DigestView {
 }
 
 /**
+ * People (and, once groups have names, groups) matching a query.
+ */
+export interface Directory {
+  /**
+   * The matches, best first.
+   */
+  entries: DirectoryEntry[];
+}
+
+/**
+ * Someone or a group that can be granted access.
+ */
+export interface DirectoryEntry {
+  /**
+   * A second line to tell namesakes apart (the email for a person).
+   */
+  detail: string;
+  /**
+   * `user` or `group`.
+   */
+  kind: string;
+  /**
+   * The display name.
+   */
+  name: string;
+  /**
+   * The principal as access settings store it: `user:<id>` or
+   * `group:<id>`.
+   */
+  principal: string;
+}
+
+/**
+ * `identity.directory`: find people to share with or restrict to.
+ */
+export interface DirectoryQuery {
+  /**
+   * The most results, 1 to 20; 8 when absent.
+   */
+  limit?: number | null;
+  /**
+   * Part of a name, handle or email; at least two characters.
+   */
+  q: string;
+}
+
+/**
  * A DocId as a 26-character ULID.
  */
 export type DocId = string;
@@ -2271,6 +3112,59 @@ export interface Done {
    * Always `true`.
    */
   ok: boolean;
+}
+
+/**
+ * The draft page that was created for review.
+ */
+export interface Draft {
+  /**
+   * Its body.
+   */
+  markdown: string;
+  /**
+   * The model that wrote it.
+   */
+  model: string;
+  /**
+   * The new page's id.
+   */
+  page_id: string;
+  /**
+   * The template or the answer was cut short.
+   */
+  truncated: boolean;
+  /**
+   * Opens it.
+   */
+  url: string;
+}
+
+/**
+ * `POST /v1/assist/draft`.
+ */
+export interface DraftInput {
+  /**
+   * What the page should say.
+   */
+  instructions: string;
+  /**
+   * The model to use.
+   */
+  model: ModelSettings;
+  /**
+   * Where the draft goes (a page id or `space:<slug>`); by default, the
+   * template's space.
+   */
+  parent?: string | null;
+  /**
+   * The page whose structure the draft follows.
+   */
+  template_page_id: string;
+  /**
+   * The new page's title.
+   */
+  title: string;
 }
 
 /**
@@ -2309,6 +3203,65 @@ export interface DrillReport {
    * Whether the restore finished within [`RTO_SECONDS`].
    */
   within_rto: boolean;
+}
+
+/**
+ * A space as the admin console shows it.
+ */
+export interface DriveAdminCreateSpaceAdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
+}
+
+/**
+ * A space as the admin console shows it.
+ */
+export interface DriveAdminSetMemberAdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
+}
+
+/**
+ * No input.
+ */
+export type DriveAdminSpacesNoInput = Record<string, never>;
+
+/**
+ * A space as the admin console shows it.
+ */
+export interface DriveAdminUpdateSpaceAdminSpaceView {
+  /**
+   * The people with a role on the whole space.
+   */
+  members: MemberView[];
+  /**
+   * The space, its owner and its settings.
+   */
+  space: SpaceView;
+  /**
+   * Bytes its pages, files, trash and versions use.
+   */
+  used_bytes: number;
 }
 
 /**
@@ -2642,6 +3595,11 @@ export interface DriveMoveNodeView {
 }
 
 /**
+ * No input.
+ */
+export type DriveMyDriveNoInput = Record<string, never>;
+
+/**
  * An operation that returns nothing else.
  */
 export interface DrivePurgeDone {
@@ -2804,12 +3762,37 @@ export interface DriveRestoreNodeView {
 /**
  * An operation that returns nothing else.
  */
+export interface DriveRevokeLinkDone {
+  /**
+   * Always true.
+   */
+  ok: boolean;
+}
+
+/**
+ * No input.
+ */
+export type DriveSharedDrivesNoInput = Record<string, never>;
+
+/**
+ * No input.
+ */
+export type DriveSharedWithMeNoInput = Record<string, never>;
+
+/**
+ * An operation that returns nothing else.
+ */
 export interface DriveStarDone {
   /**
    * Always true.
    */
   ok: boolean;
 }
+
+/**
+ * No input.
+ */
+export type DriveStarredNoInput = Record<string, never>;
 
 /**
  * An item in a space.
@@ -2892,6 +3875,37 @@ export interface DriveUpdateSpaceSpaceView {
 }
 
 /**
+ * One enrolled device.
+ */
+export interface E2eEnrolDeviceKeyInfo {
+  /**
+   * When it was enrolled.
+   */
+  added_at: Timestamp;
+  /**
+   * The first 16 bytes of SHA-256 of the key, 32 hex digits, as stored
+   * in envelope stanzas.
+   */
+  fingerprint: string;
+  /**
+   * The device's name.
+   */
+  label: string;
+  /**
+   * True for the caller's own devices.
+   */
+  mine: boolean;
+  /**
+   * The X25519 public key, 64 hex digits.
+   */
+  public_key: string;
+  /**
+   * The member the device belongs to.
+   */
+  user_id: UserId;
+}
+
+/**
  * Edit a comment.
  */
 export interface EditComment {
@@ -2945,6 +3959,25 @@ export interface EmbedResult {
 export type Empty = Record<string, never>;
 
 /**
+ * Enrols the caller's device in a space.
+ */
+export interface EnrolDevice {
+  /**
+   * A name the members recognise, such as "Dana's laptop".
+   */
+  label: string;
+  /**
+   * The device's X25519 public key, 64 hex digits, as
+   * `vellum private key` prints it.
+   */
+  public_key: string;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
  * Exports a view as CSV.
  */
 export interface ExportCsvInput {
@@ -2957,6 +3990,42 @@ export interface ExportCsvInput {
    * that view's columns, filters and order, and every matching row.
    */
   view?: string | null;
+}
+
+/**
+ * A factor just added.
+ */
+export interface FactorAdded {
+  /**
+   * The person's factors now.
+   */
+  factors: IdentityConfirmTotpFactorsView;
+  /**
+   * New recovery codes, when this was the first factor. Shown once.
+   */
+  recoveryCodes?: string[] | null;
+}
+
+/**
+ * A person's factors, as their settings page shows them.
+ */
+export interface FactorsView {
+  /**
+   * Registered passkeys.
+   */
+  passkeys: PasskeyView[];
+  /**
+   * Recovery codes not used yet.
+   */
+  recoveryCodesLeft: number;
+  /**
+   * Whether the workspace requires a factor of this person.
+   */
+  required: boolean;
+  /**
+   * Whether an authenticator app is set up.
+   */
+  totp: boolean;
 }
 
 /**
@@ -3138,6 +4207,25 @@ export interface Fragment {
 }
 
 /**
+ * Downloads one object.
+ */
+export interface GetObject {
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+  /**
+   * Also return a readable page, so a member's device can seal it
+   * (needs edit access). Off by default: only ciphertext is served.
+   */
+  plaintext?: boolean;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
  * Whether Google Calendar is set up and connected.
  */
 export interface GoogleView {
@@ -3149,6 +4237,28 @@ export interface GoogleView {
    * Whether the person has connected their calendar.
    */
   connected: boolean;
+}
+
+/**
+ * A grant made on the item.
+ */
+export interface GrantView {
+  /**
+   * When it stops counting; unset for no end.
+   */
+  expires_at?: Timestamp | null;
+  /**
+   * The person's handle, when known.
+   */
+  handle?: string | null;
+  /**
+   * `user:<id>` or `group:<id>`.
+   */
+  principal: string;
+  /**
+   * The role.
+   */
+  role: RoleView;
 }
 
 /**
@@ -3170,6 +4280,50 @@ export interface Group {
 }
 
 /**
+ * A deleted group.
+ */
+export interface GroupDeleted {
+  /**
+   * The group that is gone.
+   */
+  id: ObjectId;
+}
+
+/**
+ * A group named in the path.
+ */
+export interface GroupKey {
+  /**
+   * The group.
+   */
+  id: ObjectId;
+}
+
+/**
+ * Every group.
+ */
+export interface GroupList {
+  /**
+   * The groups, by name.
+   */
+  groups: GroupView[];
+}
+
+/**
+ * A group and the people in it.
+ */
+export interface GroupMembersView {
+  /**
+   * The group.
+   */
+  group: GroupView;
+  /**
+   * Its members, by name.
+   */
+  members: UserView[];
+}
+
+/**
  * One group of issues.
  */
 export interface GroupOut {
@@ -3181,6 +4335,86 @@ export interface GroupOut {
    * The group's value (`in-review`, `urgent`, `dev`); `None` is "none".
    */
   key?: string | null;
+}
+
+/**
+ * A group search.
+ */
+export interface GroupSearch {
+  /**
+   * The most results, 1 to 100; 20 when absent.
+   */
+  limit?: number | null;
+  /**
+   * Text the name contains, ignoring case; empty lists every group.
+   */
+  q?: string;
+}
+
+/**
+ * A group as the API shows it.
+ */
+export interface GroupView {
+  /**
+   * When it was created.
+   */
+  created_at: Timestamp;
+  /**
+   * What the group is for.
+   */
+  description: string;
+  /**
+   * The group's ID; grants name it as `group:<ID>`.
+   */
+  id: ObjectId;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
+}
+
+/**
+ * A group as the API shows it.
+ */
+export interface GroupsCreateGroupView {
+  /**
+   * When it was created.
+   */
+  created_at: Timestamp;
+  /**
+   * What the group is for.
+   */
+  description: string;
+  /**
+   * The group's ID; grants name it as `group:<ID>`.
+   */
+  id: ObjectId;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
+}
+
+/**
+ * A group as the API shows it.
+ */
+export interface GroupsUpdateGroupView {
+  /**
+   * When it was created.
+   */
+  created_at: Timestamp;
+  /**
+   * What the group is for.
+   */
+  description: string;
+  /**
+   * The group's ID; grants name it as `group:<ID>`.
+   */
+  id: ObjectId;
+  /**
+   * The display name, unique ignoring case.
+   */
+  name: string;
 }
 
 /**
@@ -3202,13 +4436,327 @@ export interface HighlightView {
 }
 
 /**
+ * A change to the book's manifest or summary: a reorder, a nest, an
+ * added, renamed or removed section, or new section access.
+ */
+export interface HistoryEntry {
+  /**
+   * When (RFC 3339).
+   */
+  at: string;
+  /**
+   * Who (`user:<id>`), empty for the system.
+   */
+  by: string;
+  /**
+   * The entry, for `books.restore_outline`.
+   */
+  id: string;
+  /**
+   * The operation, such as `move_section`.
+   */
+  op: string;
+  /**
+   * The outline after the change, without hidden sections.
+   */
+  outline: OutlineLine[];
+}
+
+/**
+ * `books.history`: the book's outline changes, newest first.
+ */
+export interface HistoryInput {
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * The most entries to return, 1 to 200; 50 when absent.
+   */
+  limit?: number | null;
+}
+
+/**
+ * The book's outline history.
+ */
+export interface HistoryList {
+  /**
+   * Entries, newest first.
+   */
+  entries: HistoryEntry[];
+}
+
+/**
+ * A hook with its secret, shown once.
+ */
+export interface HookCreated {
+  /**
+   * The hook.
+   */
+  hook: HookView;
+  /**
+   * The signing secret (`whsec_…`). Store it now: it is not shown again.
+   */
+  secret: string;
+}
+
+/**
+ * A hook by ID.
+ */
+export interface HookId {
+  /**
+   * The hook's ID.
+   */
+  id: string;
+}
+
+/**
+ * A new hook.
+ */
+export interface HookInput {
+  /**
+   * A note for admins.
+   */
+  description?: string;
+  /**
+   * The resources to send: `issue`, `comment`, `project`,
+   * `project_update`, `cycle`, `label`, `user`, `issue_sla`.
+   */
+  event_types: string[];
+  /**
+   * Team keys to cover, private ones included; empty for every public
+   * team.
+   */
+  teams?: string[];
+  /**
+   * Where to post events: `https`, port 443 or 8443, a public address.
+   */
+  url: string;
+}
+
+/**
+ * The hooks.
+ */
+export interface HookList {
+  /**
+   * The resources a hook can want.
+   */
+  event_types: string[];
+  /**
+   * Every hook, oldest first.
+   */
+  hooks: HookView[];
+}
+
+/**
+ * A hook's new settings; everything is replaced.
+ */
+export interface HookUpdate {
+  /**
+   * A note for admins.
+   */
+  description?: string;
+  /**
+   * On or off. Turning a paused hook on clears its failures.
+   */
+  enabled: boolean;
+  /**
+   * The resources to send: `issue`, `comment`, `project`,
+   * `project_update`, `cycle`, `label`, `user`, `issue_sla`.
+   */
+  event_types: string[];
+  /**
+   * The hook's ID.
+   */
+  id: string;
+  /**
+   * Team keys to cover, private ones included; empty for every public
+   * team.
+   */
+  teams?: string[];
+  /**
+   * Where to post events: `https`, port 443 or 8443, a public address.
+   */
+  url: string;
+}
+
+/**
+ * A webhook, as the admin sees it. The secret is never shown again.
+ */
+export interface HookView {
+  /**
+   * Final failures in a row.
+   */
+  consecutive_failures: number;
+  /**
+   * When it was created (RFC 3339).
+   */
+  created_at: string;
+  /**
+   * A note for admins.
+   */
+  description: string;
+  /**
+   * Whether it receives events.
+   */
+  enabled: boolean;
+  /**
+   * The resources it wants (`issue`, `comment`, …).
+   */
+  event_types: string[];
+  /**
+   * When the current run of failures began (RFC 3339).
+   */
+  failing_since?: string | null;
+  /**
+   * The hook's ID.
+   */
+  id: string;
+  /**
+   * The latest attempt.
+   */
+  last_delivery?: DeliveryView | null;
+  /**
+   * Why Vellum paused it, when it did.
+   */
+  paused_reason?: string | null;
+  /**
+   * Deliveries waiting.
+   */
+  queued: number;
+  /**
+   * Whether a rotated-out secret still signs too.
+   */
+  rotating: boolean;
+  /**
+   * The last four characters of the current secret.
+   */
+  secret_hint: string;
+  /**
+   * The team keys it covers; empty means every public team.
+   */
+  teams: string[];
+  /**
+   * Where events are posted.
+   */
+  url: string;
+}
+
+/**
+ * A factor just added.
+ */
+export interface IdentityAddPasskeyFactorAdded {
+  /**
+   * The person's factors now.
+   */
+  factors: IdentityAddPasskeyFactorsView;
+  /**
+   * New recovery codes, when this was the first factor. Shown once.
+   */
+  recoveryCodes?: string[] | null;
+}
+
+/**
+ * A person's factors, as their settings page shows them.
+ */
+export interface IdentityAddPasskeyFactorsView {
+  /**
+   * Registered passkeys.
+   */
+  passkeys: PasskeyView[];
+  /**
+   * Recovery codes not used yet.
+   */
+  recoveryCodesLeft: number;
+  /**
+   * Whether the workspace requires a factor of this person.
+   */
+  required: boolean;
+  /**
+   * Whether an authenticator app is set up.
+   */
+  totp: boolean;
+}
+
+/**
+ * A provider as Admin → Sign-in shows it. Secrets are never returned.
+ */
+export interface IdentityAdminAddProviderProviderView {
+  /**
+   * Email domains whose people get an account on first sign-in.
+   */
+  allowedDomains: string[];
+  /**
+   * Whether a verified address with no account gets one.
+   */
+  autoCreate: boolean;
+  /**
+   * For SAML, the SHA-256 fingerprints of the signing certificates.
+   */
+  certificateFingerprints: string[];
+  /**
+   * For OIDC, the client ID.
+   */
+  clientId?: string | null;
+  /**
+   * Whether the sign-in page offers it.
+   */
+  enabled: boolean;
+  /**
+   * For SAML, the provider's entity ID.
+   */
+  entityId?: string | null;
+  /**
+   * For OIDC, whether a client secret is stored.
+   */
+  hasClientSecret: boolean;
+  /**
+   * The provider's ID.
+   */
+  id: string;
+  /**
+   * For OIDC, the issuer URL.
+   */
+  issuer?: string | null;
+  /**
+   * `oidc` or `saml`.
+   */
+  kind: string;
+  /**
+   * For SAML, the metadata URL the settings came from.
+   */
+  metadataUrl?: string | null;
+  /**
+   * The button label.
+   */
+  name: string;
+  /**
+   * Set by environment variables: shown, not changed here.
+   */
+  readOnly: boolean;
+  /**
+   * For SAML, where sign-in requests go.
+   */
+  ssoUrl?: string | null;
+  /**
+   * Where its sign-in button goes.
+   */
+  startUrl: string;
+}
+
+/**
  * A user as the API shows it.
  */
-export interface IdentityCreateUserUserView {
+export interface IdentityAdminResetFactorsUserView {
   /**
    * Whether the user administers the workspace.
    */
   admin: boolean;
+  /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
   /**
    * When the account was created.
    */
@@ -3237,6 +4785,199 @@ export interface IdentityCreateUserUserView {
    * The display name.
    */
   name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
+}
+
+/**
+ * A provider an admin adds or changes.
+ */
+export interface IdentityAdminUpdateProviderProviderInput {
+  /**
+   * Email domains whose people get an account on first sign-in.
+   */
+  allowedDomains?: string[];
+  /**
+   * Whether a verified address with no account gets one.
+   */
+  autoCreate?: boolean;
+  /**
+   * SAML: the signing certificates as PEM; empty keeps the stored ones.
+   */
+  certificate?: string;
+  /**
+   * OIDC: the client ID registered with the provider.
+   */
+  clientId?: string;
+  /**
+   * A new client secret; absent keeps the stored one, empty removes it.
+   */
+  clientSecret?: string | null;
+  /**
+   * Whether the sign-in page offers it.
+   */
+  enabled?: boolean;
+  /**
+   * SAML: the provider's entity ID.
+   */
+  entityId?: string;
+  /**
+   * OIDC: the issuer URL (`https`, or `http` on this machine).
+   */
+  issuer?: string;
+  /**
+   * `oidc` (the default) or `saml`. A provider keeps its kind.
+   */
+  kind?: ProviderKind;
+  /**
+   * SAML: the metadata URL the settings came from, for reference.
+   */
+  metadataUrl?: string | null;
+  /**
+   * The button label, 1 to 60 characters.
+   */
+  name: string;
+  /**
+   * SAML: the provider's sign-in URL (HTTP-Redirect binding).
+   */
+  ssoUrl?: string;
+}
+
+/**
+ * A provider as Admin → Sign-in shows it. Secrets are never returned.
+ */
+export interface IdentityAdminUpdateProviderProviderView {
+  /**
+   * Email domains whose people get an account on first sign-in.
+   */
+  allowedDomains: string[];
+  /**
+   * Whether a verified address with no account gets one.
+   */
+  autoCreate: boolean;
+  /**
+   * For SAML, the SHA-256 fingerprints of the signing certificates.
+   */
+  certificateFingerprints: string[];
+  /**
+   * For OIDC, the client ID.
+   */
+  clientId?: string | null;
+  /**
+   * Whether the sign-in page offers it.
+   */
+  enabled: boolean;
+  /**
+   * For SAML, the provider's entity ID.
+   */
+  entityId?: string | null;
+  /**
+   * For OIDC, whether a client secret is stored.
+   */
+  hasClientSecret: boolean;
+  /**
+   * The provider's ID.
+   */
+  id: string;
+  /**
+   * For OIDC, the issuer URL.
+   */
+  issuer?: string | null;
+  /**
+   * `oidc` or `saml`.
+   */
+  kind: string;
+  /**
+   * For SAML, the metadata URL the settings came from.
+   */
+  metadataUrl?: string | null;
+  /**
+   * The button label.
+   */
+  name: string;
+  /**
+   * Set by environment variables: shown, not changed here.
+   */
+  readOnly: boolean;
+  /**
+   * For SAML, where sign-in requests go.
+   */
+  ssoUrl?: string | null;
+  /**
+   * Where its sign-in button goes.
+   */
+  startUrl: string;
+}
+
+/**
+ * A person's factors, as their settings page shows them.
+ */
+export interface IdentityConfirmTotpFactorsView {
+  /**
+   * Registered passkeys.
+   */
+  passkeys: PasskeyView[];
+  /**
+   * Recovery codes not used yet.
+   */
+  recoveryCodesLeft: number;
+  /**
+   * Whether the workspace requires a factor of this person.
+   */
+  required: boolean;
+  /**
+   * Whether an authenticator app is set up.
+   */
+  totp: boolean;
+}
+
+/**
+ * A user as the API shows it.
+ */
+export interface IdentityCreateUserUserView {
+  /**
+   * Whether the user administers the workspace.
+   */
+  admin: boolean;
+  /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
+  /**
+   * When the account was created.
+   */
+  createdAt: Timestamp;
+  /**
+   * Whether sign-in is blocked.
+   */
+  disabled: boolean;
+  /**
+   * The sign-in address.
+   */
+  email: string;
+  /**
+   * The unique handle used for assignees and mentions.
+   */
+  handle: string;
+  /**
+   * Whether the account has a password (otherwise SSO only).
+   */
+  hasPassword: boolean;
+  /**
+   * The user's ID.
+   */
+  id: UserId;
+  /**
+   * The display name.
+   */
+  name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
 }
 
 /**
@@ -3248,6 +4989,11 @@ export interface IdentitySetupUserView {
    */
   admin: boolean;
   /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
+  /**
    * When the account was created.
    */
   createdAt: Timestamp;
@@ -3275,6 +5021,10 @@ export interface IdentitySetupUserView {
    * The display name.
    */
   name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
 }
 
 /**
@@ -3286,6 +5036,11 @@ export interface IdentityUpdateMeUserView {
    */
   admin: boolean;
   /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
+  /**
    * When the account was created.
    */
   createdAt: Timestamp;
@@ -3313,6 +5068,10 @@ export interface IdentityUpdateMeUserView {
    * The display name.
    */
   name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
 }
 
 /**
@@ -3324,6 +5083,11 @@ export interface IdentityUpdateUserUserView {
    */
   admin: boolean;
   /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
+  /**
    * When the account was created.
    */
   createdAt: Timestamp;
@@ -3351,6 +5115,10 @@ export interface IdentityUpdateUserUserView {
    * The display name.
    */
   name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
 }
 
 /**
@@ -3504,6 +5272,54 @@ export interface IngestedOutput {
 }
 
 /**
+ * An initiative with its projects rolled up.
+ */
+export interface InitiativeOut {
+  /**
+   * The worst latest health among active projects.
+   */
+  health?: string | null;
+  /**
+   * Initiative ID.
+   */
+  id: string;
+  /**
+   * The initiative file, front matter and description.
+   */
+  markdown: string;
+  /**
+   * Owner handle.
+   */
+  owner?: string | null;
+  /**
+   * Percent complete by points over every project.
+   */
+  percent: number;
+  /**
+   * The projects, in display order.
+   */
+  projects: ProjectOut[];
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+  /**
+   * Title.
+   */
+  title: string;
+}
+
+/**
+ * Every initiative.
+ */
+export interface InitiativesOut {
+  /**
+   * Initiatives by title.
+   */
+  initiatives: InitiativeOut[];
+}
+
+/**
  * The answer to an insights question.
  */
 export interface InsightsOut {
@@ -3648,6 +5464,10 @@ export interface IssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -3698,6 +5518,16 @@ export interface Limit {
 }
 
 /**
+ * Names a share link.
+ */
+export interface LinkKey {
+  /**
+   * The link.
+   */
+  link_id: ShareId;
+}
+
+/**
  * A link on an issue.
  */
 export interface LinkOut {
@@ -3713,6 +5543,36 @@ export interface LinkOut {
    * URL; `vellum://doc/<id>#blk-…` for document blocks.
    */
   url: string;
+}
+
+/**
+ * A share link, without its token.
+ */
+export interface LinkView {
+  /**
+   * When.
+   */
+  created_at: Timestamp;
+  /**
+   * Who made it.
+   */
+  created_by: UserId;
+  /**
+   * When it stops working; unset for no end.
+   */
+  expires_at?: Timestamp | null;
+  /**
+   * Whether it asks for a password.
+   */
+  has_password: boolean;
+  /**
+   * The link.
+   */
+  id: ShareId;
+  /**
+   * Whether it still opens (not revoked, not expired).
+   */
+  live: boolean;
 }
 
 /**
@@ -3750,6 +5610,34 @@ export interface ListComments {
 }
 
 /**
+ * Lists a space's objects, a page at a time, in path order.
+ */
+export interface ListObjects {
+  /**
+   * Start after this path (the previous page's `next`).
+   */
+  after?: string | null;
+  /**
+   * At most this many (default and maximum 1000).
+   */
+  limit?: number | null;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
+ * Which teams to list.
+ */
+export interface ListTeams {
+  /**
+   * Include archived teams; by default only active teams are listed.
+   */
+  include_archived?: boolean;
+}
+
+/**
  * A task list.
  */
 export interface ListView {
@@ -3777,6 +5665,16 @@ export interface ListView {
    * The title.
    */
   title: string;
+}
+
+/**
+ * Which saved views to list.
+ */
+export interface ListViews {
+  /**
+   * Only views scoped to this team, plus views that span every team.
+   */
+  team?: string | null;
 }
 
 /**
@@ -3815,6 +5713,108 @@ export interface MemberInput {
    * The person's handle, with or without `@`.
    */
   member: string;
+}
+
+/**
+ * A person with a role on a whole space.
+ */
+export interface MemberView {
+  /**
+   * Their role.
+   */
+  role: SpaceRoleView;
+  /**
+   * The person.
+   */
+  user_id: UserId;
+}
+
+/**
+ * A mention by the ID of the comment that made it.
+ */
+export interface MentionRef {
+  /**
+   * The comment ID.
+   */
+  comment: string;
+}
+
+/**
+ * `books.merge_section`: folds a section's children back into it as
+ * headings.
+ */
+export interface MergeSection {
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * The section whose children are folded in.
+   */
+  section_id: string;
+}
+
+/**
+ * A metadata URL to read.
+ */
+export interface MetadataUrl {
+  /**
+   * The provider's SAML metadata URL (`https`).
+   */
+  url: string;
+}
+
+/**
+ * A milestone with its progress.
+ */
+export interface MilestoneOut {
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * Milestone ID.
+   */
+  id: string;
+  /**
+   * Issues in the milestone.
+   */
+  issues: number;
+  /**
+   * Name.
+   */
+  name: string;
+  /**
+   * Percent complete by points.
+   */
+  percent: number;
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+}
+
+/**
+ * Which model to call and how: sent by the browser with every request.
+ */
+export interface ModelSettings {
+  /**
+   * The user's own API key. Optional only for an endpoint an admin
+   * configured that needs none (a self-hosted model).
+   */
+  api_key?: ApiKey | null;
+  /**
+   * The endpoint; the provider's public API when absent.
+   */
+  base_url?: string | null;
+  /**
+   * The model name, such as `claude-opus-5-5`.
+   */
+  model: string;
+  /**
+   * The wire format.
+   */
+  provider: Provider;
 }
 
 /**
@@ -3896,6 +5896,48 @@ export interface MyIssuesOut {
 }
 
 /**
+ * My Work settings as a client sends them, and as they are stored.
+ */
+export interface MyWorkSettingsInput {
+  /**
+   * When the day starts, `HH:MM`; reminders on a date-only deadline
+   * count from it.
+   */
+  day_starts_at?: string;
+  /**
+   * When the morning digest is sent, `HH:MM`; `null` turns it off.
+   */
+  digest_at?: string | null;
+  /**
+   * An IANA time zone such as `Europe/Berlin`; `null` follows the
+   * server's zone.
+   */
+  time_zone?: string | null;
+}
+
+/**
+ * A person's My Work settings.
+ */
+export interface MyWorkSettingsView {
+  /**
+   * When their day starts, `HH:MM`.
+   */
+  day_starts_at: string;
+  /**
+   * When their digest is sent, `HH:MM`; `null` when it is off.
+   */
+  digest_at?: string | null;
+  /**
+   * The zone My Work counts in for them now.
+   */
+  effective_time_zone: string;
+  /**
+   * The zone they chose; `null` when they follow the server's.
+   */
+  time_zone?: string | null;
+}
+
+/**
  * My Work for the signed-in person.
  */
 export interface MyWorkView {
@@ -3950,7 +5992,7 @@ export interface NewAuditEvent {
 /**
  * No input.
  */
-export type NoInput = Record<string, never>;
+export type NoInput = Record<string, unknown>;
 
 /**
  * Names an item (a folder, page, book, collection or shortcut).
@@ -4048,6 +6090,38 @@ export type NumberFormat = "plain" | "percent";
 export type ObjectId = string;
 
 /**
+ * One object in a space.
+ */
+export interface ObjectInfo {
+  /**
+   * When it last changed.
+   */
+  modified: Timestamp;
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+  /**
+   * Its stored size in bytes.
+   */
+  size: number;
+}
+
+/**
+ * A page of objects.
+ */
+export interface ObjectList {
+  /**
+   * Pass as `after` for the next page; absent on the last one.
+   */
+  next?: string | null;
+  /**
+   * The objects, in path order.
+   */
+  objects: ObjectInfo[];
+}
+
+/**
  * The built-in observability tools.
  */
 export interface ObservabilitySettings {
@@ -4090,6 +6164,36 @@ export interface OutlineEntry {
    * The heading text.
    */
   text: string;
+}
+
+/**
+ * One section in a recorded outline, in reading order.
+ */
+export interface OutlineLine {
+  /**
+   * Nesting depth, 1 at the top.
+   */
+  depth: number;
+  /**
+   * The section.
+   */
+  id: string;
+  /**
+   * Its cross-reference label then, such as `§2.3 Services`.
+   */
+  label: string;
+  /**
+   * The section it sat under, if any.
+   */
+  parent?: string | null;
+  /**
+   * `prefix`, `numbered` or `suffix`.
+   */
+  region: string;
+  /**
+   * Its title then.
+   */
+  title: string;
 }
 
 /**
@@ -4139,6 +6243,43 @@ export interface ParseView {
 }
 
 /**
+ * A `WebAuthn` ceremony to run in the browser.
+ */
+export interface PasskeyCeremony {
+  /**
+   * The options for `navigator.credentials.create()` or `.get()`, with
+   * binary fields in base64url.
+   */
+  options: unknown;
+  /**
+   * The ticket that answers it.
+   */
+  ticket: string;
+}
+
+/**
+ * A passkey as listed.
+ */
+export interface PasskeyView {
+  /**
+   * When it was added.
+   */
+  createdAt: Timestamp;
+  /**
+   * The credential ID.
+   */
+  id: string;
+  /**
+   * When it last signed in.
+   */
+  lastUsedAt?: Timestamp | null;
+  /**
+   * Its label.
+   */
+  name: string;
+}
+
+/**
  * Where to move or copy an item.
  */
 export interface PlaceInput {
@@ -4173,6 +6314,24 @@ export interface PointOut {
    * The numbers for that interval.
    */
   stats: StatsOut;
+}
+
+/**
+ * A health update to post.
+ */
+export interface PostUpdate {
+  /**
+   * The notes, in Vellum Markdown.
+   */
+  body?: string;
+  /**
+   * on-track, at-risk or off-track.
+   */
+  health: string;
+  /**
+   * Project ID.
+   */
+  project_id: string;
 }
 
 /**
@@ -4227,9 +6386,21 @@ export interface ProfileResponse {
 }
 
 /**
- * A project with its computed progress.
+ * A project with its computed progress and latest health.
  */
 export interface ProjectOut {
+  /**
+   * Completed points.
+   */
+  completed: number;
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * on-track, at-risk or off-track, from the latest update.
+   */
+  health?: string | null;
   /**
    * Project ID.
    */
@@ -4247,11 +6418,27 @@ export interface ProjectOut {
    */
   markdown: string;
   /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Milestones in order, with progress.
+   */
+  milestones: MilestoneOut[];
+  /**
    * Percent complete by points.
    */
   percent: number;
   /**
-   * planned, started, paused, completed or canceled.
+   * Points in scope.
+   */
+  scope: number;
+  /**
+   * Start date.
+   */
+  start_date?: string | null;
+  /**
+   * backlog, planned, in-progress, completed or canceled.
    */
   status: string;
   /**
@@ -4266,6 +6453,18 @@ export interface ProjectOut {
    * Title.
    */
   title: string;
+  /**
+   * weekly, biweekly, monthly or never.
+   */
+  update_cadence: string;
+  /**
+   * Whether the lead owes an update by the project's cadence.
+   */
+  update_due: boolean;
+  /**
+   * When the latest update was posted.
+   */
+  updated_at?: string | null;
 }
 
 /**
@@ -4331,6 +6530,229 @@ export interface PropertyInfo {
 }
 
 /**
+ * Names one property.
+ */
+export interface PropertyKey {
+  /**
+   * The collection.
+   */
+  collection_id: CollectionId;
+  /**
+   * The property's key.
+   */
+  key: string;
+}
+
+/**
+ * The wire format a model endpoint speaks.
+ */
+export type Provider = "anthropic" | "openai_compatible";
+
+/**
+ * A provider, by ID in the path.
+ */
+export interface ProviderId {
+  /**
+   * The provider's ID.
+   */
+  id: string;
+}
+
+/**
+ * A provider an admin adds or changes.
+ */
+export interface ProviderInput {
+  /**
+   * Email domains whose people get an account on first sign-in.
+   */
+  allowedDomains?: string[];
+  /**
+   * Whether a verified address with no account gets one.
+   */
+  autoCreate?: boolean;
+  /**
+   * SAML: the signing certificates as PEM; empty keeps the stored ones.
+   */
+  certificate?: string;
+  /**
+   * OIDC: the client ID registered with the provider.
+   */
+  clientId?: string;
+  /**
+   * A new client secret; absent keeps the stored one, empty removes it.
+   */
+  clientSecret?: string | null;
+  /**
+   * Whether the sign-in page offers it.
+   */
+  enabled?: boolean;
+  /**
+   * SAML: the provider's entity ID.
+   */
+  entityId?: string;
+  /**
+   * OIDC: the issuer URL (`https`, or `http` on this machine).
+   */
+  issuer?: string;
+  /**
+   * `oidc` (the default) or `saml`. A provider keeps its kind.
+   */
+  kind?: ProviderKind;
+  /**
+   * SAML: the metadata URL the settings came from, for reference.
+   */
+  metadataUrl?: string | null;
+  /**
+   * The button label, 1 to 60 characters.
+   */
+  name: string;
+  /**
+   * SAML: the provider's sign-in URL (HTTP-Redirect binding).
+   */
+  ssoUrl?: string;
+}
+
+/**
+ * How Vellum talks to a provider.
+ */
+export type ProviderKind = "oidc" | "saml";
+
+/**
+ * A provider as Admin → Sign-in shows it. Secrets are never returned.
+ */
+export interface ProviderView {
+  /**
+   * Email domains whose people get an account on first sign-in.
+   */
+  allowedDomains: string[];
+  /**
+   * Whether a verified address with no account gets one.
+   */
+  autoCreate: boolean;
+  /**
+   * For SAML, the SHA-256 fingerprints of the signing certificates.
+   */
+  certificateFingerprints: string[];
+  /**
+   * For OIDC, the client ID.
+   */
+  clientId?: string | null;
+  /**
+   * Whether the sign-in page offers it.
+   */
+  enabled: boolean;
+  /**
+   * For SAML, the provider's entity ID.
+   */
+  entityId?: string | null;
+  /**
+   * For OIDC, whether a client secret is stored.
+   */
+  hasClientSecret: boolean;
+  /**
+   * The provider's ID.
+   */
+  id: string;
+  /**
+   * For OIDC, the issuer URL.
+   */
+  issuer?: string | null;
+  /**
+   * `oidc` or `saml`.
+   */
+  kind: string;
+  /**
+   * For SAML, the metadata URL the settings came from.
+   */
+  metadataUrl?: string | null;
+  /**
+   * The button label.
+   */
+  name: string;
+  /**
+   * Set by environment variables: shown, not changed here.
+   */
+  readOnly: boolean;
+  /**
+   * For SAML, where sign-in requests go.
+   */
+  ssoUrl?: string | null;
+  /**
+   * Where its sign-in button goes.
+   */
+  startUrl: string;
+}
+
+/**
+ * A publication of the book.
+ */
+export interface Publication {
+  /**
+   * When (RFC 3339).
+   */
+  at: string;
+  /**
+   * Who (`user:<id>`).
+   */
+  by: string;
+  /**
+   * How many files it holds.
+   */
+  files: number;
+  /**
+   * Where the files are in the store.
+   */
+  folder: string;
+  /**
+   * What was built.
+   */
+  format: PublishFormat;
+  /**
+   * Whether it is for everyone.
+   */
+  public: boolean;
+  /**
+   * Where a public site is served, relative to the app origin.
+   */
+  url?: string | null;
+}
+
+/**
+ * The book's current publications.
+ */
+export interface PublicationList {
+  /**
+   * One per format, if published.
+   */
+  publications: BooksPublicationsPublication[];
+}
+
+/**
+ * `books.publish`.
+ */
+export interface Publish {
+  /**
+   * Who it is for (`user:<id>`, `group:<id>`): restricted sections are
+   * kept only for these. Empty publishes for everyone, and only a
+   * public site is served at `/published/books/<book id>/`.
+   */
+  audience?: string[];
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * What to build.
+   */
+  format: PublishFormat;
+}
+
+/**
+ * What a publication is.
+ */
+export type PublishFormat = "site" | "mdbook";
+
+/**
  * The result of a push registration change.
  */
 export interface PushDevices {
@@ -4365,6 +6787,43 @@ export interface PushKeys {
 }
 
 /**
+ * Replace an initiative.
+ */
+export interface PutInitiative {
+  /**
+   * Initiative ID; must match the file.
+   */
+  initiative_id: string;
+  /**
+   * The whole initiative page.
+   */
+  markdown: string;
+}
+
+/**
+ * Uploads a page sealed on the device.
+ */
+export interface PutObject {
+  /**
+   * The recipient envelope, base64. It must be sealed to exactly the
+   * space's current keys.
+   */
+  envelope: string;
+  /**
+   * The version this write replaces; absent to create a new object.
+   */
+  if_match?: string | null;
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
  * Create or replace a project.
  */
 export interface PutProject {
@@ -4390,6 +6849,53 @@ export interface PutTeam {
    * The whole `team.yaml`.
    */
   yaml: string;
+}
+
+/**
+ * Replace a saved view the caller owns.
+ */
+export interface PutView {
+  /**
+   * A Work filter as JSON text.
+   */
+  filter?: string | null;
+  /**
+   * status (default), assignee, priority, project, cycle, label, team or
+   * none.
+   */
+  group_by?: string | null;
+  /**
+   * `list` (default) or `board`.
+   */
+  layout?: string | null;
+  /**
+   * The name, 1 to 120 characters.
+   */
+  name: string;
+  /**
+   * priority (default), updated, created, due, estimate or title.
+   */
+  order_by?: string | null;
+  /**
+   * `all`, `past_week` (default), `past_month` or `none`.
+   */
+  show_closed?: string | null;
+  /**
+   * Whether sub-issues show alongside their parents (default true).
+   */
+  show_sub_issues?: boolean | null;
+  /**
+   * Scope the view to one team.
+   */
+  team?: string | null;
+  /**
+   * The view ID.
+   */
+  view_id: string;
+  /**
+   * `private` (default), `team` or `workspace`.
+   */
+  visibility?: string | null;
 }
 
 /**
@@ -4522,9 +7028,62 @@ export interface RecentList {
 }
 
 /**
+ * A new set of recovery codes, shown once.
+ */
+export interface RecoveryCodes {
+  /**
+   * The codes; each works once.
+   */
+  recoveryCodes: string[];
+}
+
+/**
+ * A logged delivery of a hook.
+ */
+export interface RedeliverInput {
+  /**
+   * The delivery to send again.
+   */
+  delivery_id: string;
+  /**
+   * The hook's ID.
+   */
+  id: string;
+}
+
+/**
  * A region of the summary.
  */
 export type Region = "prefix" | "numbered" | "suffix";
+
+/**
+ * A credential as the browser returns it from
+ * `navigator.credentials.create()`.
+ */
+export interface Registration {
+  /**
+   * The credential ID, base64url.
+   */
+  id: string;
+  /**
+   * The attestation response.
+   */
+  response: RegistrationResponse;
+}
+
+/**
+ * The attestation response fields, base64url.
+ */
+export interface RegistrationResponse {
+  /**
+   * The CBOR attestation object.
+   */
+  attestationObject: string;
+  /**
+   * The client data JSON.
+   */
+  clientDataJson: string;
+}
 
 /**
  * A relation to add or remove.
@@ -4593,6 +7152,25 @@ export interface RenameInput {
 }
 
 /**
+ * The stylesheet for rendered HTML inside the app.
+ */
+export interface RenderStylesheet {
+  /**
+   * CSS scoped to [`RENDER_SCOPE`]; the theme follows the app's
+   * `<html data-theme>`.
+   */
+  css: string;
+  /**
+   * The renderer version it matches.
+   */
+  render_version: number;
+  /**
+   * The class the app puts on the element that holds rendered HTML.
+   */
+  scope: string;
+}
+
+/**
  * Something on the page that rendered with a fallback.
  */
 export interface RenderWarning {
@@ -4604,6 +7182,29 @@ export interface RenderWarning {
    * What happened, for the author.
    */
   message: string;
+}
+
+/**
+ * One block drawn for the editor.
+ */
+export interface RenderedBlockView {
+  /**
+   * Sanitised HTML: one `<article class="vl-doc">` holding the block.
+   */
+  html: string;
+  /**
+   * The renderer version that produced it.
+   */
+  render_version: number;
+  /**
+   * Whether a diagram shows its last good picture because the diagram
+   * server was unavailable.
+   */
+  stale: boolean;
+  /**
+   * What fell back, for the author; empty when the block drew cleanly.
+   */
+  warnings: string[];
 }
 
 /**
@@ -4699,6 +7300,55 @@ export interface ResolveThread {
    */
   thread_id: string;
 }
+
+/**
+ * `books.restore_outline`: puts every section that still exists back
+ * where an earlier outline had it.
+ */
+export interface RestoreOutline {
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * The history entry to restore.
+   */
+  entry: string;
+}
+
+/**
+ * Revokes one device key.
+ */
+export interface RevokeDevice {
+  /**
+   * The key's fingerprint, 32 hex digits.
+   */
+  fingerprint: string;
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
+ * What a revocation removed. Members' devices strip these keys from
+ * every envelope in the space (`vellum private reseal`).
+ */
+export interface Revoked {
+  /**
+   * The removed keys.
+   */
+  removed: DeviceKeyInfo[];
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
+ * A role granted on an item.
+ */
+export type RoleView = "viewer" | "commenter" | "editor" | "manager" | "owner";
 
 /**
  * How a rollup is computed.
@@ -4854,6 +7504,42 @@ export interface RowWritten {
 }
 
 /**
+ * What a provider's SAML metadata says, to fill in the form.
+ */
+export interface SamlMetadataView {
+  /**
+   * Its signing certificates as PEM.
+   */
+  certificate: string;
+  /**
+   * Their SHA-256 fingerprints.
+   */
+  certificateFingerprints: string[];
+  /**
+   * The provider's entity ID.
+   */
+  entityId: string;
+  /**
+   * Its HTTP-Redirect sign-in URL.
+   */
+  ssoUrl: string;
+}
+
+/**
+ * What a SAML provider needs to know about Vellum.
+ */
+export interface SamlServiceView {
+  /**
+   * The assertion consumer service URL (HTTP-POST).
+   */
+  acsUrl: string;
+  /**
+   * Vellum's entity ID (also its metadata URL).
+   */
+  entityId: string;
+}
+
+/**
  * A new version of a page's content.
  */
 export interface SaveInput {
@@ -4955,12 +7641,69 @@ export interface SaveViewInput {
 }
 
 /**
+ * A new SCIM token, shown once.
+ */
+export interface ScimTokenCreated {
+  /**
+   * Provisioning as it now is.
+   */
+  scim: ScimView;
+  /**
+   * The token (`vsc_…`), for the provider's settings.
+   */
+  token: string;
+}
+
+/**
+ * Provisioning as Admin → Sign-in shows it. The token is never shown
+ * again after it is made.
+ */
+export interface ScimView {
+  /**
+   * The SCIM base URL to give the provider.
+   */
+  baseUrl: string;
+  /**
+   * Whether a token is set, so providers can provision.
+   */
+  enabled: boolean;
+  /**
+   * When the current token was made.
+   */
+  tokenCreatedAt?: Timestamp | null;
+}
+
+/**
  * A permission ceiling carried by a credential.
  *
  * The set matches the MCP scopes in the brief: `read`, `write:draft`,
  * `write:direct`, `work` and `admin`.
  */
 export type Scope = "read" | "write:draft" | "write:direct" | "work" | "admin";
+
+/**
+ * An object's ciphertext.
+ */
+export interface SealedObject {
+  /**
+   * The recipient envelope (or, when not `sealed`, the readable
+   * bytes), base64.
+   */
+  envelope: string;
+  /**
+   * Its version, for `if_match` on the next write.
+   */
+  etag: string;
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+  /**
+   * False for a readable object: the folder manifest, or a page still
+   * to convert when `plaintext` was asked for.
+   */
+  sealed: boolean;
+}
 
 /**
  * One block that matched, with what the UI and MCP need to show and cite it.
@@ -4995,7 +7738,8 @@ export interface SearchHit {
    */
   path: string;
   /**
-   * The fused relevance score; higher is better. Only comparable within one response.
+   * The fused relevance score; higher is better. Only comparable within one
+   * response.
    */
   score: number;
   /**
@@ -5015,6 +7759,11 @@ export interface SearchHit {
    */
   title: string;
 }
+
+/**
+ * What search is doing in the background.
+ */
+export type SearchJob = "idle" | "indexing" | "embedding" | "done" | "failed";
 
 /**
  * One page of search results.
@@ -5084,6 +7833,131 @@ export interface SearchQueryQueryInput {
    */
   trashed?: boolean;
 }
+
+/**
+ * Search (R-AI-7, R-SR-5; ADR 0011 D300).
+ */
+export interface SearchSettings {
+  /**
+   * Ranks results with the local embedding model as well as keywords,
+   * when the server has one (`VELLUM_EMBEDDINGS`). Off, search is
+   * keyword-only; pages keep getting vectors, so turning it on again
+   * takes effect at once.
+   */
+  hybrid?: boolean;
+}
+
+/**
+ * Search as Admin → Settings → Search shows it.
+ */
+export interface SearchStatusView {
+  /**
+   * Its vector length.
+   */
+  dimensions?: number | null;
+  /**
+   * Documents the job has done.
+   */
+  done: number;
+  /**
+   * `tantivy` (the data folder) or `postgres`.
+   */
+  engine: string;
+  /**
+   * Why the last job stopped.
+   */
+  error?: string | null;
+  /**
+   * Whether queries are ranked with it now: a model is set and the
+   * `search.hybrid` setting is on.
+   */
+  hybrid: boolean;
+  /**
+   * How long it stays in memory unused.
+   */
+  idle_minutes?: number | null;
+  /**
+   * The background job.
+   */
+  job: SearchJob;
+  /**
+   * Whether the model is in memory now; it loads on first use and is
+   * dropped after `idle_minutes` unused.
+   */
+  loaded: boolean;
+  /**
+   * The model's id, such as `all-MiniLM-L6-v2`.
+   */
+  model?: string | null;
+  /**
+   * Whether the server has a local embedding model (`VELLUM_EMBEDDINGS`).
+   */
+  model_configured: boolean;
+  /**
+   * Documents the job has to do.
+   */
+  total: number;
+}
+
+/**
+ * Who must use a second factor when signing in with a password.
+ */
+export type SecondFactorPolicy = "optional" | "admins" | "everyone";
+
+/**
+ * One likely secret, as the editor shows it.
+ */
+export interface SecretFinding {
+  /**
+   * 1-based column, in characters.
+   */
+  column: number;
+  /**
+   * Its length in characters, so the editor can select it to remove.
+   */
+  length: number;
+  /**
+   * 1-based line.
+   */
+  line: number;
+  /**
+   * The first four characters and the length.
+   */
+  redacted: string;
+  /**
+   * What it looks like, such as `github-token`.
+   */
+  rule: string;
+}
+
+/**
+ * Text to scan.
+ */
+export interface SecretScanInput {
+  /**
+   * The page's Markdown.
+   */
+  text: string;
+}
+
+/**
+ * What a save of the text would meet.
+ */
+export interface SecretScanResult {
+  /**
+   * Likely secrets the allow-list does not excuse; empty when off.
+   */
+  findings: SecretFinding[];
+  /**
+   * `off`, `warn` or `block`.
+   */
+  policy: SecretScanning;
+}
+
+/**
+ * Secret scanning on save (R-SE-6, D296).
+ */
+export type SecretScanning = "off" | "warn" | "block";
 
 /**
  * A newly issued secret URL or address. It is shown once.
@@ -5213,6 +8087,16 @@ export interface SecuritySettings {
    */
   fresh_auth_minutes?: number;
   /**
+   * Exceptions to secret scanning: a rule id (such as `jwt`) skips that
+   * kind of secret, anything else skips secrets containing that text
+   * (a documented example key, say).
+   */
+  secret_allow?: string[];
+  /**
+   * What a page save containing a likely secret does (R-SE-6, D296).
+   */
+  secret_scanning?: SecretScanning;
+  /**
    * Session lifetime in hours.
    */
   session_hours?: number;
@@ -5282,6 +8166,24 @@ export interface SessionView {
 }
 
 /**
+ * Sets or removes a person's role on a shared drive.
+ */
+export interface SetMember {
+  /**
+   * Their new role; absent or null removes them.
+   */
+  role?: SpaceRoleView | null;
+  /**
+   * The shared drive.
+   */
+  space_id: SpaceId;
+  /**
+   * The person.
+   */
+  user_id: UserId;
+}
+
+/**
  * `books.set_section_access`: replaces the section's own settings.
  */
 export interface SetSectionAccess {
@@ -5307,6 +8209,16 @@ export interface SetSectionAccess {
    * The section.
    */
   section_id: string;
+}
+
+/**
+ * The cap on new tokens' expiry.
+ */
+export interface SetTokenPolicy {
+  /**
+   * The longest expiry in days, 1 to 3650; `null` lifts the cap.
+   */
+  maxDays?: number | null;
 }
 
 /**
@@ -5374,6 +8286,105 @@ export interface SetupInput {
 export type Severity = "warning" | "error";
 
 /**
+ * A ShareId as a 26-character ULID.
+ */
+export type ShareId = string;
+
+/**
+ * A grant to make.
+ */
+export interface ShareInput {
+  /**
+   * When it stops counting; leave unset for no end.
+   */
+  expires_at?: Timestamp | null;
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * `user:<id>` or `group:<id>`.
+   */
+  principal: string;
+  /**
+   * The role; `owner` is refused.
+   */
+  role: RoleView;
+}
+
+/**
+ * Who has access to an item through grants on it, and its share links.
+ */
+export interface SharingView {
+  /**
+   * Grants on this item, strongest role first. Access inherited from a
+   * folder or the space is not listed.
+   */
+  grants: GrantView[];
+  /**
+   * The item.
+   */
+  item: NodeView;
+  /**
+   * Share links, newest first, revoked ones included.
+   */
+  links: LinkView[];
+  /**
+   * Whether the item can have share links (pages only, with a public
+   * origin configured).
+   */
+  links_allowed: boolean;
+}
+
+/**
+ * The workspace's sign-in rules, as Admin → Sign-in shows them.
+ */
+export interface SignInView {
+  /**
+   * How many enabled admins may still use a password (break-glass).
+   */
+  breakGlassAdmins: number;
+  /**
+   * The longest expiry of new API tokens, in days, if capped.
+   */
+  maxTokenDays?: number | null;
+  /**
+   * The redirect URI to register with OIDC providers.
+   */
+  oidcCallbackUrl: string;
+  /**
+   * The identity providers, the environment's first.
+   */
+  providers: ProviderView[];
+  /**
+   * Whether passwords are refused, except for break-glass admins.
+   */
+  requireSso: boolean;
+  /**
+   * What to register with SAML providers.
+   */
+  saml: SamlServiceView;
+  /**
+   * SCIM provisioning (D294).
+   */
+  scim: ScimView;
+  /**
+   * Who must use a second factor with a password.
+   */
+  secondFactor: SecondFactorPolicy;
+}
+
+/**
+ * How many sessions ended.
+ */
+export interface SignedOut {
+  /**
+   * Sessions ended.
+   */
+  sessions: number;
+}
+
+/**
  * An open issue with a similar title.
  */
 export interface SimilarOut {
@@ -5411,6 +8422,16 @@ export interface SlaOut {
    * When it stopped (closed or met).
    */
   stopped_at?: string | null;
+}
+
+/**
+ * A code from Slack's "Save as task" reply.
+ */
+export interface SlackLinkInput {
+  /**
+   * The `slack_link` value from the link Slack showed.
+   */
+  code: string;
 }
 
 /**
@@ -5471,6 +8492,25 @@ export interface SpaceKey {
 }
 
 /**
+ * A space's key list: what new pages are sealed to.
+ */
+export interface SpaceKeys {
+  /**
+   * Every enrolled device, oldest first.
+   */
+  keys: DeviceKeyInfo[];
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+  /**
+   * Changes whenever the list changes; empty while the space has no
+   * keys (it is not private).
+   */
+  version: string;
+}
+
+/**
  * What kind of space.
  */
 export type SpaceKindView = "shared_drive" | "user_drive";
@@ -5484,6 +8524,21 @@ export interface SpaceList {
    */
   spaces: SpaceView[];
 }
+
+/**
+ * A space, by ID.
+ */
+export interface SpaceRef {
+  /**
+   * The space.
+   */
+  space_id: SpaceId;
+}
+
+/**
+ * A role on a whole space (ADR 0021, D242).
+ */
+export type SpaceRoleView = "viewer" | "commenter" | "editor" | "manager" | "owner";
 
 /**
  * A space.
@@ -5531,15 +8586,38 @@ export interface Span {
 }
 
 /**
- * How the sign-in page offers single sign-on.
+ * `books.split_section`: turns a section's headings into child sections.
+ */
+export interface SplitSection {
+  /**
+   * The book.
+   */
+  book_id: BookId;
+  /**
+   * The heading level to split at, 1 to 6; the shallowest present when
+   * absent.
+   */
+  level?: number | null;
+  /**
+   * The section.
+   */
+  section_id: string;
+}
+
+/**
+ * A sign-in button.
  */
 export interface SsoButton {
+  /**
+   * The provider's ID.
+   */
+  id: string;
   /**
    * The provider's name, for "Sign in with {name}".
    */
   name: string;
   /**
-   * Where the button goes; append `?next=<path>` to return there.
+   * Where the button goes; append `&next=<path>` to return there.
    */
   startUrl: string;
 }
@@ -5604,6 +8682,20 @@ export interface StatusOut {
 }
 
 /**
+ * A stored object.
+ */
+export interface Stored {
+  /**
+   * Its new version.
+   */
+  etag: string;
+  /**
+   * Its path inside the space folder.
+   */
+  path: string;
+}
+
+/**
  * A block as stored in an index: what a backend returns.
  */
 export interface StoredBlock {
@@ -5651,6 +8743,17 @@ export interface StoredBlock {
    * The document's title.
    */
   title: string;
+}
+
+/**
+ * Which accent colour to draw figures in (ADR 0068, D302).
+ */
+export interface StylesheetInput {
+  /**
+   * The app's accent colour as six hex digits, `rrggbb` (a leading `#`
+   * is accepted). Absent draws in Vellum's own colours.
+   */
+  seed?: string | null;
 }
 
 /**
@@ -5766,6 +8869,20 @@ export interface SuggestionOut {
 }
 
 /**
+ * `POST /v1/assist/summarize`.
+ */
+export interface SummarizeInput {
+  /**
+   * The model to use.
+   */
+  model: ModelSettings;
+  /**
+   * The page to summarise.
+   */
+  page_id: string;
+}
+
+/**
  * What a sync did.
  */
 export interface SyncView {
@@ -5816,7 +8933,7 @@ export interface TargetOut {
 /**
  * Where a task comes from.
  */
-export type TaskKind = "checklist" | "issue" | "comment" | "review";
+export type TaskKind = "checklist" | "issue" | "comment" | "mention" | "review";
 
 /**
  * A task by ID.
@@ -5864,6 +8981,10 @@ export interface TaskView {
    * The list's title, for items in task lists.
    */
   list?: string | null;
+  /**
+   * For a mention: who mentioned the person, without `@`.
+   */
+  mentioned_by?: string | null;
   /**
    * Whether its deadline has passed.
    */
@@ -5945,6 +9066,10 @@ export interface TasksCreateTaskView {
    */
   list?: string | null;
   /**
+   * For a mention: who mentioned the person, without `@`.
+   */
+  mentioned_by?: string | null;
+  /**
    * Whether its deadline has passed.
    */
   overdue: boolean;
@@ -5959,39 +9084,19 @@ export interface TasksCreateTaskView {
 }
 
 /**
- * No input.
- */
-export type TasksDigestNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksGoogleConnectNoInput = Record<string, unknown>;
-
-/**
  * An acknowledgement with nothing to return.
  */
 export type TasksGoogleDisconnectDone = Record<string, unknown>;
 
 /**
- * No input.
+ * An acknowledgement with nothing to return.
  */
-export type TasksGoogleDisconnectNoInput = Record<string, unknown>;
+export type TasksLinkSlackDone = Record<string, unknown>;
 
 /**
- * No input.
+ * An acknowledgement with nothing to return.
  */
-export type TasksGoogleStatusNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksGoogleSyncNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksListsNoInput = Record<string, unknown>;
+export type TasksMentionDismissDone = Record<string, unknown>;
 
 /**
  * One task in a view.
@@ -6030,6 +9135,10 @@ export interface TasksMoveTaskView {
    */
   list?: string | null;
   /**
+   * For a mention: who mentioned the person, without `@`.
+   */
+  mentioned_by?: string | null;
+  /**
    * Whether its deadline has passed.
    */
   overdue: boolean;
@@ -6042,11 +9151,6 @@ export interface TasksMoveTaskView {
    */
   title: string;
 }
-
-/**
- * No input.
- */
-export type TasksMyWorkNoInput = Record<string, unknown>;
 
 /**
  * What a recognised quick-add phrase set.
@@ -6090,6 +9194,10 @@ export interface TasksReopenTaskView {
    */
   list?: string | null;
   /**
+   * For a mention: who mentioned the person, without `@`.
+   */
+  mentioned_by?: string | null;
+  /**
    * Whether its deadline has passed.
    */
   overdue: boolean;
@@ -6109,29 +9217,9 @@ export interface TasksReopenTaskView {
 export type TasksRevokeCaptureDone = Record<string, unknown>;
 
 /**
- * No input.
- */
-export type TasksRevokeCaptureNoInput = Record<string, unknown>;
-
-/**
  * An acknowledgement with nothing to return.
  */
 export type TasksRevokeFeedDone = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksRevokeFeedNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksRotateCaptureNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type TasksRotateFeedNoInput = Record<string, unknown>;
 
 /**
  * A task list.
@@ -6162,6 +9250,11 @@ export interface TasksShareListListView {
    */
   title: string;
 }
+
+/**
+ * An acknowledgement with nothing to return.
+ */
+export type TasksUnlinkSlackDone = Record<string, unknown>;
 
 /**
  * A task list.
@@ -6230,6 +9323,10 @@ export interface TasksUpdateTaskView {
    */
   list?: string | null;
   /**
+   * For a mention: who mentioned the person, without `@`.
+   */
+  mentioned_by?: string | null;
+  /**
    * Whether its deadline has passed.
    */
   overdue: boolean;
@@ -6269,6 +9366,10 @@ export interface TeamOptionOut {
  * A team and its workflow.
  */
 export interface TeamOut {
+  /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
   /**
    * Whether the team runs cycles.
    */
@@ -6330,6 +9431,22 @@ export interface TeamRef {
 }
 
 /**
+ * A team's whole settings file, for the settings screen.
+ */
+export interface TeamSettingsOut {
+  /**
+   * `team.yaml` as JSON: statuses, estimates, cycles, triage rules, SLAs,
+   * labels, templates, forms and the Git mapping. Send it back, edited,
+   * as the `yaml` of `PUT /v1/work/teams/{team}` (JSON is valid YAML).
+   */
+  settings: unknown;
+  /**
+   * The same file as YAML text.
+   */
+  yaml: string;
+}
+
+/**
  * Every team.
  */
 export interface TeamsOut {
@@ -6359,6 +9476,86 @@ export interface TelemetrySettings {
    * Hours between reports.
    */
   interval_hours?: number;
+}
+
+/**
+ * A team's issue template.
+ */
+export interface TemplateOut {
+  /**
+   * Assignee handle.
+   */
+  assignee?: string | null;
+  /**
+   * Body, in Vellum Markdown.
+   */
+  body: string;
+  /**
+   * Estimate.
+   */
+  estimate?: string | null;
+  /**
+   * Labels added.
+   */
+  labels: string[];
+  /**
+   * Name, unique within the team.
+   */
+  name: string;
+  /**
+   * Priority 0–4.
+   */
+  priority?: number | null;
+  /**
+   * Project ID.
+   */
+  project?: string | null;
+  /**
+   * Repeat (`1w`).
+   */
+  repeat?: string | null;
+  /**
+   * Starting status slug.
+   */
+  state?: string | null;
+  /**
+   * Title to start from.
+   */
+  title?: string | null;
+}
+
+/**
+ * A team's templates.
+ */
+export interface TemplatesOut {
+  /**
+   * In the team file's order.
+   */
+  templates: TemplateOut[];
+}
+
+/**
+ * `POST /v1/assist/test`.
+ */
+export interface TestInput {
+  /**
+   * The model to try.
+   */
+  model: ModelSettings;
+}
+
+/**
+ * Whether the model answered.
+ */
+export interface TestResult {
+  /**
+   * What happened, in a sentence.
+   */
+  detail: string;
+  /**
+   * The model answered.
+   */
+  ok: boolean;
 }
 
 /**
@@ -6517,6 +9714,38 @@ export interface TocNode {
 }
 
 /**
+ * Who owns a token, as administrators see it.
+ */
+export interface TokenOwner {
+  /**
+   * The sign-in address.
+   */
+  email: string;
+  /**
+   * The user's ID.
+   */
+  id: UserId;
+  /**
+   * The display name.
+   */
+  name: string;
+}
+
+/**
+ * What a new personal API token may have.
+ */
+export interface TokenPolicy {
+  /**
+   * The longest expiry in days; `None` allows tokens that never expire.
+   */
+  maxDays?: number | null;
+  /**
+   * The scopes you may grant.
+   */
+  scopes: Scope[];
+}
+
+/**
  * An API token as listed (never the secret).
  */
 export interface TokenView {
@@ -6547,6 +9776,34 @@ export interface TokenView {
 }
 
 /**
+ * A code from the authenticator app being added.
+ */
+export interface TotpCode {
+  /**
+   * The 6-digit code the app shows now.
+   */
+  code: string;
+}
+
+/**
+ * A new authenticator app: what to scan or type into it.
+ */
+export interface TotpSetup {
+  /**
+   * The link as a QR code: one string per row, `1` for a dark module.
+   */
+  qr: string[];
+  /**
+   * The secret in base32, to type in by hand.
+   */
+  secret: string;
+  /**
+   * The `otpauth://` link, which a phone opens in its app.
+   */
+  uri: string;
+}
+
+/**
  * One trace.
  */
 export interface TraceInput {
@@ -6554,6 +9811,33 @@ export interface TraceInput {
    * The 32-hex-digit W3C trace id.
    */
   trace_id: string;
+}
+
+/**
+ * `books.transfer_section`: moves or copies a section and everything
+ * under it into another book.
+ */
+export interface TransferSection {
+  /**
+   * The source book.
+   */
+  book_id: BookId;
+  /**
+   * Copy with fresh IDs instead of moving.
+   */
+  copy?: boolean;
+  /**
+   * Where it goes in the target book.
+   */
+  place: BooksTransferSectionPlaceInput;
+  /**
+   * The section.
+   */
+  section_id: string;
+  /**
+   * The target book.
+   */
+  to_book: BookId;
 }
 
 /**
@@ -6634,6 +9918,20 @@ export interface Unread {
 }
 
 /**
+ * A grant to remove.
+ */
+export interface UnshareInput {
+  /**
+   * The item.
+   */
+  id: ObjectId;
+  /**
+   * `user:<id>` or `group:<id>`.
+   */
+  principal: string;
+}
+
+/**
  * Which browser to forget.
  */
 export interface Unsubscribe {
@@ -6641,6 +9939,24 @@ export interface Unsubscribe {
    * The push service URL the browser registered.
    */
   endpoint: string;
+}
+
+/**
+ * Changes to a group.
+ */
+export interface UpdateGroup {
+  /**
+   * A new description.
+   */
+  description?: string | null;
+  /**
+   * The group.
+   */
+  id: ObjectId;
+  /**
+   * A new name.
+   */
+  name?: string | null;
 }
 
 /**
@@ -6732,6 +10048,10 @@ export interface UpdateIssue {
    */
   key: string;
   /**
+   * Milestone ID; empty clears.
+   */
+  milestone?: string | null;
+  /**
    * Parent issue key; empty clears.
    */
   parent?: string | null;
@@ -6751,6 +10071,10 @@ export interface UpdateIssue {
    * Relations to remove.
    */
   remove_relations?: RelationIn[];
+  /**
+   * How often it repeats (`1w`); empty stops it.
+   */
+  repeat?: string | null;
   /**
    * New status slug.
    */
@@ -6773,6 +10097,99 @@ export interface UpdateMe {
    * The new display name.
    */
   name: string;
+}
+
+/**
+ * A project update.
+ */
+export interface UpdateOut {
+  /**
+   * Author handle.
+   */
+  author: string;
+  /**
+   * The notes, in Vellum Markdown.
+   */
+  body: string;
+  /**
+   * Important project changes since the update before.
+   */
+  changes: string[];
+  /**
+   * When it was posted.
+   */
+  created_at: string;
+  /**
+   * on-track, at-risk or off-track.
+   */
+  health: string;
+  /**
+   * Update ID.
+   */
+  id: string;
+}
+
+/**
+ * Changes a property. Fields left out stay as they are; the key never
+ * changes. A rename rewrites the formulas that name the property.
+ */
+export interface UpdatePropertyInput {
+  /**
+   * A rollup's aggregation.
+   */
+  agg?: Aggregation | null;
+  /**
+   * The collection.
+   */
+  collection_id: CollectionId;
+  /**
+   * How numbers show.
+   */
+  format?: NumberFormat | null;
+  /**
+   * A formula's new expression.
+   */
+  formula?: string | null;
+  /**
+   * The property's key.
+   */
+  key: string;
+  /**
+   * A new display name.
+   */
+  name?: string | null;
+  /**
+   * The full new option list of a select or multi-select.
+   */
+  options?: SelectOption[] | null;
+  /**
+   * A rollup's property on the related rows, by key or name.
+   */
+  prop?: string | null;
+  /**
+   * A new type. Row files are not rewritten: each value is read again
+   * as the new type, and one that does not fit is kept as written and
+   * reported. Titles and relations keep their type.
+   */
+  type?: string | null;
+  /**
+   * A rollup's relation, by key or name (when changing to a rollup).
+   */
+  via?: string | null;
+}
+
+/**
+ * A changed provider, with its ID in the path.
+ */
+export interface UpdateProvider {
+  /**
+   * The provider's ID.
+   */
+  id: string;
+  /**
+   * Its new settings.
+   */
+  provider: IdentityAdminUpdateProviderProviderInput;
 }
 
 /**
@@ -6820,6 +10237,20 @@ export interface UpdateSection {
 }
 
 /**
+ * Changes to the sign-in rules; absent fields stay as they are.
+ */
+export interface UpdateSignIn {
+  /**
+   * Refuse passwords, except for break-glass admins.
+   */
+  requireSso?: boolean | null;
+  /**
+   * Who must use a second factor with a password.
+   */
+  secondFactor?: SecondFactorPolicy | null;
+}
+
+/**
  * Changes to a space.
  */
 export interface UpdateSpace {
@@ -6846,6 +10277,11 @@ export interface UpdateUser {
    */
   admin?: boolean | null;
   /**
+   * Let an administrator keep signing in with a password while single
+   * sign-on is required (break-glass).
+   */
+  breakGlass?: boolean | null;
+  /**
    * Block or allow sign-in. Blocking ends every session and token.
    */
   disabled?: boolean | null;
@@ -6857,6 +10293,114 @@ export interface UpdateUser {
    * A new display name.
    */
   name?: string | null;
+}
+
+/**
+ * A project's updates.
+ */
+export interface UpdatesOut {
+  /**
+   * Newest first.
+   */
+  updates: UpdateOut[];
+}
+
+/**
+ * The workspace's size and activity at one moment.
+ */
+export interface UsageCounts {
+  /**
+   * People seen in the last 24 hours.
+   */
+  active_users_1d: number;
+  /**
+   * People seen in the last 30 days.
+   */
+  active_users_30d: number;
+  /**
+   * People seen in the last 7 days.
+   */
+  active_users_7d: number;
+  /**
+   * Enabled administrators.
+   */
+  admins: number;
+  /**
+   * Personal API tokens.
+   */
+  api_tokens: number;
+  /**
+   * Live books.
+   */
+  books: number;
+  /**
+   * Live collections.
+   */
+  collections: number;
+  /**
+   * Accounts that may sign in.
+   */
+  enabled_users: number;
+  /**
+   * Drive activity entries (edits, moves, shares…) in the last 24 hours.
+   */
+  events_1d: number;
+  /**
+   * Drive activity entries in the last 7 days.
+   */
+  events_7d: number;
+  /**
+   * Bytes of current files, live and trashed.
+   */
+  file_bytes: number;
+  /**
+   * Live folders.
+   */
+  folders: number;
+  /**
+   * Live pages.
+   */
+  pages: number;
+  /**
+   * When the counts were taken (Unix milliseconds); 0 before the first
+   * sample.
+   */
+  sampled_at_ms: number;
+  /**
+   * Browser sessions that have not expired.
+   */
+  sessions: number;
+  /**
+   * Spaces (shared and personal drives).
+   */
+  spaces: number;
+  /**
+   * Items in the trash.
+   */
+  trashed: number;
+  /**
+   * Accounts, enabled or not.
+   */
+  users: number;
+  /**
+   * Bytes of saved versions.
+   */
+  version_bytes: number;
+  /**
+   * Saved page versions.
+   */
+  versions: number;
+}
+
+/**
+ * How fresh the usage counts must be.
+ */
+export interface UsageInput {
+  /**
+   * Count again now instead of answering from the last sample (at most
+   * five minutes old).
+   */
+  refresh?: boolean;
 }
 
 /**
@@ -6924,6 +10468,16 @@ export interface UsageView {
 }
 
 /**
+ * A user, by ID in the path.
+ */
+export interface UserById {
+  /**
+   * The user's ID.
+   */
+  id: UserId;
+}
+
+/**
  * A UserId as a 26-character ULID.
  */
 export type UserId = string;
@@ -6936,6 +10490,11 @@ export interface UserView {
    * Whether the user administers the workspace.
    */
   admin: boolean;
+  /**
+   * Whether this admin may use a password when single sign-on is
+   * required.
+   */
+  breakGlass?: boolean;
   /**
    * When the account was created.
    */
@@ -6964,6 +10523,10 @@ export interface UserView {
    * The display name.
    */
   name: string;
+  /**
+   * Whether the account has an authenticator app or passkey.
+   */
+  secondFactor?: boolean;
 }
 
 /**
@@ -7066,6 +10629,49 @@ export interface Versioned {
 }
 
 /**
+ * A saved view's settings.
+ */
+export interface ViewIn {
+  /**
+   * A Work filter as JSON text.
+   */
+  filter?: string | null;
+  /**
+   * status (default), assignee, priority, project, cycle, label, team or
+   * none.
+   */
+  group_by?: string | null;
+  /**
+   * `list` (default) or `board`.
+   */
+  layout?: string | null;
+  /**
+   * The name, 1 to 120 characters.
+   */
+  name: string;
+  /**
+   * priority (default), updated, created, due, estimate or title.
+   */
+  order_by?: string | null;
+  /**
+   * `all`, `past_week` (default), `past_month` or `none`.
+   */
+  show_closed?: string | null;
+  /**
+   * Whether sub-issues show alongside their parents (default true).
+   */
+  show_sub_issues?: boolean | null;
+  /**
+   * Scope the view to one team.
+   */
+  team?: string | null;
+  /**
+   * `private` (default), `team` or `workspace`.
+   */
+  visibility?: string | null;
+}
+
+/**
  * A saved view, in the text form `schema.yaml` uses.
  */
 export interface ViewInfo {
@@ -7127,6 +10733,66 @@ export interface ViewKey {
 export type ViewKind = "table" | "board" | "gallery" | "calendar" | "timeline" | "list";
 
 /**
+ * A saved view.
+ */
+export interface ViewOut {
+  /**
+   * The filter as JSON text, in the shape `query_issues` takes.
+   */
+  filter: string;
+  /**
+   * status, assignee, priority, project, cycle, label, team or none.
+   */
+  group_by: string;
+  /**
+   * The view ID.
+   */
+  id: string;
+  /**
+   * `list` or `board`.
+   */
+  layout: string;
+  /**
+   * The name.
+   */
+  name: string;
+  /**
+   * priority, updated, created, due, estimate or title.
+   */
+  order_by: string;
+  /**
+   * Who made it; only they can change or delete it.
+   */
+  owner: string;
+  /**
+   * `all`, `past_week`, `past_month` or `none`.
+   */
+  show_closed: string;
+  /**
+   * Whether sub-issues show alongside their parents.
+   */
+  show_sub_issues: boolean;
+  /**
+   * The team it is scoped to, or none for every team.
+   */
+  team?: string | null;
+  /**
+   * `private`, `team` or `workspace`.
+   */
+  visibility: string;
+}
+
+/**
+ * A saved view by ID.
+ */
+export interface ViewRef {
+  /**
+   * The view ID.
+   */
+  view_id: string;
+}
+
+/**
  * The result of running a view.
  */
 export interface ViewResult {
@@ -7162,6 +10828,144 @@ export interface ViewResult {
    * The view name.
    */
   view: string;
+}
+
+/**
+ * The saved views the caller can open.
+ */
+export interface ViewsOut {
+  /**
+   * Views, by name.
+   */
+  views: ViewOut[];
+}
+
+/**
+ * Done.
+ */
+export interface WebhooksDeleteDone {
+  /**
+   * Always true.
+   */
+  ok: boolean;
+}
+
+/**
+ * Done.
+ */
+export interface WebhooksRedeliverDone {
+  /**
+   * Always true.
+   */
+  ok: boolean;
+}
+
+/**
+ * One delivery attempt, as the admin sees it.
+ */
+export interface WebhooksTestDeliveryView {
+  /**
+   * When it was sent (RFC 3339).
+   */
+  at: string;
+  /**
+   * 1 for the first attempt.
+   */
+  attempt: number;
+  /**
+   * The delivery ID, as sent in `Vellum-Delivery`.
+   */
+  delivery_id: string;
+  /**
+   * How long it took.
+   */
+  duration_ms: number;
+  /**
+   * Why there was no answer.
+   */
+  error?: string | null;
+  /**
+   * `issue.create`, `comment.update`, … or `ping`.
+   */
+  event: string;
+  /**
+   * The event ID, as in the payload's `id`.
+   */
+  event_id: string;
+  /**
+   * When it will be tried again (RFC 3339).
+   */
+  next_attempt?: string | null;
+  /**
+   * `delivered`, `retry`, `rejected` or `gone`.
+   */
+  outcome: string;
+  /**
+   * The receiver's status code, when it answered.
+   */
+  status?: number | null;
+}
+
+/**
+ * A webhook, as the admin sees it. The secret is never shown again.
+ */
+export interface WebhooksUpdateHookView {
+  /**
+   * Final failures in a row.
+   */
+  consecutive_failures: number;
+  /**
+   * When it was created (RFC 3339).
+   */
+  created_at: string;
+  /**
+   * A note for admins.
+   */
+  description: string;
+  /**
+   * Whether it receives events.
+   */
+  enabled: boolean;
+  /**
+   * The resources it wants (`issue`, `comment`, …).
+   */
+  event_types: string[];
+  /**
+   * When the current run of failures began (RFC 3339).
+   */
+  failing_since?: string | null;
+  /**
+   * The hook's ID.
+   */
+  id: string;
+  /**
+   * The latest attempt.
+   */
+  last_delivery?: DeliveryView | null;
+  /**
+   * Why Vellum paused it, when it did.
+   */
+  paused_reason?: string | null;
+  /**
+   * Deliveries waiting.
+   */
+  queued: number;
+  /**
+   * Whether a rotated-out secret still signs too.
+   */
+  rotating: boolean;
+  /**
+   * The last four characters of the current secret.
+   */
+  secret_hint: string;
+  /**
+   * The team keys it covers; empty means every public team.
+   */
+  teams: string[];
+  /**
+   * Where events are posted.
+   */
+  url: string;
 }
 
 /**
@@ -7259,6 +11063,10 @@ export interface WorkAcceptSuggestionIssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -7289,9 +11097,95 @@ export interface WorkAcceptSuggestionIssueOut {
 }
 
 /**
+ * A project with its computed progress and latest health.
+ */
+export interface WorkAddMilestoneProjectOut {
+  /**
+   * Completed points.
+   */
+  completed: number;
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * on-track, at-risk or off-track, from the latest update.
+   */
+  health?: string | null;
+  /**
+   * Project ID.
+   */
+  id: string;
+  /**
+   * Issues in the project.
+   */
+  issues: number;
+  /**
+   * Lead handle.
+   */
+  lead?: string | null;
+  /**
+   * The project file, front matter and spec.
+   */
+  markdown: string;
+  /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Milestones in order, with progress.
+   */
+  milestones: MilestoneOut[];
+  /**
+   * Percent complete by points.
+   */
+  percent: number;
+  /**
+   * Points in scope.
+   */
+  scope: number;
+  /**
+   * Start date.
+   */
+  start_date?: string | null;
+  /**
+   * backlog, planned, in-progress, completed or canceled.
+   */
+  status: string;
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+  /**
+   * Team keys.
+   */
+  teams: string[];
+  /**
+   * Title.
+   */
+  title: string;
+  /**
+   * weekly, biweekly, monthly or never.
+   */
+  update_cadence: string;
+  /**
+   * Whether the lead owes an update by the project's cadence.
+   */
+  update_due: boolean;
+  /**
+   * When the latest update was posted.
+   */
+  updated_at?: string | null;
+}
+
+/**
  * A team and its workflow.
  */
-export interface WorkCreateTeamTeamOut {
+export interface WorkArchiveTeamTeamOut {
+  /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
   /**
    * Whether the team runs cycles.
    */
@@ -7340,6 +11234,244 @@ export interface WorkCreateTeamTeamOut {
    * Whether intake issues go to triage first.
    */
   triage: boolean;
+}
+
+/**
+ * An initiative with its projects rolled up.
+ */
+export interface WorkCreateInitiativeInitiativeOut {
+  /**
+   * The worst latest health among active projects.
+   */
+  health?: string | null;
+  /**
+   * Initiative ID.
+   */
+  id: string;
+  /**
+   * The initiative file, front matter and description.
+   */
+  markdown: string;
+  /**
+   * Owner handle.
+   */
+  owner?: string | null;
+  /**
+   * Percent complete by points over every project.
+   */
+  percent: number;
+  /**
+   * The projects, in display order.
+   */
+  projects: ProjectOut[];
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+  /**
+   * Title.
+   */
+  title: string;
+}
+
+/**
+ * A project with its computed progress and latest health.
+ */
+export interface WorkCreateProjectProjectOut {
+  /**
+   * Completed points.
+   */
+  completed: number;
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * on-track, at-risk or off-track, from the latest update.
+   */
+  health?: string | null;
+  /**
+   * Project ID.
+   */
+  id: string;
+  /**
+   * Issues in the project.
+   */
+  issues: number;
+  /**
+   * Lead handle.
+   */
+  lead?: string | null;
+  /**
+   * The project file, front matter and spec.
+   */
+  markdown: string;
+  /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Milestones in order, with progress.
+   */
+  milestones: MilestoneOut[];
+  /**
+   * Percent complete by points.
+   */
+  percent: number;
+  /**
+   * Points in scope.
+   */
+  scope: number;
+  /**
+   * Start date.
+   */
+  start_date?: string | null;
+  /**
+   * backlog, planned, in-progress, completed or canceled.
+   */
+  status: string;
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+  /**
+   * Team keys.
+   */
+  teams: string[];
+  /**
+   * Title.
+   */
+  title: string;
+  /**
+   * weekly, biweekly, monthly or never.
+   */
+  update_cadence: string;
+  /**
+   * Whether the lead owes an update by the project's cadence.
+   */
+  update_due: boolean;
+  /**
+   * When the latest update was posted.
+   */
+  updated_at?: string | null;
+}
+
+/**
+ * A team and its workflow.
+ */
+export interface WorkCreateTeamTeamOut {
+  /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
+  /**
+   * Whether the team runs cycles.
+   */
+  cycles: boolean;
+  /**
+   * The status new issues get.
+   */
+  default_status: string;
+  /**
+   * Team ID.
+   */
+  id: string;
+  /**
+   * Key prefix, such as `ENG`.
+   */
+  key: string;
+  /**
+   * Label references (`group/name` or `name`).
+   */
+  labels: string[];
+  /**
+   * The team lead's handle.
+   */
+  lead?: string | null;
+  /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Display name.
+   */
+  name: string;
+  /**
+   * Statuses in board order.
+   */
+  statuses: StatusOut[];
+  /**
+   * Template names.
+   */
+  templates: string[];
+  /**
+   * IANA time zone for cycles and recurring work.
+   */
+  timezone: string;
+  /**
+   * Whether intake issues go to triage first.
+   */
+  triage: boolean;
+}
+
+/**
+ * A saved view.
+ */
+export interface WorkCreateViewViewOut {
+  /**
+   * The filter as JSON text, in the shape `query_issues` takes.
+   */
+  filter: string;
+  /**
+   * status, assignee, priority, project, cycle, label, team or none.
+   */
+  group_by: string;
+  /**
+   * The view ID.
+   */
+  id: string;
+  /**
+   * `list` or `board`.
+   */
+  layout: string;
+  /**
+   * The name.
+   */
+  name: string;
+  /**
+   * priority, updated, created, due, estimate or title.
+   */
+  order_by: string;
+  /**
+   * Who made it; only they can change or delete it.
+   */
+  owner: string;
+  /**
+   * `all`, `past_week`, `past_month` or `none`.
+   */
+  show_closed: string;
+  /**
+   * Whether sub-issues show alongside their parents.
+   */
+  show_sub_issues: boolean;
+  /**
+   * The team it is scoped to, or none for every team.
+   */
+  team?: string | null;
+  /**
+   * `private`, `team` or `workspace`.
+   */
+  visibility: string;
+}
+
+/**
+ * Nothing to return.
+ */
+export interface WorkDeleteViewDone {
+  /**
+   * Always true.
+   */
+  ok: boolean;
 }
 
 /**
@@ -7426,6 +11558,10 @@ export interface WorkDismissSuggestionIssueOut {
    * Relations to other issues.
    */
   relations: RelationOut[];
+  /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
   /**
    * The running or last SLA.
    */
@@ -7541,6 +11677,10 @@ export interface WorkGetIssueIssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -7571,9 +11711,21 @@ export interface WorkGetIssueIssueOut {
 }
 
 /**
- * A project with its computed progress.
+ * A project with its computed progress and latest health.
  */
 export interface WorkGetProjectProjectOut {
+  /**
+   * Completed points.
+   */
+  completed: number;
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * on-track, at-risk or off-track, from the latest update.
+   */
+  health?: string | null;
   /**
    * Project ID.
    */
@@ -7591,11 +11743,27 @@ export interface WorkGetProjectProjectOut {
    */
   markdown: string;
   /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Milestones in order, with progress.
+   */
+  milestones: MilestoneOut[];
+  /**
    * Percent complete by points.
    */
   percent: number;
   /**
-   * planned, started, paused, completed or canceled.
+   * Points in scope.
+   */
+  scope: number;
+  /**
+   * Start date.
+   */
+  start_date?: string | null;
+  /**
+   * backlog, planned, in-progress, completed or canceled.
    */
   status: string;
   /**
@@ -7610,12 +11778,28 @@ export interface WorkGetProjectProjectOut {
    * Title.
    */
   title: string;
+  /**
+   * weekly, biweekly, monthly or never.
+   */
+  update_cadence: string;
+  /**
+   * Whether the lead owes an update by the project's cadence.
+   */
+  update_due: boolean;
+  /**
+   * When the latest update was posted.
+   */
+  updated_at?: string | null;
 }
 
 /**
  * A team and its workflow.
  */
 export interface WorkGetTeamTeamOut {
+  /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
   /**
    * Whether the team runs cycles.
    */
@@ -7665,16 +11849,6 @@ export interface WorkGetTeamTeamOut {
    */
   triage: boolean;
 }
-
-/**
- * No input.
- */
-export type WorkListProjectsNoInput = Record<string, unknown>;
-
-/**
- * No input.
- */
-export type WorkListTeamsNoInput = Record<string, unknown>;
 
 /**
  * An issue.
@@ -7761,6 +11935,10 @@ export interface WorkMoveIssueIssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -7791,14 +11969,89 @@ export interface WorkMoveIssueIssueOut {
 }
 
 /**
- * No input.
+ * A project update.
  */
-export type WorkMyAssignmentsNoInput = Record<string, unknown>;
+export interface WorkPostUpdateUpdateOut {
+  /**
+   * Author handle.
+   */
+  author: string;
+  /**
+   * The notes, in Vellum Markdown.
+   */
+  body: string;
+  /**
+   * Important project changes since the update before.
+   */
+  changes: string[];
+  /**
+   * When it was posted.
+   */
+  created_at: string;
+  /**
+   * on-track, at-risk or off-track.
+   */
+  health: string;
+  /**
+   * Update ID.
+   */
+  id: string;
+}
 
 /**
- * A project with its computed progress.
+ * An initiative with its projects rolled up.
+ */
+export interface WorkPutInitiativeInitiativeOut {
+  /**
+   * The worst latest health among active projects.
+   */
+  health?: string | null;
+  /**
+   * Initiative ID.
+   */
+  id: string;
+  /**
+   * The initiative file, front matter and description.
+   */
+  markdown: string;
+  /**
+   * Owner handle.
+   */
+  owner?: string | null;
+  /**
+   * Percent complete by points over every project.
+   */
+  percent: number;
+  /**
+   * The projects, in display order.
+   */
+  projects: ProjectOut[];
+  /**
+   * Target date.
+   */
+  target_date?: string | null;
+  /**
+   * Title.
+   */
+  title: string;
+}
+
+/**
+ * A project with its computed progress and latest health.
  */
 export interface WorkPutProjectProjectOut {
+  /**
+   * Completed points.
+   */
+  completed: number;
+  /**
+   * Completed issues.
+   */
+  completed_issues: number;
+  /**
+   * on-track, at-risk or off-track, from the latest update.
+   */
+  health?: string | null;
   /**
    * Project ID.
    */
@@ -7816,11 +12069,27 @@ export interface WorkPutProjectProjectOut {
    */
   markdown: string;
   /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Milestones in order, with progress.
+   */
+  milestones: MilestoneOut[];
+  /**
    * Percent complete by points.
    */
   percent: number;
   /**
-   * planned, started, paused, completed or canceled.
+   * Points in scope.
+   */
+  scope: number;
+  /**
+   * Start date.
+   */
+  start_date?: string | null;
+  /**
+   * backlog, planned, in-progress, completed or canceled.
    */
   status: string;
   /**
@@ -7835,12 +12104,136 @@ export interface WorkPutProjectProjectOut {
    * Title.
    */
   title: string;
+  /**
+   * weekly, biweekly, monthly or never.
+   */
+  update_cadence: string;
+  /**
+   * Whether the lead owes an update by the project's cadence.
+   */
+  update_due: boolean;
+  /**
+   * When the latest update was posted.
+   */
+  updated_at?: string | null;
 }
 
 /**
  * A team and its workflow.
  */
 export interface WorkPutTeamTeamOut {
+  /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
+  /**
+   * Whether the team runs cycles.
+   */
+  cycles: boolean;
+  /**
+   * The status new issues get.
+   */
+  default_status: string;
+  /**
+   * Team ID.
+   */
+  id: string;
+  /**
+   * Key prefix, such as `ENG`.
+   */
+  key: string;
+  /**
+   * Label references (`group/name` or `name`).
+   */
+  labels: string[];
+  /**
+   * The team lead's handle.
+   */
+  lead?: string | null;
+  /**
+   * Member handles.
+   */
+  members: string[];
+  /**
+   * Display name.
+   */
+  name: string;
+  /**
+   * Statuses in board order.
+   */
+  statuses: StatusOut[];
+  /**
+   * Template names.
+   */
+  templates: string[];
+  /**
+   * IANA time zone for cycles and recurring work.
+   */
+  timezone: string;
+  /**
+   * Whether intake issues go to triage first.
+   */
+  triage: boolean;
+}
+
+/**
+ * A saved view.
+ */
+export interface WorkPutViewViewOut {
+  /**
+   * The filter as JSON text, in the shape `query_issues` takes.
+   */
+  filter: string;
+  /**
+   * status, assignee, priority, project, cycle, label, team or none.
+   */
+  group_by: string;
+  /**
+   * The view ID.
+   */
+  id: string;
+  /**
+   * `list` or `board`.
+   */
+  layout: string;
+  /**
+   * The name.
+   */
+  name: string;
+  /**
+   * priority, updated, created, due, estimate or title.
+   */
+  order_by: string;
+  /**
+   * Who made it; only they can change or delete it.
+   */
+  owner: string;
+  /**
+   * `all`, `past_week`, `past_month` or `none`.
+   */
+  show_closed: string;
+  /**
+   * Whether sub-issues show alongside their parents.
+   */
+  show_sub_issues: boolean;
+  /**
+   * The team it is scoped to, or none for every team.
+   */
+  team?: string | null;
+  /**
+   * `private`, `team` or `workspace`.
+   */
+  visibility: string;
+}
+
+/**
+ * A team and its workflow.
+ */
+export interface WorkRestoreTeamTeamOut {
+  /**
+   * Archived teams keep their issues but take no new ones (D303).
+   */
+  archived: boolean;
   /**
    * Whether the team runs cycles.
    */
@@ -7975,6 +12368,10 @@ export interface WorkSubmitFormIssueOut {
    * Relations to other issues.
    */
   relations: RelationOut[];
+  /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
   /**
    * The running or last SLA.
    */
@@ -8128,6 +12525,10 @@ export interface WorkTriageIssueIssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -8242,6 +12643,10 @@ export interface WorkUpdateIssueIssueOut {
    */
   relations: RelationOut[];
   /**
+   * How often it repeats (`1w`, `2w`, `1m`, `3d`).
+   */
+  repeat?: string | null;
+  /**
    * The running or last SLA.
    */
   sla?: SlaOut | null;
@@ -8273,6 +12678,13 @@ export interface WorkUpdateIssueIssueOut {
 
 /** Every operation: its method, path, input and output. */
 export interface Operations {
+  /** The organisation's seed colour and export and site themes */
+  "admin.appearance": {
+    method: "GET";
+    path: "/v1/appearance";
+    input: AdminAppearanceEmpty;
+    output: AppearanceSettings;
+  };
   /** Browser timings for a page view or slow call, joined to its trace */
   "admin.client_report": {
     method: "POST";
@@ -8378,6 +12790,13 @@ export interface Operations {
     input: SettingsUpdate;
     output: AdminUpdateSettingsVersioned;
   };
+  /** People, pages, storage and activity on this server, counted at most five minutes ago */
+  "admin.usage": {
+    method: "GET";
+    path: "/v1/admin/usage";
+    input: UsageInput;
+    output: UsageCounts;
+  };
   /** Checks the audit log's hash chain end to end */
   "admin.verify_audit": {
     method: "POST";
@@ -8385,12 +12804,61 @@ export interface Operations {
     input: AdminVerifyAuditEmpty;
     output: ChainReport;
   };
+  /** Search's engine, embedding model and background indexing */
+  "admin_search.status": {
+    method: "GET";
+    path: "/v1/admin/search";
+    input: NoInput;
+    output: SearchStatusView;
+  };
+  /** Ask this space, answered with citations by your own model */
+  "assist.ask": {
+    method: "POST";
+    path: "/v1/assist/ask";
+    input: AskInput;
+    output: Answer;
+  };
+  /** Draft a page from a template with your own model */
+  "assist.draft": {
+    method: "POST";
+    path: "/v1/assist/draft";
+    input: DraftInput;
+    output: Draft;
+  };
+  /** Summarise a page with your own model */
+  "assist.summarize": {
+    method: "POST";
+    path: "/v1/assist/summarize";
+    input: SummarizeInput;
+    output: Answer;
+  };
+  /** Check that your own model answers */
+  "assist.test": {
+    method: "POST";
+    path: "/v1/assist/test";
+    input: TestInput;
+    output: TestResult;
+  };
   /** Add a section */
   "books.add_section": {
     method: "POST";
     path: "/v1/books/{book_id}/sections";
     input: AddSection;
     output: SectionDoc;
+  };
+  /** Copy a section with everything under it within the book */
+  "books.copy_section": {
+    method: "POST";
+    path: "/v1/books/{book_id}/sections/{section_id}/copy";
+    input: CopySection;
+    output: Created;
+  };
+  /** Create an empty book in a drive folder */
+  "books.create": {
+    method: "POST";
+    path: "/v1/books";
+    input: CreateBook;
+    output: BooksCreateBookSummary;
   };
   /** Tag the current book */
   "books.create_snapshot": {
@@ -8420,6 +12888,13 @@ export interface Operations {
     input: SectionKey;
     output: SectionDoc;
   };
+  /** List the book's outline changes, newest first */
+  "books.history": {
+    method: "GET";
+    path: "/v1/books/{book_id}/history";
+    input: HistoryInput;
+    output: HistoryList;
+  };
   /** List the books you can open */
   "books.list": {
     method: "GET";
@@ -8434,12 +12909,33 @@ export interface Operations {
     input: BookKey;
     output: SnapshotList;
   };
+  /** Fold a section's children back into it as headings */
+  "books.merge_section": {
+    method: "POST";
+    path: "/v1/books/{book_id}/sections/{section_id}/merge";
+    input: MergeSection;
+    output: BooksMergeSectionRemoved;
+  };
   /** Move or nest a section with everything under it */
   "books.move_section": {
     method: "POST";
     path: "/v1/books/{book_id}/sections/{section_id}/move";
     input: MoveSection;
     output: SectionDoc;
+  };
+  /** List the book's current publications */
+  "books.publications": {
+    method: "GET";
+    path: "/v1/books/{book_id}/publications";
+    input: BookKey;
+    output: PublicationList;
+  };
+  /** Publish the book as a static site or an mdBook tree */
+  "books.publish": {
+    method: "POST";
+    path: "/v1/books/{book_id}/publish";
+    input: Publish;
+    output: Publication;
   };
   /** Remove a section with everything under it */
   "books.remove_section": {
@@ -8448,6 +12944,13 @@ export interface Operations {
     input: SectionKey;
     output: BooksRemoveSectionRemoved;
   };
+  /** Put the sections back in an earlier order */
+  "books.restore_outline": {
+    method: "POST";
+    path: "/v1/books/{book_id}/history/restore";
+    input: RestoreOutline;
+    output: BookInfo;
+  };
   /** Restrict a section and set its owners and reviewers */
   "books.set_section_access": {
     method: "PUT";
@@ -8455,12 +12958,33 @@ export interface Operations {
     input: SetSectionAccess;
     output: BooksSetSectionAccessSectionAccessInfo;
   };
+  /** Turn a section's headings into sections */
+  "books.split_section": {
+    method: "POST";
+    path: "/v1/books/{book_id}/sections/{section_id}/split";
+    input: SplitSection;
+    output: Created;
+  };
+  /** Move or copy a section with everything under it into another book */
+  "books.transfer_section": {
+    method: "POST";
+    path: "/v1/books/{book_id}/sections/{section_id}/transfer";
+    input: TransferSection;
+    output: Created;
+  };
   /** Rename a section or replace its body */
   "books.update_section": {
     method: "PATCH";
     path: "/v1/books/{book_id}/sections/{section_id}";
     input: UpdateSection;
     output: SectionDoc;
+  };
+  /** Add a property (a column) to a collection */
+  "collections.add_property": {
+    method: "POST";
+    path: "/v1/collections/{collection_id}/properties";
+    input: AddPropertyInput;
+    output: CollectionInfo;
   };
   /** Compute a chart's data from a collection */
   "collections.chart": {
@@ -8482,6 +13006,13 @@ export interface Operations {
     path: "/v1/collections/{collection_id}/rows";
     input: CreateRowInput;
     output: RowWritten;
+  };
+  /** Remove a property and the view settings that use it */
+  "collections.delete_property": {
+    method: "DELETE";
+    path: "/v1/collections/{collection_id}/properties/{key}";
+    input: PropertyKey;
+    output: CollectionInfo;
   };
   /** Delete a row and unlink it */
   "collections.delete_row": {
@@ -8553,6 +13084,13 @@ export interface Operations {
     input: SaveViewInput;
     output: CollectionInfo;
   };
+  /** Rename a property or change its type, options, formula or format */
+  "collections.update_property": {
+    method: "PATCH";
+    path: "/v1/collections/{collection_id}/properties/{key}";
+    input: UpdatePropertyInput;
+    output: CollectionInfo;
+  };
   /** Change a row's values or body */
   "collections.update_row": {
     method: "PATCH";
@@ -8566,6 +13104,34 @@ export interface Operations {
     path: "/v1/drive/items/{id}/activity";
     input: ActivityInput;
     output: ActivityList;
+  };
+  /** Create a shared drive for someone */
+  "drive.admin_create_space": {
+    method: "POST";
+    path: "/v1/admin/spaces";
+    input: AdminCreateSpace;
+    output: DriveAdminCreateSpaceAdminSpaceView;
+  };
+  /** Set or remove someone's role on a shared drive */
+  "drive.admin_set_member": {
+    method: "PUT";
+    path: "/v1/admin/spaces/{space_id}/members/{user_id}";
+    input: SetMember;
+    output: DriveAdminSetMemberAdminSpaceView;
+  };
+  /** List every space with its size and members */
+  "drive.admin_spaces": {
+    method: "GET";
+    path: "/v1/admin/spaces";
+    input: DriveAdminSpacesNoInput;
+    output: AdminSpaceList;
+  };
+  /** Rename any space and change its quota, trash and version settings */
+  "drive.admin_update_space": {
+    method: "PATCH";
+    path: "/v1/admin/spaces/{space_id}";
+    input: UpdateSpace;
+    output: DriveAdminUpdateSpaceAdminSpaceView;
   };
   /** List the pages that link to a page */
   "drive.backlinks": {
@@ -8587,6 +13153,13 @@ export interface Operations {
     path: "/v1/drive/spaces/{space_id}/folders";
     input: CreateFolder;
     output: DriveCreateFolderNodeView;
+  };
+  /** Make a share link to a page, optionally expiring and password-protected */
+  "drive.create_link": {
+    method: "POST";
+    path: "/v1/drive/items/{id}/links";
+    input: CreateLinkInput;
+    output: CreatedLink;
   };
   /** Create a page */
   "drive.create_page": {
@@ -8648,7 +13221,7 @@ export interface Operations {
   "drive.my_drive": {
     method: "GET";
     path: "/v1/drive/my-drive";
-    input: NoInput;
+    input: DriveMyDriveNoInput;
     output: MyDrive;
   };
   /** Apply the space's version retention now */
@@ -8707,6 +13280,13 @@ export interface Operations {
     input: VersionKey;
     output: SaveView;
   };
+  /** Revoke a share link */
+  "drive.revoke_link": {
+    method: "DELETE";
+    path: "/v1/drive/links/{link_id}";
+    input: LinkKey;
+    output: DriveRevokeLinkDone;
+  };
   /** Save a page, merging changes made meanwhile */
   "drive.save": {
     method: "PUT";
@@ -8714,19 +13294,33 @@ export interface Operations {
     input: SaveInput;
     output: SaveView;
   };
+  /** Give a person or group a role on an item */
+  "drive.share": {
+    method: "PUT";
+    path: "/v1/drive/items/{id}/grants";
+    input: ShareInput;
+    output: SharingView;
+  };
   /** List the shared drives you can open */
   "drive.shared_drives": {
     method: "GET";
     path: "/v1/drive/shared-drives";
-    input: NoInput;
+    input: DriveSharedDrivesNoInput;
     output: SpaceList;
   };
   /** List items in other people's My Drives shared with you */
   "drive.shared_with_me": {
     method: "GET";
     path: "/v1/drive/shared-with-me";
-    input: NoInput;
+    input: DriveSharedWithMeNoInput;
     output: NodeList;
+  };
+  /** List who has access to an item and its share links */
+  "drive.sharing": {
+    method: "GET";
+    path: "/v1/drive/items/{id}/sharing";
+    input: NodeKey;
+    output: SharingView;
   };
   /** Star or unstar an item */
   "drive.star": {
@@ -8739,7 +13333,7 @@ export interface Operations {
   "drive.starred": {
     method: "GET";
     path: "/v1/drive/starred";
-    input: NoInput;
+    input: DriveStarredNoInput;
     output: NodeList;
   };
   /** Move an item, with everything in it, to the trash */
@@ -8762,6 +13356,13 @@ export interface Operations {
     path: "/v1/drive/spaces/{space_id}/tree";
     input: TreeInput;
     output: TreeView;
+  };
+  /** Remove the roles a person or group holds on an item */
+  "drive.unshare": {
+    method: "DELETE";
+    path: "/v1/drive/items/{id}/grants/{principal}";
+    input: UnshareInput;
+    output: SharingView;
   };
   /** Rename a space and change its quota, trash and version settings */
   "drive.update_space": {
@@ -8791,12 +13392,215 @@ export interface Operations {
     input: NodeKey;
     output: VersionList;
   };
+  /** Delete a sealed page */
+  "e2e.delete": {
+    method: "DELETE";
+    path: "/v1/spaces/{space_id}/e2e/object";
+    input: DeleteObject;
+    output: Deleted;
+  };
+  /** Enrol this device in a private space */
+  "e2e.enrol": {
+    method: "POST";
+    path: "/v1/spaces/{space_id}/e2e/keys";
+    input: EnrolDevice;
+    output: E2eEnrolDeviceKeyInfo;
+  };
+  /** Download a sealed page */
+  "e2e.get": {
+    method: "GET";
+    path: "/v1/spaces/{space_id}/e2e/object";
+    input: GetObject;
+    output: SealedObject;
+  };
+  /** List the devices a private space is sealed to */
+  "e2e.keys": {
+    method: "GET";
+    path: "/v1/spaces/{space_id}/e2e/keys";
+    input: SpaceRef;
+    output: SpaceKeys;
+  };
+  /** List a private space's objects */
+  "e2e.objects": {
+    method: "GET";
+    path: "/v1/spaces/{space_id}/e2e/objects";
+    input: ListObjects;
+    output: ObjectList;
+  };
+  /** Upload a page sealed on this device */
+  "e2e.put": {
+    method: "PUT";
+    path: "/v1/spaces/{space_id}/e2e/object";
+    input: PutObject;
+    output: Stored;
+  };
+  /** Revoke a device from a private space */
+  "e2e.revoke": {
+    method: "DELETE";
+    path: "/v1/spaces/{space_id}/e2e/keys/{fingerprint}";
+    input: RevokeDevice;
+    output: Revoked;
+  };
+  /** Add people to a group and remove others */
+  "groups.change_members": {
+    method: "POST";
+    path: "/v1/admin/groups/{id}/members";
+    input: ChangeMembers;
+    output: GroupMembersView;
+  };
+  /** Create a group */
+  "groups.create": {
+    method: "POST";
+    path: "/v1/admin/groups";
+    input: CreateGroup;
+    output: GroupsCreateGroupView;
+  };
+  /** Delete a group; its members lose what it granted */
+  "groups.delete": {
+    method: "DELETE";
+    path: "/v1/admin/groups/{id}";
+    input: GroupKey;
+    output: GroupDeleted;
+  };
+  /** List every group */
+  "groups.list": {
+    method: "GET";
+    path: "/v1/admin/groups";
+    input: Empty;
+    output: GroupList;
+  };
+  /** List a group's members */
+  "groups.members": {
+    method: "GET";
+    path: "/v1/admin/groups/{id}/members";
+    input: GroupKey;
+    output: GroupMembersView;
+  };
+  /** Find groups by name, for choosing who to share with */
+  "groups.search": {
+    method: "GET";
+    path: "/v1/directory/groups";
+    input: GroupSearch;
+    output: Directory;
+  };
+  /** Rename a group or change its description */
+  "groups.update": {
+    method: "PATCH";
+    path: "/v1/admin/groups/{id}";
+    input: UpdateGroup;
+    output: GroupsUpdateGroupView;
+  };
+  /** Add the passkey the browser created */
+  "identity.add_passkey": {
+    method: "POST";
+    path: "/v1/me/second-factors/passkeys";
+    input: AddPasskey;
+    output: IdentityAddPasskeyFactorAdded;
+  };
+  /** Add an OpenID Connect or SAML sign-in provider */
+  "identity.admin_add_provider": {
+    method: "POST";
+    path: "/v1/admin/sign-in/providers";
+    input: ProviderInput;
+    output: IdentityAdminAddProviderProviderView;
+  };
+  /** Remove a sign-in provider */
+  "identity.admin_remove_provider": {
+    method: "DELETE";
+    path: "/v1/admin/sign-in/providers/{id}";
+    input: ProviderId;
+    output: SignInView;
+  };
+  /** Remove someone's second factors and end their sessions */
+  "identity.admin_reset_factors": {
+    method: "POST";
+    path: "/v1/admin/users/{id}/second-factors/reset";
+    input: UserById;
+    output: IdentityAdminResetFactorsUserView;
+  };
+  /** Turn SCIM provisioning off */
+  "identity.admin_revoke_scim": {
+    method: "DELETE";
+    path: "/v1/admin/sign-in/scim/token";
+    input: Empty;
+    output: SignInView;
+  };
+  /** Revoke anyone's API token */
+  "identity.admin_revoke_token": {
+    method: "DELETE";
+    path: "/v1/admin/tokens/{id}";
+    input: ById;
+    output: Done;
+  };
+  /** Make a new SCIM provisioning token; the old one stops working */
+  "identity.admin_rotate_scim": {
+    method: "POST";
+    path: "/v1/admin/sign-in/scim/token";
+    input: Empty;
+    output: ScimTokenCreated;
+  };
+  /** Read a SAML provider's metadata to fill in its settings */
+  "identity.admin_saml_metadata": {
+    method: "POST";
+    path: "/v1/admin/sign-in/saml-metadata";
+    input: MetadataUrl;
+    output: SamlMetadataView;
+  };
+  /** The workspace's sign-in rules and providers */
+  "identity.admin_sign_in": {
+    method: "GET";
+    path: "/v1/admin/sign-in";
+    input: Empty;
+    output: SignInView;
+  };
+  /** End every session of one person */
+  "identity.admin_sign_out": {
+    method: "POST";
+    path: "/v1/admin/users/{id}/sign-out";
+    input: UserById;
+    output: SignedOut;
+  };
+  /** Cap how long new API tokens may last */
+  "identity.admin_token_policy": {
+    method: "PUT";
+    path: "/v1/admin/token-policy";
+    input: SetTokenPolicy;
+    output: TokenPolicy;
+  };
+  /** List everyone's API tokens */
+  "identity.admin_tokens": {
+    method: "GET";
+    path: "/v1/admin/tokens";
+    input: Empty;
+    output: Array_of_AdminTokenView;
+  };
+  /** Change a sign-in provider */
+  "identity.admin_update_provider": {
+    method: "PUT";
+    path: "/v1/admin/sign-in/providers/{id}";
+    input: UpdateProvider;
+    output: IdentityAdminUpdateProviderProviderView;
+  };
+  /** Change the workspace's sign-in rules */
+  "identity.admin_update_sign_in": {
+    method: "PATCH";
+    path: "/v1/admin/sign-in";
+    input: UpdateSignIn;
+    output: SignInView;
+  };
   /** List apps you connected with OAuth */
   "identity.apps": {
     method: "GET";
     path: "/v1/me/apps";
     input: Empty;
     output: Array_of_AppView;
+  };
+  /** Confirm the authenticator app with its first code */
+  "identity.confirm_totp": {
+    method: "POST";
+    path: "/v1/me/second-factors/totp/confirm";
+    input: TotpCode;
+    output: FactorAdded;
   };
   /** Create an API token; the secret is returned once */
   "identity.create_token": {
@@ -8811,6 +13615,41 @@ export interface Operations {
     path: "/v1/admin/users";
     input: CreateUser;
     output: IdentityCreateUserUserView;
+  };
+  /** Find people to share with */
+  "identity.directory": {
+    method: "GET";
+    path: "/v1/directory";
+    input: DirectoryQuery;
+    output: Directory;
+  };
+  /** Your authenticator app, passkeys and recovery codes */
+  "identity.factors": {
+    method: "GET";
+    path: "/v1/me/second-factors";
+    input: Empty;
+    output: FactorsView;
+  };
+  /** Replace your recovery codes; the new ones are shown once */
+  "identity.recovery_codes": {
+    method: "POST";
+    path: "/v1/me/second-factors/recovery-codes";
+    input: Empty;
+    output: RecoveryCodes;
+  };
+  /** Remove a passkey */
+  "identity.remove_passkey": {
+    method: "DELETE";
+    path: "/v1/me/second-factors/passkeys/{id}";
+    input: ById;
+    output: FactorsView;
+  };
+  /** Remove your authenticator app */
+  "identity.remove_totp": {
+    method: "DELETE";
+    path: "/v1/me/second-factors/totp";
+    input: Empty;
+    output: FactorsView;
   };
   /** Disconnect an app */
   "identity.revoke_app": {
@@ -8847,12 +13686,33 @@ export interface Operations {
     input: SetupInput;
     output: IdentitySetupUserView;
   };
+  /** Start adding a passkey: the options for the browser */
+  "identity.start_passkey": {
+    method: "POST";
+    path: "/v1/me/second-factors/passkeys/options";
+    input: Empty;
+    output: PasskeyCeremony;
+  };
+  /** Start adding an authenticator app; confirm it with a code */
+  "identity.start_totp": {
+    method: "POST";
+    path: "/v1/me/second-factors/totp";
+    input: Empty;
+    output: TotpSetup;
+  };
   /** Who is signed in, and whether the workspace needs set-up */
   "identity.status": {
     method: "GET";
     path: "/v1/auth/status";
     input: Empty;
     output: AuthStatus;
+  };
+  /** The scopes and longest expiry a new API token may have */
+  "identity.token_policy": {
+    method: "GET";
+    path: "/v1/me/token-policy";
+    input: Empty;
+    output: TokenPolicy;
   };
   /** List your API tokens */
   "identity.tokens": {
@@ -8931,12 +13791,26 @@ export interface Operations {
     input: PreferencesView;
     output: PreferencesView;
   };
+  /** Draws one fenced block, such as a diagram, for the editor */
+  "render.block": {
+    method: "POST";
+    path: "/v1/render/block";
+    input: BlockInput;
+    output: RenderedBlockView;
+  };
   /** Renders a page as sanitised HTML for the reader */
   "render.page": {
     method: "GET";
     path: "/v1/pages/{id}/render";
     input: PageKey;
     output: RenderedPageView;
+  };
+  /** The theme stylesheet for rendered HTML shown inside the app */
+  "render.stylesheet": {
+    method: "GET";
+    path: "/v1/render/stylesheet";
+    input: StylesheetInput;
+    output: RenderStylesheet;
   };
   /** A block with the heading section around it, for quoting and citations */
   "search.context": {
@@ -8959,12 +13833,26 @@ export interface Operations {
     input: TitlesInput;
     output: TitlesPage;
   };
+  /** Finds likely secrets in page text */
+  "security.scan_secrets": {
+    method: "POST";
+    path: "/v1/security/secrets/scan";
+    input: SecretScanInput;
+    output: SecretScanResult;
+  };
   /** Completes a task; a repeating task moves to its next date */
   "tasks.complete": {
     method: "POST";
     path: "/v1/tasks/{task}/complete";
     input: CompleteInput;
     output: CompleteView;
+  };
+  /** Where your tasks connect: CalDAV, e-mail and Slack capture */
+  "tasks.connections": {
+    method: "GET";
+    path: "/v1/my-work/connections";
+    input: NoInput;
+    output: ConnectionsView;
   };
   /** Adds a task from a quick-add line */
   "tasks.create": {
@@ -8991,35 +13879,35 @@ export interface Operations {
   "tasks.digest": {
     method: "GET";
     path: "/v1/my-work/digest";
-    input: TasksDigestNoInput;
+    input: NoInput;
     output: DigestView;
   };
   /** Starts connecting Google Calendar; returns Google's consent page */
   "tasks.google_connect": {
     method: "POST";
     path: "/v1/my-work/google/connect";
-    input: TasksGoogleConnectNoInput;
+    input: NoInput;
     output: SecretView;
   };
   /** Disconnects Google Calendar */
   "tasks.google_disconnect": {
     method: "DELETE";
     path: "/v1/my-work/google";
-    input: TasksGoogleDisconnectNoInput;
+    input: NoInput;
     output: TasksGoogleDisconnectDone;
   };
   /** Whether Google Calendar time-blocking is set up and connected */
   "tasks.google_status": {
     method: "GET";
     path: "/v1/my-work/google";
-    input: TasksGoogleStatusNoInput;
+    input: NoInput;
     output: GoogleView;
   };
   /** Syncs time blocks with Google Calendar now */
   "tasks.google_sync": {
     method: "POST";
     path: "/v1/my-work/google/sync";
-    input: TasksGoogleSyncNoInput;
+    input: NoInput;
     output: SyncView;
   };
   /** Imports tasks from Google Tasks, Todoist or Things */
@@ -9029,12 +13917,26 @@ export interface Operations {
     input: ImportInput;
     output: ImportView;
   };
+  /** Links your Slack account for Save as task, with the code Slack showed you */
+  "tasks.link_slack": {
+    method: "POST";
+    path: "/v1/my-work/slack-link";
+    input: SlackLinkInput;
+    output: TasksLinkSlackDone;
+  };
   /** Lists the person's task lists and lists shared with them */
   "tasks.lists": {
     method: "GET";
     path: "/v1/task-lists";
-    input: TasksListsNoInput;
+    input: NoInput;
     output: ListsView;
+  };
+  /** Takes a mention out of My Work without replying */
+  "tasks.mention_dismiss": {
+    method: "POST";
+    path: "/v1/my-work/mentions/{comment}/dismiss";
+    input: MentionRef;
+    output: TasksMentionDismissDone;
   };
   /** Moves a task to another bucket or day */
   "tasks.move": {
@@ -9047,7 +13949,7 @@ export interface Operations {
   "tasks.my_work": {
     method: "GET";
     path: "/v1/my-work";
-    input: TasksMyWorkNoInput;
+    input: NoInput;
     output: MyWorkView;
   };
   /** Parses a quick-add line for highlighting */
@@ -9068,29 +13970,43 @@ export interface Operations {
   "tasks.revoke_capture": {
     method: "DELETE";
     path: "/v1/my-work/capture-address";
-    input: TasksRevokeCaptureNoInput;
+    input: NoInput;
     output: TasksRevokeCaptureDone;
   };
   /** Turns the calendar feed off */
   "tasks.revoke_feed": {
     method: "DELETE";
     path: "/v1/my-work/feed";
-    input: TasksRevokeFeedNoInput;
+    input: NoInput;
     output: TasksRevokeFeedDone;
   };
   /** Issues a new capture e-mail address and revokes the old one */
   "tasks.rotate_capture": {
     method: "POST";
     path: "/v1/my-work/capture-address";
-    input: TasksRotateCaptureNoInput;
+    input: NoInput;
     output: SecretView;
   };
   /** Issues a new calendar feed URL and revokes the old one */
   "tasks.rotate_feed": {
     method: "POST";
     path: "/v1/my-work/feed";
-    input: TasksRotateFeedNoInput;
+    input: NoInput;
     output: SecretView;
+  };
+  /** Your My Work settings: time zone, start of day and digest time */
+  "tasks.settings": {
+    method: "GET";
+    path: "/v1/my-work/settings";
+    input: NoInput;
+    output: MyWorkSettingsView;
+  };
+  /** Replaces your My Work settings */
+  "tasks.settings_update": {
+    method: "PUT";
+    path: "/v1/my-work/settings";
+    input: MyWorkSettingsInput;
+    output: MyWorkSettingsView;
   };
   /** Shares a list with someone */
   "tasks.share_list": {
@@ -9098,6 +14014,13 @@ export interface Operations {
     path: "/v1/task-lists/{list_id}/members";
     input: MemberInput;
     output: TasksShareListListView;
+  };
+  /** Unlinks your Slack account */
+  "tasks.unlink_slack": {
+    method: "DELETE";
+    path: "/v1/my-work/slack-link";
+    input: NoInput;
+    output: TasksUnlinkSlackDone;
   };
   /** Stops sharing a list with someone */
   "tasks.unshare_list": {
@@ -9113,6 +14036,62 @@ export interface Operations {
     input: UpdateInput;
     output: TasksUpdateTaskView;
   };
+  /** Add a webhook; its signing secret is shown once */
+  "webhooks.create": {
+    method: "POST";
+    path: "/v1/admin/webhooks";
+    input: HookInput;
+    output: HookCreated;
+  };
+  /** Remove a webhook */
+  "webhooks.delete": {
+    method: "DELETE";
+    path: "/v1/admin/webhooks/{id}";
+    input: HookId;
+    output: WebhooksDeleteDone;
+  };
+  /** A webhook's last 100 delivery attempts */
+  "webhooks.deliveries": {
+    method: "GET";
+    path: "/v1/admin/webhooks/{id}/deliveries";
+    input: HookId;
+    output: DeliveryList;
+  };
+  /** Every webhook, with its health and last delivery */
+  "webhooks.list": {
+    method: "GET";
+    path: "/v1/admin/webhooks";
+    input: NoInput;
+    output: HookList;
+  };
+  /** Send a logged event to a webhook again */
+  "webhooks.redeliver": {
+    method: "POST";
+    path: "/v1/admin/webhooks/{id}/redeliver";
+    input: RedeliverInput;
+    output: WebhooksRedeliverDone;
+  };
+  /** Make a new signing secret; the old one signs for 24 more hours */
+  "webhooks.rotate_secret": {
+    method: "POST";
+    path: "/v1/admin/webhooks/{id}/secret";
+    input: HookId;
+    output: HookCreated;
+  };
+  /** Send a signed test delivery now */
+  "webhooks.test": {
+    method: "POST";
+    path: "/v1/admin/webhooks/{id}/test";
+    input: HookId;
+    output: WebhooksTestDeliveryView;
+  };
+  /** Change a webhook's URL, events, teams or turn it on or off */
+  "webhooks.update": {
+    method: "PUT";
+    path: "/v1/admin/webhooks/{id}";
+    input: HookUpdate;
+    output: WebhooksUpdateHookView;
+  };
   /** Applies the waiting triage suggestion as the caller */
   "work.accept_suggestion": {
     method: "POST";
@@ -9127,12 +14106,33 @@ export interface Operations {
     input: AddComment;
     output: CommentResult;
   };
+  /** Adds a milestone to a project */
+  "work.add_milestone": {
+    method: "POST";
+    path: "/v1/work/projects/{project_id}/milestones";
+    input: AddMilestone;
+    output: WorkAddMilestoneProjectOut;
+  };
+  /** Archives a team */
+  "work.archive_team": {
+    method: "POST";
+    path: "/v1/work/teams/{team}/archive";
+    input: TeamRef;
+    output: WorkArchiveTeamTeamOut;
+  };
   /** Assigns, reassigns or unassigns a thread */
   "work.assign_thread": {
     method: "POST";
     path: "/v1/work/threads/{thread_id}/assign";
     input: AssignThread;
     output: CommentResult;
+  };
+  /** Creates an initiative */
+  "work.create_initiative": {
+    method: "POST";
+    path: "/v1/work/initiatives";
+    input: CreateInitiative;
+    output: WorkCreateInitiativeInitiativeOut;
   };
   /** Creates an issue */
   "work.create_issue": {
@@ -9141,6 +14141,13 @@ export interface Operations {
     input: CreateIssue;
     output: CreatedIssue;
   };
+  /** Creates a project from fields */
+  "work.create_project": {
+    method: "POST";
+    path: "/v1/work/projects";
+    input: CreateProject;
+    output: WorkCreateProjectProjectOut;
+  };
   /** Creates a team */
   "work.create_team": {
     method: "POST";
@@ -9148,12 +14155,26 @@ export interface Operations {
     input: CreateTeam;
     output: WorkCreateTeamTeamOut;
   };
+  /** Saves a view */
+  "work.create_view": {
+    method: "POST";
+    path: "/v1/work/views";
+    input: ViewIn;
+    output: WorkCreateViewViewOut;
+  };
   /** Deletes my comment, or any comment as an admin */
   "work.delete_comment": {
     method: "DELETE";
     path: "/v1/work/comments/{comment_id}";
     input: CommentRef;
     output: CommentResult;
+  };
+  /** Deletes a saved view the caller owns */
+  "work.delete_view": {
+    method: "DELETE";
+    path: "/v1/work/views/{view_id}";
+    input: ViewRef;
+    output: WorkDeleteViewDone;
   };
   /** Drops the waiting triage suggestion */
   "work.dismiss_suggestion": {
@@ -9190,6 +14211,13 @@ export interface Operations {
     input: TeamRef;
     output: WorkGetTeamTeamOut;
   };
+  /** Reads a team's whole settings file (team.yaml) as JSON and YAML */
+  "work.get_team_settings": {
+    method: "GET";
+    path: "/v1/work/teams/{team}/settings";
+    input: TeamRef;
+    output: TeamSettingsOut;
+  };
   /** Lists a team's triage inbox */
   "work.inbox": {
     method: "GET";
@@ -9225,19 +14253,47 @@ export interface Operations {
     input: TeamRef;
     output: FormsOut;
   };
+  /** Lists initiatives with their projects' rolled-up health and progress */
+  "work.list_initiatives": {
+    method: "GET";
+    path: "/v1/work/initiatives";
+    input: NoInput;
+    output: InitiativesOut;
+  };
   /** Lists projects with progress */
   "work.list_projects": {
     method: "GET";
     path: "/v1/work/projects";
-    input: WorkListProjectsNoInput;
+    input: NoInput;
     output: ProjectsOut;
   };
   /** Lists teams with their workflows */
   "work.list_teams": {
     method: "GET";
     path: "/v1/work/teams";
-    input: WorkListTeamsNoInput;
+    input: ListTeams;
     output: TeamsOut;
+  };
+  /** Lists a team's issue templates in full */
+  "work.list_templates": {
+    method: "GET";
+    path: "/v1/work/teams/{team}/templates";
+    input: TeamRef;
+    output: TemplatesOut;
+  };
+  /** Lists a project's health updates, newest first */
+  "work.list_updates": {
+    method: "GET";
+    path: "/v1/work/projects/{project_id}/updates";
+    input: ProjectRef;
+    output: UpdatesOut;
+  };
+  /** Lists the saved views the caller can open */
+  "work.list_views": {
+    method: "GET";
+    path: "/v1/work/views";
+    input: ListViews;
+    output: ViewsOut;
   };
   /** Moves an issue to another team; the old key keeps working */
   "work.move_issue": {
@@ -9250,7 +14306,7 @@ export interface Operations {
   "work.my_assignments": {
     method: "GET";
     path: "/v1/work/me/assignments";
-    input: WorkMyAssignmentsNoInput;
+    input: NoInput;
     output: AssignmentsOut;
   };
   /** Lists my issues in focus order */
@@ -9259,6 +14315,20 @@ export interface Operations {
     path: "/v1/work/me/issues";
     input: MyIssues;
     output: MyIssuesOut;
+  };
+  /** Posts a health update: on track, at risk or off track */
+  "work.post_update": {
+    method: "POST";
+    path: "/v1/work/projects/{project_id}/updates";
+    input: PostUpdate;
+    output: WorkPostUpdateUpdateOut;
+  };
+  /** Replaces an initiative page */
+  "work.put_initiative": {
+    method: "PUT";
+    path: "/v1/work/initiatives/{initiative_id}";
+    input: PutInitiative;
+    output: WorkPutInitiativeInitiativeOut;
   };
   /** Creates or replaces a project page */
   "work.put_project": {
@@ -9273,6 +14343,13 @@ export interface Operations {
     path: "/v1/work/teams/{team}";
     input: PutTeam;
     output: WorkPutTeamTeamOut;
+  };
+  /** Replaces a saved view the caller owns */
+  "work.put_view": {
+    method: "PUT";
+    path: "/v1/work/views/{view_id}";
+    input: PutView;
+    output: WorkPutViewViewOut;
   };
   /** Lists issues by filter, grouped and ordered */
   "work.query_issues": {
@@ -9294,6 +14371,13 @@ export interface Operations {
     path: "/v1/work/threads/{thread_id}/resolve";
     input: ResolveThread;
     output: CommentResult;
+  };
+  /** Restores an archived team */
+  "work.restore_team": {
+    method: "POST";
+    path: "/v1/work/teams/{team}/restore";
+    input: TeamRef;
+    output: WorkRestoreTeamTeamOut;
   };
   /** Submits answers to an intake form as a triage issue */
   "work.submit_form": {
@@ -9334,6 +14418,7 @@ export interface Operations {
 
 /** How to call each operation, for the runtime in `client.ts`. */
 export const OPERATIONS = {
+  "admin.appearance": { method: "GET", path: "/v1/appearance", mutation: false },
   "admin.client_report": { method: "POST", path: "/v1/telemetry/client", mutation: true },
   "admin.create_backup": { method: "POST", path: "/v1/admin/backups", mutation: true },
   "admin.export_audit": { method: "GET", path: "/v1/admin/audit/export", mutation: false },
@@ -9349,21 +14434,38 @@ export const OPERATIONS = {
   "admin.state": { method: "GET", path: "/v1/admin/state", mutation: false },
   "admin.telemetry_preview": { method: "GET", path: "/v1/admin/telemetry/preview", mutation: false },
   "admin.update_settings": { method: "PUT", path: "/v1/admin/settings", mutation: true },
+  "admin.usage": { method: "GET", path: "/v1/admin/usage", mutation: false },
   "admin.verify_audit": { method: "POST", path: "/v1/admin/audit/verify", mutation: true },
+  "admin_search.status": { method: "GET", path: "/v1/admin/search", mutation: false },
+  "assist.ask": { method: "POST", path: "/v1/assist/ask", mutation: true },
+  "assist.draft": { method: "POST", path: "/v1/assist/draft", mutation: true },
+  "assist.summarize": { method: "POST", path: "/v1/assist/summarize", mutation: true },
+  "assist.test": { method: "POST", path: "/v1/assist/test", mutation: true },
   "books.add_section": { method: "POST", path: "/v1/books/{book_id}/sections", mutation: true },
+  "books.copy_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/copy", mutation: true },
+  "books.create": { method: "POST", path: "/v1/books", mutation: true },
   "books.create_snapshot": { method: "POST", path: "/v1/books/{book_id}/snapshots", mutation: true },
   "books.diff": { method: "GET", path: "/v1/books/{book_id}/diff", mutation: false },
   "books.get": { method: "GET", path: "/v1/books/{book_id}", mutation: false },
   "books.get_section": { method: "GET", path: "/v1/books/{book_id}/sections/{section_id}", mutation: false },
+  "books.history": { method: "GET", path: "/v1/books/{book_id}/history", mutation: false },
   "books.list": { method: "GET", path: "/v1/books", mutation: false },
   "books.list_snapshots": { method: "GET", path: "/v1/books/{book_id}/snapshots", mutation: false },
+  "books.merge_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/merge", mutation: true },
   "books.move_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/move", mutation: true },
+  "books.publications": { method: "GET", path: "/v1/books/{book_id}/publications", mutation: false },
+  "books.publish": { method: "POST", path: "/v1/books/{book_id}/publish", mutation: true },
   "books.remove_section": { method: "DELETE", path: "/v1/books/{book_id}/sections/{section_id}", mutation: true },
+  "books.restore_outline": { method: "POST", path: "/v1/books/{book_id}/history/restore", mutation: true },
   "books.set_section_access": { method: "PUT", path: "/v1/books/{book_id}/sections/{section_id}/access", mutation: true },
+  "books.split_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/split", mutation: true },
+  "books.transfer_section": { method: "POST", path: "/v1/books/{book_id}/sections/{section_id}/transfer", mutation: true },
   "books.update_section": { method: "PATCH", path: "/v1/books/{book_id}/sections/{section_id}", mutation: true },
+  "collections.add_property": { method: "POST", path: "/v1/collections/{collection_id}/properties", mutation: true },
   "collections.chart": { method: "GET", path: "/v1/collections/chart", mutation: false },
   "collections.create_from_csv": { method: "POST", path: "/v1/collections", mutation: true },
   "collections.create_row": { method: "POST", path: "/v1/collections/{collection_id}/rows", mutation: true },
+  "collections.delete_property": { method: "DELETE", path: "/v1/collections/{collection_id}/properties/{key}", mutation: true },
   "collections.delete_row": { method: "DELETE", path: "/v1/collections/{collection_id}/rows/{row_id}", mutation: true },
   "collections.delete_view": { method: "DELETE", path: "/v1/collections/{collection_id}/views/{view}", mutation: true },
   "collections.embed": { method: "GET", path: "/v1/collections/embed", mutation: false },
@@ -9374,11 +14476,17 @@ export const OPERATIONS = {
   "collections.list": { method: "GET", path: "/v1/collections", mutation: false },
   "collections.query": { method: "GET", path: "/v1/collections/{collection_id}/query", mutation: false },
   "collections.save_view": { method: "PUT", path: "/v1/collections/{collection_id}/views/{view}", mutation: true },
+  "collections.update_property": { method: "PATCH", path: "/v1/collections/{collection_id}/properties/{key}", mutation: true },
   "collections.update_row": { method: "PATCH", path: "/v1/collections/{collection_id}/rows/{row_id}", mutation: true },
   "drive.activity": { method: "GET", path: "/v1/drive/items/{id}/activity", mutation: false },
+  "drive.admin_create_space": { method: "POST", path: "/v1/admin/spaces", mutation: true },
+  "drive.admin_set_member": { method: "PUT", path: "/v1/admin/spaces/{space_id}/members/{user_id}", mutation: true },
+  "drive.admin_spaces": { method: "GET", path: "/v1/admin/spaces", mutation: false },
+  "drive.admin_update_space": { method: "PATCH", path: "/v1/admin/spaces/{space_id}", mutation: true },
   "drive.backlinks": { method: "GET", path: "/v1/drive/items/{id}/backlinks", mutation: false },
   "drive.copy": { method: "POST", path: "/v1/drive/items/{id}/copy", mutation: true },
   "drive.create_folder": { method: "POST", path: "/v1/drive/spaces/{space_id}/folders", mutation: true },
+  "drive.create_link": { method: "POST", path: "/v1/drive/items/{id}/links", mutation: true },
   "drive.create_page": { method: "POST", path: "/v1/drive/spaces/{space_id}/pages", mutation: true },
   "drive.create_shortcut": { method: "POST", path: "/v1/drive/spaces/{space_id}/shortcuts", mutation: true },
   "drive.create_space": { method: "POST", path: "/v1/drive/spaces", mutation: true },
@@ -9396,27 +14504,68 @@ export const OPERATIONS = {
   "drive.resolve_shortcut": { method: "GET", path: "/v1/drive/items/{id}/target", mutation: false },
   "drive.restore": { method: "POST", path: "/v1/drive/items/{id}/restore", mutation: true },
   "drive.restore_version": { method: "POST", path: "/v1/drive/items/{id}/versions/{version_id}/restore", mutation: true },
+  "drive.revoke_link": { method: "DELETE", path: "/v1/drive/links/{link_id}", mutation: true },
   "drive.save": { method: "PUT", path: "/v1/drive/items/{id}/content", mutation: true },
+  "drive.share": { method: "PUT", path: "/v1/drive/items/{id}/grants", mutation: true },
   "drive.shared_drives": { method: "GET", path: "/v1/drive/shared-drives", mutation: false },
   "drive.shared_with_me": { method: "GET", path: "/v1/drive/shared-with-me", mutation: false },
+  "drive.sharing": { method: "GET", path: "/v1/drive/items/{id}/sharing", mutation: false },
   "drive.star": { method: "PUT", path: "/v1/drive/items/{id}/star", mutation: true },
   "drive.starred": { method: "GET", path: "/v1/drive/starred", mutation: false },
   "drive.trash": { method: "POST", path: "/v1/drive/items/{id}/trash", mutation: true },
   "drive.trash_list": { method: "GET", path: "/v1/drive/spaces/{space_id}/trash", mutation: false },
   "drive.tree": { method: "GET", path: "/v1/drive/spaces/{space_id}/tree", mutation: false },
+  "drive.unshare": { method: "DELETE", path: "/v1/drive/items/{id}/grants/{principal}", mutation: true },
   "drive.update_space": { method: "PATCH", path: "/v1/drive/spaces/{space_id}", mutation: true },
   "drive.usage": { method: "GET", path: "/v1/drive/spaces/{space_id}/usage", mutation: false },
   "drive.version": { method: "GET", path: "/v1/drive/items/{id}/versions/{version_id}", mutation: false },
   "drive.versions": { method: "GET", path: "/v1/drive/items/{id}/versions", mutation: false },
+  "e2e.delete": { method: "DELETE", path: "/v1/spaces/{space_id}/e2e/object", mutation: true },
+  "e2e.enrol": { method: "POST", path: "/v1/spaces/{space_id}/e2e/keys", mutation: true },
+  "e2e.get": { method: "GET", path: "/v1/spaces/{space_id}/e2e/object", mutation: false },
+  "e2e.keys": { method: "GET", path: "/v1/spaces/{space_id}/e2e/keys", mutation: false },
+  "e2e.objects": { method: "GET", path: "/v1/spaces/{space_id}/e2e/objects", mutation: false },
+  "e2e.put": { method: "PUT", path: "/v1/spaces/{space_id}/e2e/object", mutation: true },
+  "e2e.revoke": { method: "DELETE", path: "/v1/spaces/{space_id}/e2e/keys/{fingerprint}", mutation: true },
+  "groups.change_members": { method: "POST", path: "/v1/admin/groups/{id}/members", mutation: true },
+  "groups.create": { method: "POST", path: "/v1/admin/groups", mutation: true },
+  "groups.delete": { method: "DELETE", path: "/v1/admin/groups/{id}", mutation: true },
+  "groups.list": { method: "GET", path: "/v1/admin/groups", mutation: false },
+  "groups.members": { method: "GET", path: "/v1/admin/groups/{id}/members", mutation: false },
+  "groups.search": { method: "GET", path: "/v1/directory/groups", mutation: false },
+  "groups.update": { method: "PATCH", path: "/v1/admin/groups/{id}", mutation: true },
+  "identity.add_passkey": { method: "POST", path: "/v1/me/second-factors/passkeys", mutation: true },
+  "identity.admin_add_provider": { method: "POST", path: "/v1/admin/sign-in/providers", mutation: true },
+  "identity.admin_remove_provider": { method: "DELETE", path: "/v1/admin/sign-in/providers/{id}", mutation: true },
+  "identity.admin_reset_factors": { method: "POST", path: "/v1/admin/users/{id}/second-factors/reset", mutation: true },
+  "identity.admin_revoke_scim": { method: "DELETE", path: "/v1/admin/sign-in/scim/token", mutation: true },
+  "identity.admin_revoke_token": { method: "DELETE", path: "/v1/admin/tokens/{id}", mutation: true },
+  "identity.admin_rotate_scim": { method: "POST", path: "/v1/admin/sign-in/scim/token", mutation: true },
+  "identity.admin_saml_metadata": { method: "POST", path: "/v1/admin/sign-in/saml-metadata", mutation: true },
+  "identity.admin_sign_in": { method: "GET", path: "/v1/admin/sign-in", mutation: false },
+  "identity.admin_sign_out": { method: "POST", path: "/v1/admin/users/{id}/sign-out", mutation: true },
+  "identity.admin_token_policy": { method: "PUT", path: "/v1/admin/token-policy", mutation: true },
+  "identity.admin_tokens": { method: "GET", path: "/v1/admin/tokens", mutation: false },
+  "identity.admin_update_provider": { method: "PUT", path: "/v1/admin/sign-in/providers/{id}", mutation: true },
+  "identity.admin_update_sign_in": { method: "PATCH", path: "/v1/admin/sign-in", mutation: true },
   "identity.apps": { method: "GET", path: "/v1/me/apps", mutation: false },
+  "identity.confirm_totp": { method: "POST", path: "/v1/me/second-factors/totp/confirm", mutation: true },
   "identity.create_token": { method: "POST", path: "/v1/me/tokens", mutation: true },
   "identity.create_user": { method: "POST", path: "/v1/admin/users", mutation: true },
+  "identity.directory": { method: "GET", path: "/v1/directory", mutation: false },
+  "identity.factors": { method: "GET", path: "/v1/me/second-factors", mutation: false },
+  "identity.recovery_codes": { method: "POST", path: "/v1/me/second-factors/recovery-codes", mutation: true },
+  "identity.remove_passkey": { method: "DELETE", path: "/v1/me/second-factors/passkeys/{id}", mutation: true },
+  "identity.remove_totp": { method: "DELETE", path: "/v1/me/second-factors/totp", mutation: true },
   "identity.revoke_app": { method: "DELETE", path: "/v1/me/apps/{id}", mutation: true },
   "identity.revoke_session": { method: "DELETE", path: "/v1/me/sessions/{id}", mutation: true },
   "identity.revoke_token": { method: "DELETE", path: "/v1/me/tokens/{id}", mutation: true },
   "identity.sessions": { method: "GET", path: "/v1/me/sessions", mutation: false },
   "identity.setup": { method: "POST", path: "/v1/setup", mutation: true },
+  "identity.start_passkey": { method: "POST", path: "/v1/me/second-factors/passkeys/options", mutation: true },
+  "identity.start_totp": { method: "POST", path: "/v1/me/second-factors/totp", mutation: true },
   "identity.status": { method: "GET", path: "/v1/auth/status", mutation: false },
+  "identity.token_policy": { method: "GET", path: "/v1/me/token-policy", mutation: false },
   "identity.tokens": { method: "GET", path: "/v1/me/tokens", mutation: false },
   "identity.update_me": { method: "PATCH", path: "/v1/me", mutation: true },
   "identity.update_user": { method: "PATCH", path: "/v1/admin/users/{id}", mutation: true },
@@ -9428,11 +14577,15 @@ export const OPERATIONS = {
   "notify.push_unsubscribe": { method: "DELETE", path: "/v1/push/subscriptions", mutation: true },
   "notify.read": { method: "POST", path: "/v1/notifications/read", mutation: true },
   "notify.set_preferences": { method: "PUT", path: "/v1/notifications/preferences", mutation: true },
+  "render.block": { method: "POST", path: "/v1/render/block", mutation: true },
   "render.page": { method: "GET", path: "/v1/pages/{id}/render", mutation: false },
+  "render.stylesheet": { method: "GET", path: "/v1/render/stylesheet", mutation: false },
   "search.context": { method: "GET", path: "/v1/search/context/{doc_id}/{block_id}", mutation: false },
   "search.query": { method: "GET", path: "/v1/search", mutation: false },
   "search.titles": { method: "GET", path: "/v1/search/titles", mutation: false },
+  "security.scan_secrets": { method: "POST", path: "/v1/security/secrets/scan", mutation: true },
   "tasks.complete": { method: "POST", path: "/v1/tasks/{task}/complete", mutation: true },
+  "tasks.connections": { method: "GET", path: "/v1/my-work/connections", mutation: false },
   "tasks.create": { method: "POST", path: "/v1/tasks", mutation: true },
   "tasks.create_list": { method: "POST", path: "/v1/task-lists", mutation: true },
   "tasks.delete": { method: "DELETE", path: "/v1/tasks/{task}", mutation: true },
@@ -9442,7 +14595,9 @@ export const OPERATIONS = {
   "tasks.google_status": { method: "GET", path: "/v1/my-work/google", mutation: false },
   "tasks.google_sync": { method: "POST", path: "/v1/my-work/google/sync", mutation: true },
   "tasks.import": { method: "POST", path: "/v1/tasks/import", mutation: true },
+  "tasks.link_slack": { method: "POST", path: "/v1/my-work/slack-link", mutation: true },
   "tasks.lists": { method: "GET", path: "/v1/task-lists", mutation: false },
+  "tasks.mention_dismiss": { method: "POST", path: "/v1/my-work/mentions/{comment}/dismiss", mutation: true },
   "tasks.move": { method: "POST", path: "/v1/tasks/{task}/move", mutation: true },
   "tasks.my_work": { method: "GET", path: "/v1/my-work", mutation: false },
   "tasks.parse": { method: "GET", path: "/v1/tasks/parse", mutation: false },
@@ -9451,35 +14606,61 @@ export const OPERATIONS = {
   "tasks.revoke_feed": { method: "DELETE", path: "/v1/my-work/feed", mutation: true },
   "tasks.rotate_capture": { method: "POST", path: "/v1/my-work/capture-address", mutation: true },
   "tasks.rotate_feed": { method: "POST", path: "/v1/my-work/feed", mutation: true },
+  "tasks.settings": { method: "GET", path: "/v1/my-work/settings", mutation: false },
+  "tasks.settings_update": { method: "PUT", path: "/v1/my-work/settings", mutation: true },
   "tasks.share_list": { method: "POST", path: "/v1/task-lists/{list_id}/members", mutation: true },
+  "tasks.unlink_slack": { method: "DELETE", path: "/v1/my-work/slack-link", mutation: true },
   "tasks.unshare_list": { method: "DELETE", path: "/v1/task-lists/{list_id}/members/{member}", mutation: true },
   "tasks.update": { method: "PATCH", path: "/v1/tasks/{task}", mutation: true },
+  "webhooks.create": { method: "POST", path: "/v1/admin/webhooks", mutation: true },
+  "webhooks.delete": { method: "DELETE", path: "/v1/admin/webhooks/{id}", mutation: true },
+  "webhooks.deliveries": { method: "GET", path: "/v1/admin/webhooks/{id}/deliveries", mutation: false },
+  "webhooks.list": { method: "GET", path: "/v1/admin/webhooks", mutation: false },
+  "webhooks.redeliver": { method: "POST", path: "/v1/admin/webhooks/{id}/redeliver", mutation: true },
+  "webhooks.rotate_secret": { method: "POST", path: "/v1/admin/webhooks/{id}/secret", mutation: true },
+  "webhooks.test": { method: "POST", path: "/v1/admin/webhooks/{id}/test", mutation: true },
+  "webhooks.update": { method: "PUT", path: "/v1/admin/webhooks/{id}", mutation: true },
   "work.accept_suggestion": { method: "POST", path: "/v1/work/issues/{key}/triage/suggestion/accept", mutation: true },
   "work.add_comment": { method: "POST", path: "/v1/work/comments", mutation: true },
+  "work.add_milestone": { method: "POST", path: "/v1/work/projects/{project_id}/milestones", mutation: true },
+  "work.archive_team": { method: "POST", path: "/v1/work/teams/{team}/archive", mutation: true },
   "work.assign_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/assign", mutation: true },
+  "work.create_initiative": { method: "POST", path: "/v1/work/initiatives", mutation: true },
   "work.create_issue": { method: "POST", path: "/v1/work/issues", mutation: true },
+  "work.create_project": { method: "POST", path: "/v1/work/projects", mutation: true },
   "work.create_team": { method: "POST", path: "/v1/work/teams", mutation: true },
+  "work.create_view": { method: "POST", path: "/v1/work/views", mutation: true },
   "work.delete_comment": { method: "DELETE", path: "/v1/work/comments/{comment_id}", mutation: true },
+  "work.delete_view": { method: "DELETE", path: "/v1/work/views/{view_id}", mutation: true },
   "work.dismiss_suggestion": { method: "DELETE", path: "/v1/work/issues/{key}/triage/suggestion", mutation: true },
   "work.edit_comment": { method: "PATCH", path: "/v1/work/comments/{comment_id}", mutation: true },
   "work.get_issue": { method: "GET", path: "/v1/work/issues/{key}", mutation: false },
   "work.get_project": { method: "GET", path: "/v1/work/projects/{project_id}", mutation: false },
   "work.get_team": { method: "GET", path: "/v1/work/teams/{team}", mutation: false },
+  "work.get_team_settings": { method: "GET", path: "/v1/work/teams/{team}/settings", mutation: false },
   "work.inbox": { method: "GET", path: "/v1/work/teams/{team}/inbox", mutation: false },
   "work.insights": { method: "GET", path: "/v1/work/insights", mutation: false },
   "work.list_comments": { method: "GET", path: "/v1/work/comments", mutation: false },
   "work.list_cycles": { method: "GET", path: "/v1/work/teams/{team}/cycles", mutation: false },
   "work.list_forms": { method: "GET", path: "/v1/work/teams/{team}/forms", mutation: false },
+  "work.list_initiatives": { method: "GET", path: "/v1/work/initiatives", mutation: false },
   "work.list_projects": { method: "GET", path: "/v1/work/projects", mutation: false },
   "work.list_teams": { method: "GET", path: "/v1/work/teams", mutation: false },
+  "work.list_templates": { method: "GET", path: "/v1/work/teams/{team}/templates", mutation: false },
+  "work.list_updates": { method: "GET", path: "/v1/work/projects/{project_id}/updates", mutation: false },
+  "work.list_views": { method: "GET", path: "/v1/work/views", mutation: false },
   "work.move_issue": { method: "POST", path: "/v1/work/issues/{key}/move", mutation: true },
   "work.my_assignments": { method: "GET", path: "/v1/work/me/assignments", mutation: false },
   "work.my_issues": { method: "GET", path: "/v1/work/me/issues", mutation: false },
+  "work.post_update": { method: "POST", path: "/v1/work/projects/{project_id}/updates", mutation: true },
+  "work.put_initiative": { method: "PUT", path: "/v1/work/initiatives/{initiative_id}", mutation: true },
   "work.put_project": { method: "PUT", path: "/v1/work/projects/{project_id}", mutation: true },
   "work.put_team": { method: "PUT", path: "/v1/work/teams/{team}", mutation: true },
+  "work.put_view": { method: "PUT", path: "/v1/work/views/{view_id}", mutation: true },
   "work.query_issues": { method: "GET", path: "/v1/work/issues", mutation: false },
   "work.react": { method: "POST", path: "/v1/work/comments/{comment_id}/reactions", mutation: true },
   "work.resolve_thread": { method: "POST", path: "/v1/work/threads/{thread_id}/resolve", mutation: true },
+  "work.restore_team": { method: "POST", path: "/v1/work/teams/{team}/restore", mutation: true },
   "work.submit_form": { method: "POST", path: "/v1/work/teams/{team}/forms/{slug}", mutation: true },
   "work.suggest_triage": { method: "PUT", path: "/v1/work/issues/{key}/triage/suggestion", mutation: true },
   "work.triage_brief": { method: "GET", path: "/v1/work/issues/{key}/triage/brief", mutation: false },

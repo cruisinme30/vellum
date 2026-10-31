@@ -9,9 +9,12 @@
 //! activity entry. Files are the truth: if a crash lands between the two,
 //! [`Drive::scan`] brings the index back in line.
 
+mod admin;
+mod attach;
 mod books;
 mod content;
 mod create;
+mod import;
 mod order;
 mod organize;
 mod scan;
@@ -32,10 +35,15 @@ use vellum_store::{BlobPath, BlobStore, StoreError};
 use crate::error::{DriveError, DriveResult};
 use crate::layout;
 use crate::model::{Activity, ActivityKind, Node, NodeKind, Space};
-use crate::ports::{Access, Clock, DriveIndex, Permission, SystemClock};
+use crate::ports::{
+    Access, Clock, ContentCheck, DriveIndex, Permission, SystemClock,
+};
 
+pub use admin::AdminSpace;
+pub use attach::{Attachment, MAX_ATTACHMENTS};
 pub use content::{SaveOutcome, Saved};
 pub use create::MY_DRIVE_NAME;
+pub use import::{Imported, MAX_IMPORT_FILES};
 pub use order::{MAX_TREE_ITEMS, Tree};
 pub use views::Filter;
 
@@ -52,6 +60,7 @@ pub struct Drive {
     access: Arc<dyn Access>,
     clock: Arc<dyn Clock>,
     metrics: Metrics,
+    check: Option<Arc<dyn ContentCheck>>,
 }
 
 #[derive(Debug, Clone)]
@@ -102,6 +111,32 @@ impl Drive {
             access,
             clock,
             metrics: Metrics::new(),
+            check: None,
+        }
+    }
+
+    /// Checks every page text before it is written (R-SE-6).
+    #[must_use]
+    pub fn with_content_check(mut self, check: Arc<dyn ContentCheck>) -> Self {
+        self.check = Some(check);
+        self
+    }
+
+    /// Runs the content check, if there is one, on page text `bytes`.
+    async fn check_content(
+        &self,
+        actor: &Actor,
+        space: SpaceId,
+        path: &BlobPath,
+        bytes: &[u8],
+    ) -> DriveResult<()> {
+        match &self.check {
+            Some(check) => {
+                check
+                    .check(actor, space, path, &String::from_utf8_lossy(bytes))
+                    .await
+            }
+            None => Ok(()),
         }
     }
 
@@ -121,9 +156,10 @@ impl Drive {
             1,
             &[KeyValue::new("op", op), KeyValue::new("outcome", outcome)],
         );
-        self.metrics
-            .seconds
-            .record(started.elapsed().as_secs_f64(), &[KeyValue::new("op", op)]);
+        self.metrics.seconds.record(
+            started.elapsed().as_secs_f64(),
+            &[KeyValue::new("op", op)],
+        );
         if let Err(err) = &result {
             tracing::debug!(op, error = %err, "drive operation failed");
         }
@@ -153,7 +189,11 @@ impl Drive {
     ) -> DriveResult<()> {
         let user = match actor {
             Actor::User { user } => *user,
-            Actor::Model { on_behalf_of } if permission != Permission::Manage => *on_behalf_of,
+            Actor::Model { on_behalf_of }
+                if permission != Permission::Manage =>
+            {
+                *on_behalf_of
+            }
             Actor::Model { .. } => return Err(DriveError::PermissionDenied),
             _ => return Ok(()),
         };
@@ -184,7 +224,12 @@ impl Drive {
     }
 
     /// Like [`Self::authorize`] but answers instead of failing.
-    async fn may(&self, actor: &Actor, node: &Node, permission: Permission) -> DriveResult<bool> {
+    async fn may(
+        &self,
+        actor: &Actor,
+        node: &Node,
+        permission: Permission,
+    ) -> DriveResult<bool> {
         match self.authorize(actor, node.space, node.id, permission).await {
             Ok(()) => Ok(true),
             Err(DriveError::PermissionDenied) => Ok(false),
@@ -217,7 +262,11 @@ impl Drive {
 
     /// The directory a new child of `parent` goes in, checking that the
     /// parent is a live folder or page of `space`.
-    async fn dir_of(&self, space: &Space, parent: Option<ObjectId>) -> DriveResult<BlobPath> {
+    async fn dir_of(
+        &self,
+        space: &Space,
+        parent: Option<ObjectId>,
+    ) -> DriveResult<BlobPath> {
         let Some(parent) = parent else {
             return Ok(space.root.clone());
         };
@@ -230,7 +279,9 @@ impl Drive {
         self.children_dir(holder.kind, &holder.path)
             .await?
             .ok_or_else(|| {
-                DriveError::Invalid(format!("{parent} is not a folder or page in this space"))
+                DriveError::Invalid(format!(
+                    "{parent} is not a folder or page in this space"
+                ))
             })
     }
 
@@ -255,7 +306,9 @@ impl Drive {
                     Err(err) => Err(err.into()),
                 }
             }
-            NodeKind::Book | NodeKind::Collection | NodeKind::Shortcut => Ok(None),
+            NodeKind::Book | NodeKind::Collection | NodeKind::Shortcut => {
+                Ok(None)
+            }
         }
     }
 
@@ -275,7 +328,12 @@ impl Drive {
     }
 
     /// Appends an activity entry for `node`.
-    async fn record(&self, actor: &Actor, node: &Node, kind: ActivityKind) -> DriveResult<()> {
+    async fn record(
+        &self,
+        actor: &Actor,
+        node: &Node,
+        kind: ActivityKind,
+    ) -> DriveResult<()> {
         let entry = Activity {
             id: EventId::generate(),
             at: self.clock.now(),
@@ -334,8 +392,12 @@ impl Drive {
             // directory (D168), so each needs the other's name free too.
             let twin = match kind {
                 NodeKind::Page => layout::page_dir(&path),
-                NodeKind::Folder => Some(dir.join(&format!("{}.md", path.file_name()))?),
-                NodeKind::Book | NodeKind::Collection | NodeKind::Shortcut => None,
+                NodeKind::Folder => {
+                    Some(dir.join(&format!("{}.md", path.file_name()))?)
+                }
+                NodeKind::Book | NodeKind::Collection | NodeKind::Shortcut => {
+                    None
+                }
             };
             let twin_taken = match &twin {
                 Some(twin) => self.occupied(twin).await?,
@@ -349,9 +411,13 @@ impl Drive {
     }
 
     /// Every blob at or beneath `path`.
-    async fn blobs_under(&self, path: &BlobPath) -> DriveResult<Vec<(BlobPath, u64)>> {
+    async fn blobs_under(
+        &self,
+        path: &BlobPath,
+    ) -> DriveResult<Vec<(BlobPath, u64)>> {
         let entries: Vec<_> = self.store.list(Some(path)).try_collect().await?;
-        let mut out: Vec<(BlobPath, u64)> = entries.into_iter().map(|e| (e.path, e.size)).collect();
+        let mut out: Vec<(BlobPath, u64)> =
+            entries.into_iter().map(|e| (e.path, e.size)).collect();
         out.sort();
         Ok(out)
     }
@@ -359,7 +425,12 @@ impl Drive {
     /// Moves every blob of a node (one file, a whole directory, or a page
     /// with the pages nested under it) from `from` to `to`, undoing the
     /// moves already made if one fails.
-    async fn move_blobs(&self, kind: NodeKind, from: &BlobPath, to: &BlobPath) -> DriveResult<()> {
+    async fn move_blobs(
+        &self,
+        kind: NodeKind,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> DriveResult<()> {
         if from == to {
             return Ok(());
         }
@@ -380,14 +451,20 @@ impl Drive {
                 }
             }
         }
-        let mut done: Vec<(BlobPath, BlobPath)> = Vec::with_capacity(moves.len());
+        let mut done: Vec<(BlobPath, BlobPath)> =
+            Vec::with_capacity(moves.len());
         for (path, target) in moves {
             match self.store.rename(&path, &target).await {
                 Ok(_) => done.push((path, target)),
                 Err(err) => {
                     for (back, moved) in done.iter().rev() {
-                        if let Err(undo) = self.store.rename(moved, back).await {
-                            tracing::error!(path = %moved, error = %undo, "could not undo a partial move");
+                        if let Err(undo) = self.store.rename(moved, back).await
+                        {
+                            tracing::error!(
+                                path = %moved,
+                                error = %undo,
+                                "could not undo a partial move"
+                            );
                         }
                     }
                     return Err(err.into());
@@ -398,11 +475,16 @@ impl Drive {
     }
 
     /// Reads a blob as UTF-8 text.
-    async fn read_text(&self, path: &BlobPath) -> DriveResult<(String, vellum_store::Blob)> {
+    async fn read_text(
+        &self,
+        path: &BlobPath,
+    ) -> DriveResult<(String, vellum_store::Blob)> {
         let blob = self.store.get(path).await?;
-        let text = String::from_utf8(blob.bytes.to_vec()).map_err(|_| DriveError::Malformed {
-            path: path.to_string(),
-            reason: "not UTF-8".to_owned(),
+        let text = String::from_utf8(blob.bytes.to_vec()).map_err(|_| {
+            DriveError::Malformed {
+                path: path.to_string(),
+                reason: "not UTF-8".to_owned(),
+            }
         })?;
         Ok((text, blob))
     }
@@ -417,7 +499,11 @@ impl Drive {
     }
 
     /// Writes a small drive-owned file unconditionally.
-    async fn put_file(&self, path: &BlobPath, text: String) -> DriveResult<u64> {
+    async fn put_file(
+        &self,
+        path: &BlobPath,
+        text: String,
+    ) -> DriveResult<u64> {
         let meta = self
             .store
             .put(path, Bytes::from(text), vellum_store::Precondition::None)

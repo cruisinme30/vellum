@@ -4,9 +4,10 @@
 import { NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
 import { useState, type FocusEvent } from "react";
 
+import { UploadButton } from "../../attachments/upload-button";
 import { useT } from "../../i18n/i18n";
 import { Icon } from "../../shell/icon";
-import { embedTarget, safeUrl } from "../urls";
+import { embedTarget, mediaUrl, safeUrl } from "../urls";
 
 interface FieldProperties {
   readonly label: string;
@@ -16,7 +17,13 @@ interface FieldProperties {
   readonly readOnly: boolean;
 }
 
-function Field({ label, value, onChange, type = "text", readOnly }: FieldProperties) {
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  readOnly,
+}: FieldProperties) {
   return (
     <label className="vl-field">
       <span>{label}</span>
@@ -41,7 +48,9 @@ function useEditing(properties: ReactNodeViewProps, key: string) {
   const [focused, setFocused] = useState(false);
   const open =
     properties.editor.isEditable &&
-    (focused || properties.selected || String(properties.node.attrs[key]) === "");
+    (focused ||
+      properties.selected ||
+      String(properties.node.attrs[key]) === "");
   const formEvents = {
     onFocus: () => {
       setFocused(true);
@@ -66,7 +75,12 @@ export function LinkCardView(properties: ReactNodeViewProps) {
   return (
     <NodeViewWrapper className="vl-block vl-linkCard" contentEditable={false}>
       {href ? (
-        <a className="vl-card-link" href={href} target="_blank" rel="noopener noreferrer">
+        <a
+          className="vl-card-link"
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           <Icon name="link" />
           <span>
             <strong>{title === "" ? href : title}</strong>
@@ -101,7 +115,10 @@ export function LinkCardView(properties: ReactNodeViewProps) {
   );
 }
 
-/** `::: embed <url>`: a sandboxed frame for supported providers, a link otherwise. */
+/**
+ * `::: embed <url>`: a sandboxed frame for supported providers, a link
+ * otherwise.
+ */
 export function EmbedView(properties: ReactNodeViewProps) {
   const t = useT();
   const { node, updateAttributes, editor } = properties;
@@ -115,7 +132,7 @@ export function EmbedView(properties: ReactNodeViewProps) {
         <iframe
           src={target.src}
           title={t("embed-title", { provider: target.provider })}
-          sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
+          sandbox="allow-scripts allow-same-origin allow-popups"
           referrerPolicy="strict-origin-when-cross-origin"
           loading="lazy"
           allowFullScreen
@@ -155,7 +172,7 @@ export function ImageView(properties: ReactNodeViewProps) {
   const source = String(node.attrs["src"]);
   const alt = String(node.attrs["alt"]);
   const width = String(node.attrs["width"]);
-  const safe = safeUrl(source);
+  const safe = mediaUrl(source);
   const [editing, formEvents] = useEditing(properties, "src");
   return (
     <NodeViewWrapper
@@ -180,6 +197,18 @@ export function ImageView(properties: ReactNodeViewProps) {
       )}
       {editing && (
         <div className="vl-form" {...formEvents}>
+          {editor.isEditable && (
+            <UploadButton
+              label={t("image-upload")}
+              accept="image/*"
+              onUploaded={(file) => {
+                updateAttributes({
+                  src: file.ref,
+                  alt: alt === "" ? file.name.replace(/\.[^.]*$/, "") : alt,
+                });
+              }}
+            />
+          )}
           <Field
             label={t("field-image-url")}
             type="url"

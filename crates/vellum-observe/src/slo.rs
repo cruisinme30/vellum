@@ -43,7 +43,8 @@ pub struct Scope {
 
 impl Scope {
     fn covers(&self, stat: &RouteStat) -> bool {
-        (self.methods.is_empty() || self.methods.iter().any(|m| m == &stat.method))
+        (self.methods.is_empty()
+            || self.methods.iter().any(|m| m == &stat.method))
             && self
                 .route_prefix
                 .as_deref()
@@ -89,7 +90,8 @@ pub fn default_slos() -> Vec<Slo> {
     vec![
         Slo {
             id: "availability".to_owned(),
-            description: "99.9 % of requests succeed each month (Org profile).".to_owned(),
+            description: "99.9 % of requests succeed each month (Org profile)."
+                .to_owned(),
             objective: 0.999,
             window_days: 30,
             indicator: Indicator::Availability,
@@ -97,7 +99,9 @@ pub fn default_slos() -> Vec<Slo> {
         },
         Slo {
             id: "read-latency".to_owned(),
-            description: "95 % of reads finish within 150 ms (uncached read p95).".to_owned(),
+            description:
+                "95 % of reads finish within 150 ms (uncached read p95)."
+                    .to_owned(),
             objective: 0.95,
             window_days: 30,
             indicator: Indicator::Latency { threshold_ms: 150 },
@@ -165,18 +169,22 @@ fn burn(slo: &Slo, good: u64, total: u64) -> f64 {
 }
 
 fn counts_for(slo: &Slo, stats: &[RouteStat]) -> (u64, u64) {
-    stats
-        .iter()
-        .filter(|s| slo.scope.covers(s))
-        .fold((0, 0), |(good, total), s| {
+    stats.iter().filter(|s| slo.scope.covers(s)).fold(
+        (0, 0),
+        |(good, total), s| {
             (good + slo.good(&s.counts), total + s.counts.requests)
-        })
+        },
+    )
 }
 
 /// Evaluates `slo` against stats for the last 5 minutes and the last hour.
 #[must_use]
 #[expect(clippy::cast_precision_loss, reason = "counts are far below 2^52")]
-pub fn evaluate_stats(slo: &Slo, short: &[RouteStat], long: &[RouteStat]) -> SloStatus {
+pub fn evaluate_stats(
+    slo: &Slo,
+    short: &[RouteStat],
+    long: &[RouteStat],
+) -> SloStatus {
     let (good5, total5) = counts_for(slo, short);
     let (good, total) = counts_for(slo, long);
     let fast = burn(slo, good5, total5);

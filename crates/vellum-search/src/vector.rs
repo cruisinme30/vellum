@@ -82,7 +82,11 @@ pub fn dot_quantised(query: &[f32], stored: &[u8]) -> Result<f32> {
 ///
 /// # Errors
 /// [`SearchError::Embedding`] on a count or dimension mismatch.
-pub fn check_shape(vectors: &[Vec<f32>], count: usize, dimensions: usize) -> Result<()> {
+pub fn check_shape(
+    vectors: &[Vec<f32>],
+    count: usize,
+    dimensions: usize,
+) -> Result<()> {
     if vectors.len() != count {
         return Err(SearchError::Embedding(format!(
             "expected {count} vectors, got {}",

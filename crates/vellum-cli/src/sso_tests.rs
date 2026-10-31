@@ -7,7 +7,9 @@
 use std::sync::{Arc, Mutex};
 
 use aws_lc_rs::rand::SystemRandom;
-use aws_lc_rs::signature::{ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair, KeyPair as _};
+use aws_lc_rs::signature::{
+    ECDSA_P256_SHA256_FIXED_SIGNING, EcdsaKeyPair, KeyPair as _,
+};
 use axum::extract::State;
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -20,7 +22,9 @@ use vellum_api::config::GatewayConfig;
 use vellum_api::gateway::GatewayBuilder;
 
 use crate::identity::oidc_config;
-use crate::identity_tests::{ORIGIN, Reply, finish, request, send, signed_in_admin};
+use crate::identity_tests::{
+    ORIGIN, Reply, finish, request, send, signed_in_admin,
+};
 use crate::services::{Services, VERSION};
 
 struct Provider {
@@ -62,7 +66,8 @@ async fn token(
     let claims = json!({
         "iss": p.issuer, "aud": "vellum", "sub": "okta-ana",
         "exp": now + 300, "iat": now, "nonce": *p.nonce.lock().unwrap(),
-        "email": "ana@northstar.dev", "email_verified": true, "name": "Ana Lima",
+        "email": "ana@northstar.dev", "email_verified": true,
+            "name": "Ana Lima",
     });
     let header = b64(br#"{"alg":"ES256","kid":"k1"}"#);
     let message = format!("{header}.{}", b64(claims.to_string().as_bytes()));
@@ -70,7 +75,9 @@ async fn token(
         .key
         .sign(&SystemRandom::new(), message.as_bytes())
         .unwrap();
-    Json(json!({ "id_token": format!("{message}.{}", b64(signature.as_ref())) }))
+    Json(
+        json!({ "id_token": format!("{message}.{}", b64(signature.as_ref())) }),
+    )
 }
 
 /// Starts the provider and returns it with its issuer URL.
@@ -130,10 +137,12 @@ async fn single_sign_on_opens_a_session_and_returns_to_the_page() {
     let _admin = signed_in_admin(&app).await;
 
     // The sign-in page learns there is a button.
-    let status = send(&app, finish(request("GET", "/api/v1/auth/status"))).await;
+    let status =
+        send(&app, finish(request("GET", "/api/v1/auth/status"))).await;
     assert_eq!(status.json()["sso"]["name"], "Northstar", "{}", status.text);
 
-    let start = send(&app, finish(request("GET", "/auth/sso/start?next=/drive"))).await;
+    let start =
+        send(&app, finish(request("GET", "/auth/sso/start?next=/drive"))).await;
     assert_eq!(start.status, StatusCode::SEE_OTHER, "{}", start.text);
     let to_provider = Url::parse(&location(&start)).unwrap();
     assert!(
@@ -153,7 +162,8 @@ async fn single_sign_on_opens_a_session_and_returns_to_the_page() {
     assert!(state_cookie.starts_with("vellum_sso="), "{state_cookie}");
     let callback = format!(
         "/auth/sso/callback?code=c1&state={}",
-        url::form_urlencoded::byte_serialize(param("state").as_bytes()).collect::<String>()
+        url::form_urlencoded::byte_serialize(param("state").as_bytes())
+            .collect::<String>()
     );
 
     // Without the state cookie (another browser), the callback fails.
@@ -162,7 +172,8 @@ async fn single_sign_on_opens_a_session_and_returns_to_the_page() {
     assert!(forged.text.contains("another browser"), "{}", forged.text);
 
     // A fresh start, finished in the same browser, signs Ana in.
-    let start = send(&app, finish(request("GET", "/auth/sso/start?next=/drive"))).await;
+    let start =
+        send(&app, finish(request("GET", "/auth/sso/start?next=/drive"))).await;
     let to_provider = Url::parse(&location(&start)).unwrap();
     let param = |name: &str| {
         to_provider
@@ -175,7 +186,8 @@ async fn single_sign_on_opens_a_session_and_returns_to_the_page() {
     let state_cookie = set_cookies(&start).remove(0);
     let callback = format!(
         "/auth/sso/callback?code=c2&state={}",
-        url::form_urlencoded::byte_serialize(param("state").as_bytes()).collect::<String>()
+        url::form_urlencoded::byte_serialize(param("state").as_bytes())
+            .collect::<String>()
     );
     let done = send(
         &app,
@@ -186,11 +198,17 @@ async fn single_sign_on_opens_a_session_and_returns_to_the_page() {
     assert_eq!(location(&done), "/drive");
     let session = set_cookies(&done)
         .into_iter()
-        .find(|c| c.starts_with("vellum_session=") && c.len() > "vellum_session=".len())
+        .find(|c| {
+            c.starts_with("vellum_session=")
+                && c.len() > "vellum_session=".len()
+        })
         .expect("a session cookie");
     let me = send(
         &app,
-        finish(request("GET", "/api/v1/auth/status").header(header::COOKIE, &session)),
+        finish(
+            request("GET", "/api/v1/auth/status")
+                .header(header::COOKIE, &session),
+        ),
     )
     .await;
     assert_eq!(

@@ -44,14 +44,18 @@ pub fn issue_blocks(markdown: &str) -> Vec<IssueBlock> {
         let text = bare.trim_start();
         if let Some((ch, len)) = fence {
             let run = text.len() - text.trim_start_matches(ch).len();
-            if lead < 4 && run >= len && text.trim_start_matches(ch).trim().is_empty() {
+            if lead < 4
+                && run >= len
+                && text.trim_start_matches(ch).trim().is_empty()
+            {
                 fence = None;
             }
             append(&mut out, &open, line);
             continue;
         }
         if lead < 4
-            && let Some(ch) = ['`', '~'].into_iter().find(|c| text.starts_with(*c))
+            && let Some(ch) =
+                ['`', '~'].into_iter().find(|c| text.starts_with(*c))
         {
             let run = text.len() - text.trim_start_matches(ch).len();
             if run >= 3 {
@@ -102,7 +106,9 @@ fn opener(rest: &str) -> Option<(&str, Option<String>)> {
         Some((before, last)) if last.starts_with("^blk-") => {
             (before.trim_end(), last.strip_prefix('^').map(str::to_owned))
         }
-        _ if head.starts_with("^blk-") => ("", head.strip_prefix('^').map(str::to_owned)),
+        _ if head.starts_with("^blk-") => {
+            ("", head.strip_prefix('^').map(str::to_owned))
+        }
         _ => (head, None),
     };
     let name = head.split_whitespace().next().unwrap_or_default();
@@ -110,7 +116,8 @@ fn opener(rest: &str) -> Option<(&str, Option<String>)> {
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'));
-    (valid || (name.is_empty() && (id.is_some() || rest.contains('{')))).then_some((name, id))
+    (valid || (name.is_empty() && (id.is_some() || rest.contains('{'))))
+        .then_some((name, id))
 }
 
 /// One group of an embedded view, ready to draw.

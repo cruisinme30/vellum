@@ -11,7 +11,12 @@ const IDLE = 1000;
 
 /** A live connection whose state and Done answers the test controls. */
 function fakeLive(initial: Partial<LiveState> = {}) {
-  let state: LiveState = { status: "online", canWrite: true, peers: new Map(), ...initial };
+  let state: LiveState = {
+    status: "online",
+    canWrite: true,
+    peers: new Map(),
+    ...initial,
+  };
   const listeners = new Set<() => void>();
   const answers: { resolve: () => void; reject: (error: Error) => void }[] = [];
   const done = vi.fn(
@@ -132,21 +137,24 @@ describe("saving", () => {
     saver.dispose();
   });
 
-  it("asks the server on Done even with nothing new, but not for viewers", async () => {
-    const document_ = new Y.Doc();
-    const fake = fakeLive();
-    const saver = createSaver(document_, fake.live, { idleMs: IDLE });
-    void saver.save();
-    expect(fake.done).toHaveBeenCalledTimes(1);
-    fake.answer();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(saver.getSnapshot()).toBe("saved");
+  it(
+    "asks the server on Done even with nothing new, but not for " + "viewers",
+    async () => {
+      const document_ = new Y.Doc();
+      const fake = fakeLive();
+      const saver = createSaver(document_, fake.live, { idleMs: IDLE });
+      void saver.save();
+      expect(fake.done).toHaveBeenCalledTimes(1);
+      fake.answer();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(saver.getSnapshot()).toBe("saved");
 
-    fake.set({ canWrite: false });
-    await saver.save();
-    expect(fake.done).toHaveBeenCalledTimes(1);
-    saver.dispose();
-  });
+      fake.set({ canWrite: false });
+      await saver.save();
+      expect(fake.done).toHaveBeenCalledTimes(1);
+      saver.dispose();
+    },
+  );
 
   it("stops after dispose", async () => {
     const document_ = new Y.Doc();

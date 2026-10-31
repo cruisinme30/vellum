@@ -10,14 +10,19 @@
 //! memory limits and re-encoded, which drops metadata (EXIF location,
 //! comments) and any payload hidden after the image data. SVG is accepted
 //! but only ever served as a download; the renderer inlines SVG only after
-//! its own sanitiser. A [`Scanner`] (`ClamAV` via [`Clamd`]) runs last.
+//! its own sanitiser. ZIP containers (Office files included) are inflated
+//! under size, ratio and depth limits before anything scans them. A
+//! [`Scanner`] (`ClamAV` via [`Clamd`]) runs last; [`check`] runs the whole
+//! pipeline and is the one entry point an upload route should use.
 
-use std::io::Cursor;
+use std::io::{Cursor, Read};
+use std::sync::Arc;
 use std::time::Duration;
 
 use image::{ImageFormat, ImageReader, Limits};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio::sync::Semaphore;
 
 /// A kind of file Vellum accepts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -141,6 +146,11 @@ pub enum UploadError {
     /// The scanner could not be reached; uploads fail closed.
     #[error("virus scanner unavailable: {0}")]
     ScannerUnavailable(String),
+    /// An archive is encrypted, unreadable, nested too deep or expands
+    /// past the limits: a zip bomb, or a file the scanner could not see
+    /// into (red team round 4).
+    #[error("archive refused: {0}")]
+    Archive(String),
 }
 
 /// Limits applied to every upload.
@@ -153,6 +163,8 @@ pub struct UploadPolicy {
     pub max_dimension: u32,
     /// Largest decoded image in bytes (guards against decompression bombs).
     pub max_decoded_bytes: u64,
+    /// Largest total an archive may inflate to, nested archives included.
+    pub max_expanded_bytes: u64,
 }
 
 impl Default for UploadPolicy {
@@ -161,8 +173,113 @@ impl Default for UploadPolicy {
             max_bytes: 100 * 1024 * 1024,
             max_dimension: 16_384,
             max_decoded_bytes: 512 * 1024 * 1024,
+            max_expanded_bytes: 512 * 1024 * 1024,
         }
     }
+}
+
+/// Most entries in one archive, nested archives included.
+pub const MAX_ARCHIVE_ENTRIES: usize = 20_000;
+/// Most an archive entry may expand over its packed size. Office XML and
+/// text expand 5 to 20 times; a zip bomb about 1000 times.
+pub const MAX_ARCHIVE_RATIO: u64 = 200;
+/// Entries up to this size may expand any amount.
+const RATIO_FREE_BYTES: u64 = 8 * 1024 * 1024;
+/// Archives inside archives are followed this deep; deeper is refused
+/// (`ClamAV` gives up past its `MaxRecursion` and answers "OK").
+pub const MAX_ARCHIVE_DEPTH: u32 = 4;
+
+/// Inflates every entry of a ZIP archive without keeping it, so that what
+/// the scanner is asked to read is bounded and fully readable.
+struct ArchiveWalk {
+    max_total: u64,
+    total: u64,
+    entries: usize,
+}
+
+impl ArchiveWalk {
+    fn walk(&mut self, bytes: &[u8], depth: u32) -> Result<(), UploadError> {
+        let refuse = |why: String| UploadError::Archive(why);
+        if depth > MAX_ARCHIVE_DEPTH {
+            return Err(refuse(format!(
+                "archives are nested more than {MAX_ARCHIVE_DEPTH} deep"
+            )));
+        }
+        let mut zip = zip::ZipArchive::new(Cursor::new(bytes))
+            .map_err(|e| refuse(format!("not a readable zip ({e})")))?;
+        for index in 0..zip.len() {
+            self.entries += 1;
+            if self.entries > MAX_ARCHIVE_ENTRIES {
+                return Err(refuse(format!(
+                    "more than {MAX_ARCHIVE_ENTRIES} files"
+                )));
+            }
+            // Encrypted entries and unknown compression fail here, so the
+            // scanner never gets an archive it cannot see into.
+            let mut file = zip.by_index(index).map_err(|e| {
+                refuse(format!("entry {index} cannot be read ({e})"))
+            })?;
+            if file.is_dir() {
+                continue;
+            }
+            let expands = file
+                .compressed_size()
+                .saturating_mul(MAX_ARCHIVE_RATIO)
+                .max(RATIO_FREE_BYTES);
+            let room = self.max_total.saturating_sub(self.total);
+            let cap = expands.min(room);
+            let mut head = [0_u8; 4];
+            let mut limited = file.by_ref().take(cap.saturating_add(1));
+            let got = read_up_to(&mut limited, &mut head).map_err(|e| {
+                refuse(format!("entry {index} is corrupt ({e})"))
+            })?;
+            let nested = got == 4 && head == *b"PK\x03\x04";
+            let corrupt = |e: std::io::Error| {
+                refuse(format!("entry {index} is corrupt ({e})"))
+            };
+            let (size, inner) = if nested {
+                let mut inner = head.to_vec();
+                let _ = limited.read_to_end(&mut inner).map_err(corrupt)?;
+                (inner.len() as u64, Some(inner))
+            } else {
+                let rest = std::io::copy(&mut limited, &mut std::io::sink())
+                    .map_err(corrupt)?;
+                (rest + got as u64, None)
+            };
+            if size > expands {
+                return Err(refuse(format!(
+                    "an entry expands more than {MAX_ARCHIVE_RATIO} times its \
+                        packed size"
+                )));
+            }
+            self.total += size;
+            if self.total > self.max_total {
+                return Err(refuse(format!(
+                    "the archive expands past {} MiB",
+                    self.max_total / 1024 / 1024
+                )));
+            }
+            if let Some(inner) = inner {
+                self.walk(&inner, depth + 1)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Reads until `buf` is full or the reader ends.
+fn read_up_to(
+    reader: &mut impl Read,
+    buf: &mut [u8],
+) -> std::io::Result<usize> {
+    let mut filled = 0;
+    while filled < buf.len() {
+        match reader.read(buf.get_mut(filled..).unwrap_or_default())? {
+            0 => break,
+            n => filled += n,
+        }
+    }
+    Ok(filled)
 }
 
 /// A checked upload, ready to store.
@@ -183,7 +300,11 @@ impl UploadPolicy {
     /// # Errors
     ///
     /// Returns the first check the upload fails.
-    pub fn clean(&self, file_name: &str, bytes: Vec<u8>) -> Result<Cleaned, UploadError> {
+    pub fn clean(
+        &self,
+        file_name: &str,
+        bytes: Vec<u8>,
+    ) -> Result<Cleaned, UploadError> {
         if bytes.len() as u64 > self.max_bytes {
             return Err(UploadError::TooLarge(self.max_bytes));
         }
@@ -196,6 +317,14 @@ impl UploadPolicy {
         if !kind.extensions().contains(&ext.as_str()) {
             return Err(UploadError::Mismatch(kind));
         }
+        if kind == Kind::Zip {
+            ArchiveWalk {
+                max_total: self.max_expanded_bytes,
+                total: 0,
+                entries: 0,
+            }
+            .walk(&bytes, 1)?;
+        }
         let bytes = match kind.raster() {
             Some(format) => self.reencode(&bytes, format)?,
             None => bytes,
@@ -207,7 +336,11 @@ impl UploadPolicy {
         })
     }
 
-    fn reencode(&self, bytes: &[u8], format: ImageFormat) -> Result<Vec<u8>, UploadError> {
+    fn reencode(
+        &self,
+        bytes: &[u8],
+        format: ImageFormat,
+    ) -> Result<Vec<u8>, UploadError> {
         let mut limits = Limits::default();
         limits.max_image_width = Some(self.max_dimension);
         limits.max_image_height = Some(self.max_dimension);
@@ -239,8 +372,8 @@ const fn is_format_char(c: char) -> bool {
     )
 }
 
-/// Keeps the last path segment, drops control, formatting and reserved characters and
-/// leading dots, and caps the length at 200 bytes.
+/// Keeps the last path segment, drops control, formatting and reserved
+/// characters and leading dots, and caps the length at 200 bytes.
 #[must_use]
 pub fn safe_file_name(name: &str) -> String {
     let base = name.rsplit(['/', '\\']).next().unwrap_or_default();
@@ -269,23 +402,51 @@ pub trait Scanner: Send + Sync {
     ///
     /// # Errors
     ///
-    /// [`UploadError::Infected`] for malware, [`UploadError::ScannerUnavailable`]
-    /// when the scan could not run.
-    fn scan(&self, bytes: &[u8]) -> impl Future<Output = Result<(), UploadError>> + Send;
+    /// [`UploadError::Infected`] for malware,
+    /// [`UploadError::ScannerUnavailable`] when the scan could not run.
+    fn scan(
+        &self,
+        bytes: &[u8],
+    ) -> impl Future<Output = Result<(), UploadError>> + Send;
 }
 
+/// Scans one replica sends to clamd at once. clamd runs 10 scanner threads
+/// by default (`MaxThreads`) and queues the rest, so more in flight only
+/// holds more uploads in memory while they wait.
+pub const CLAMD_IN_FLIGHT: usize = 8;
+
 /// `ClamAV`'s `clamd` over TCP, using the `INSTREAM` command.
+///
+/// At most [`CLAMD_IN_FLIGHT`] scans run at once. A scan that cannot start
+/// and finish within the timeout fails closed as
+/// [`UploadError::ScannerUnavailable`], so a flood of uploads is refused
+/// quickly instead of queueing without bound.
 #[derive(Debug, Clone)]
 pub struct Clamd {
     address: String,
     timeout: Duration,
+    slots: Arc<Semaphore>,
 }
 
 impl Clamd {
     /// A scanner at `address` (for example `clamav:3310`).
     #[must_use]
-    pub const fn new(address: String, timeout: Duration) -> Self {
-        Self { address, timeout }
+    pub fn new(address: String, timeout: Duration) -> Self {
+        Self::with_in_flight(address, timeout, CLAMD_IN_FLIGHT)
+    }
+
+    /// Like [`Clamd::new`], with at most `in_flight` scans at once.
+    #[must_use]
+    pub fn with_in_flight(
+        address: String,
+        timeout: Duration,
+        in_flight: usize,
+    ) -> Self {
+        Self {
+            address,
+            timeout,
+            slots: Arc::new(Semaphore::new(in_flight.max(1))),
+        }
     }
 
     async fn instream(&self, bytes: &[u8]) -> std::io::Result<String> {
@@ -295,8 +456,10 @@ impl Clamd {
         // StreamMaxLength. Read while writing: once clamd closes with our
         // bytes unread, its kernel may reset the connection, and on macOS
         // that reset discards a reply we have not read yet.
-        let (sent, (reply, read)) =
-            tokio::join!(Self::send(&mut writer, bytes), Self::reply(&mut reader));
+        let (sent, (reply, read)) = tokio::join!(
+            Self::send(&mut writer, bytes),
+            Self::reply(&mut reader)
+        );
         let reply = String::from_utf8_lossy(&reply)
             .trim_end_matches(['\0', '\n'])
             .to_owned();
@@ -309,7 +472,9 @@ impl Clamd {
 
     /// Reads clamd's NUL-terminated reply, keeping what arrived before any
     /// error.
-    async fn reply<R: AsyncRead + Unpin>(reader: &mut R) -> (Vec<u8>, std::io::Result<()>) {
+    async fn reply<R: AsyncRead + Unpin>(
+        reader: &mut R,
+    ) -> (Vec<u8>, std::io::Result<()>) {
         let mut reply = Vec::new();
         let mut buf = [0_u8; 512];
         while reply.len() < 4096 && !reply.contains(&0) {
@@ -322,7 +487,10 @@ impl Clamd {
         (reply, Ok(()))
     }
 
-    async fn send<W: AsyncWrite + Unpin>(stream: &mut W, bytes: &[u8]) -> std::io::Result<()> {
+    async fn send<W: AsyncWrite + Unpin>(
+        stream: &mut W,
+        bytes: &[u8],
+    ) -> std::io::Result<()> {
         stream.write_all(b"zINSTREAM\0").await?;
         for chunk in bytes.chunks(64 * 1024) {
             let len = u32::try_from(chunk.len()).unwrap_or(u32::MAX);
@@ -336,12 +504,20 @@ impl Clamd {
 impl Scanner for Clamd {
     async fn scan(&self, bytes: &[u8]) -> Result<(), UploadError> {
         let span = tracing::info_span!("upload.scan", bytes = bytes.len());
+        // The wait for a slot counts against the same budget as the scan.
+        let bounded = async {
+            let _slot =
+                self.slots.acquire().await.map_err(std::io::Error::other)?;
+            self.instream(bytes).await
+        };
         let reply = tracing::Instrument::instrument(
-            tokio::time::timeout(self.timeout, self.instream(bytes)),
+            tokio::time::timeout(self.timeout, bounded),
             span,
         )
         .await
-        .map_err(|_| UploadError::ScannerUnavailable("timed out".to_owned()))?
+        .map_err(|_| {
+            UploadError::ScannerUnavailable("timed out or busy".to_owned())
+        })?
         .map_err(|e| UploadError::ScannerUnavailable(e.to_string()))?;
         match reply.strip_suffix(" FOUND") {
             Some(found) => Err(UploadError::Infected(
@@ -350,12 +526,48 @@ impl Scanner for Clamd {
             None if reply.ends_with("OK") => Ok(()),
             None if reply.contains("size limit exceeded") => {
                 Err(UploadError::ScannerUnavailable(format!(
-                    "clamd refused a {} byte upload as too large; set StreamMaxLength \
-                     in clamd.conf to at least the upload limit ({reply})",
+                    "clamd refused a {} byte upload as too large; set \
+                     StreamMaxLength in clamd.conf to at least the upload \
+                     limit ({reply})",
                     bytes.len()
                 )))
             }
             None => Err(UploadError::ScannerUnavailable(reply)),
         }
     }
+}
+
+/// Checks an upload end to end, then scans it.
+///
+/// Limits, type, archive and image checks run on a blocking thread, then
+/// the scanner when there is one. Upload routes call this rather than
+/// [`UploadPolicy::clean`], so no route can skip the scan or decode a
+/// large image on an async worker.
+///
+/// # Errors
+///
+/// The first check the upload fails, as [`UploadPolicy::clean`] and
+/// [`Scanner::scan`] report it.
+pub async fn check<S: Scanner>(
+    policy: UploadPolicy,
+    scanner: Option<&S>,
+    file_name: String,
+    bytes: Vec<u8>,
+) -> Result<Cleaned, UploadError> {
+    // Refuse oversized bodies before moving them to another thread.
+    if bytes.len() as u64 > policy.max_bytes {
+        return Err(UploadError::TooLarge(policy.max_bytes));
+    }
+    let cleaned =
+        tokio::task::spawn_blocking(move || policy.clean(&file_name, bytes))
+            .await
+            .map_err(|e| {
+                UploadError::Image(format!("the upload check stopped: {e}"))
+            })??;
+    if let Some(scanner) = scanner {
+        // What is stored is what is scanned: the bytes as sent, or the
+        // re-encoded image that replaces them.
+        scanner.scan(&cleaned.bytes).await?;
+    }
+    Ok(cleaned)
 }

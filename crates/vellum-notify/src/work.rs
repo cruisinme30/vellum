@@ -18,10 +18,12 @@
 //! other events when it is known.
 
 use jiff::Timestamp;
+use serde_json::{Map, Value, json};
 use vellum_work::comment::Target;
 use vellum_work::event::IssueSnapshot;
 use vellum_work::{IssueId, UserRef, WorkEvent};
 
+use crate::event::{EventAction, EventType, WebhookEvent};
 use crate::notification::{Notification, NotificationKind};
 
 /// What a comment's issue looks like now, for its subject and recipients.
@@ -31,6 +33,8 @@ pub struct IssueInfo {
     pub key: String,
     /// The title.
     pub title: String,
+    /// The team key, such as `ENG`.
+    pub team: String,
     /// People who follow the issue.
     pub subscribers: Vec<UserRef>,
 }
@@ -52,7 +56,11 @@ pub struct Addressed {
 
 /// The notifications `event` causes.
 #[must_use]
-pub fn notifications(event: &WorkEvent, lookup: &dyn IssueLookup, at: Timestamp) -> Vec<Addressed> {
+pub fn notifications(
+    event: &WorkEvent,
+    lookup: &dyn IssueLookup,
+    at: Timestamp,
+) -> Vec<Addressed> {
     let mut out = Vec::new();
     match event {
         WorkEvent::IssueCreated { issue, .. } => {
@@ -71,7 +79,9 @@ pub fn notifications(event: &WorkEvent, lookup: &dyn IssueLookup, at: Timestamp)
         WorkEvent::IssueStateChanged { issue, .. } => {
             let mut to: Vec<String> = lookup
                 .issue(issue.id)
-                .map(|i| i.subscribers.iter().map(ToString::to_string).collect())
+                .map(|i| {
+                    i.subscribers.iter().map(ToString::to_string).collect()
+                })
                 .unwrap_or_default();
             to.extend(issue.assignee.iter().map(ToString::to_string));
             to.sort();
@@ -96,7 +106,8 @@ pub fn notifications(event: &WorkEvent, lookup: &dyn IssueLookup, at: Timestamp)
             let kind = match risk {
                 vellum_work::sla::Risk::Red => NotificationKind::SlaBreached,
                 vellum_work::sla::Risk::Orange => NotificationKind::SlaHighRisk,
-                vellum_work::sla::Risk::Gray | vellum_work::sla::Risk::Yellow => return out,
+                vellum_work::sla::Risk::Gray
+                | vellum_work::sla::Risk::Yellow => return out,
             };
             let title = if kind == NotificationKind::SlaBreached {
                 format!("{} breached its SLA", issue.key)
@@ -104,7 +115,14 @@ pub fn notifications(event: &WorkEvent, lookup: &dyn IssueLookup, at: Timestamp)
                 format!("{} is close to breaching its SLA", issue.key)
             };
             out.push(Addressed {
-                notification: note(kind, issue, title, issue.title.clone(), None, at),
+                notification: note(
+                    kind,
+                    issue,
+                    title,
+                    issue.title.clone(),
+                    None,
+                    at,
+                ),
                 to: recipients.iter().map(ToString::to_string).collect(),
             });
         }
@@ -116,7 +134,9 @@ pub fn notifications(event: &WorkEvent, lookup: &dyn IssueLookup, at: Timestamp)
             ..
         } => {
             if let Some(info) = lookup.issue(*issue) {
-                out.extend(comment_notes(&info, comment, mentions, recipients, at));
+                out.extend(comment_notes(
+                    &info, comment, mentions, recipients, at,
+                ));
             }
         }
         _ => {}
@@ -146,7 +166,7 @@ fn comment_notes(
         subject: info.key.clone(),
         title,
         body: body.clone(),
-        url: format!("/issue/{}", info.key),
+        url: format!("/issues/{}", info.key),
         actor: Some(author.clone()),
         at,
     };
@@ -176,7 +196,11 @@ fn comment_notes(
     out
 }
 
-fn assigned(issue: &IssueSnapshot, assignee: &UserRef, at: Timestamp) -> Addressed {
+fn assigned(
+    issue: &IssueSnapshot,
+    assignee: &UserRef,
+    at: Timestamp,
+) -> Addressed {
     Addressed {
         notification: note(
             NotificationKind::IssueAssigned,
@@ -203,7 +227,7 @@ fn note(
         subject: issue.key.to_string(),
         title,
         body,
-        url: format!("/issue/{}", issue.key),
+        url: format!("/issues/{}", issue.key),
         actor,
         at,
     }
@@ -220,6 +244,300 @@ fn excerpt(body: &str) -> String {
     short
 }
 
+/// The webhook events `event` causes (#149, D176).
+///
+/// | Work event | Webhook |
+/// |---|---|
+/// | issue created | `issue.create` |
+/// | issue updated, status changed, moved, triaged | `issue.update` with `updated_from` |
+/// | cycle created / rolled over | `cycle.create` / `cycle.update` |
+/// | SLA started / orange / red | `issue_sla.sla_set` / `.sla_high_risk` / `.sla_breached` |
+/// | project created / changed | `project.create` / `project.update` |
+/// | project update posted | `project_update.create` |
+/// | label created, updated, deleted | `label.create` / `.update` / `.remove` |
+/// | comment on an issue added, edited, deleted | `comment.create` / `.update` / `.remove` |
+///
+/// Comments on documents are never sent: a document's readers are set by
+/// its own permissions, which a webhook cannot check.
+#[must_use]
+#[expect(clippy::too_many_lines, reason = "one arm per Work event")]
+pub fn webhook_events(
+    event: &WorkEvent,
+    lookup: &dyn IssueLookup,
+    at: Timestamp,
+) -> Vec<WebhookEvent> {
+    let issue_url = |key: &str| Some(format!("/issues/{key}"));
+    let snapshot = |issue: &IssueSnapshot| {
+        serde_json::to_value(issue).unwrap_or(Value::Null)
+    };
+    let make = |event_type,
+                action,
+                team: Option<String>,
+                data: Value,
+                from: Option<Value>,
+                url| {
+        WebhookEvent {
+            id: uuid::Uuid::now_v7().to_string(),
+            event_type,
+            action,
+            occurred_at: at,
+            team,
+            actor: None,
+            data,
+            updated_from: from,
+            url,
+        }
+    };
+    let issue_event = |issue: &IssueSnapshot, action, from: Option<Value>| {
+        make(
+            EventType::Issue,
+            action,
+            Some(issue.team.to_string()),
+            snapshot(issue),
+            from,
+            issue_url(&issue.key.to_string()),
+        )
+    };
+    let comment = |thread: &str,
+                   target: &Target,
+                   comment: Option<&vellum_work::comment::Comment>,
+                   id: &str,
+                   action| {
+        let Target::Issue { issue } = target else {
+            return None;
+        };
+        let info = lookup.issue(*issue)?;
+        let mut data = json!({
+            "id": id,
+            "thread": thread,
+            "issue": info.key,
+        });
+        if let (Some(c), Some(map)) = (comment, data.as_object_mut()) {
+            let _ =
+                map.insert("author".to_owned(), json!(c.author.to_string()));
+            let _ = map.insert("body".to_owned(), json!(c.body));
+            let _ = map.insert(
+                "created_at".to_owned(),
+                serde_json::to_value(c)
+                    .ok()
+                    .and_then(|v| v.get("created_at").cloned())
+                    .unwrap_or(Value::Null),
+            );
+        }
+        Some(make(
+            EventType::Comment,
+            action,
+            Some(info.team),
+            data,
+            None,
+            issue_url(&info.key),
+        ))
+    };
+    let out = match event {
+        WorkEvent::IssueCreated { issue, .. } => {
+            Some(issue_event(issue, EventAction::Create, None))
+        }
+        WorkEvent::IssueUpdated { issue, changes } => {
+            let from: Map<String, Value> = changes
+                .iter()
+                .map(|c| {
+                    (
+                        c.field.clone(),
+                        c.from.clone().map_or(Value::Null, Value::String),
+                    )
+                })
+                .collect();
+            Some(issue_event(
+                issue,
+                EventAction::Update,
+                Some(Value::Object(from)),
+            ))
+        }
+        WorkEvent::IssueStateChanged { issue, from, .. } => Some(issue_event(
+            issue,
+            EventAction::Update,
+            Some(json!({ "state": from.to_string() })),
+        )),
+        WorkEvent::IssueMoved { issue, from } => Some(issue_event(
+            issue,
+            EventAction::Update,
+            Some(json!({ "key": from.to_string() })),
+        )),
+        WorkEvent::IssueTriaged { issue, action } => {
+            let mut e = issue_event(
+                issue,
+                EventAction::Update,
+                Some(json!({ "triage": null })),
+            );
+            if let Some(map) = e.data.as_object_mut() {
+                let _ = map.insert("triage".to_owned(), json!(action));
+            }
+            Some(e)
+        }
+        WorkEvent::CycleCreated { team, cycle } => Some(make(
+            EventType::Cycle,
+            EventAction::Create,
+            Some(team.to_string()),
+            json!({ "team": team.to_string(), "cycle": cycle.to_string() }),
+            None,
+            None,
+        )),
+        WorkEvent::CycleRolledOver {
+            team,
+            from,
+            to,
+            moved,
+            removed,
+        } => Some(make(
+            EventType::Cycle,
+            EventAction::Update,
+            Some(team.to_string()),
+            json!({
+                "team": team.to_string(),
+                "cycle": from.to_string(),
+                "rolled_over_to": to.as_ref().map(ToString::to_string),
+                "moved": moved.len(),
+                "removed": removed.len(),
+            }),
+            None,
+            None,
+        )),
+        WorkEvent::SlaStarted {
+            issue,
+            kind,
+            breaches_at,
+        } => {
+            let mut data = snapshot(issue);
+            if let Some(map) = data.as_object_mut() {
+                let _ = map.insert("sla".to_owned(), json!(kind));
+                let _ = map.insert(
+                    "breaches_at".to_owned(),
+                    json!(breaches_at.unix_timestamp()),
+                );
+            }
+            Some(make(
+                EventType::IssueSla,
+                EventAction::SlaSet,
+                Some(issue.team.to_string()),
+                data,
+                None,
+                issue_url(&issue.key.to_string()),
+            ))
+        }
+        WorkEvent::SlaRisk { issue, risk, .. } => {
+            let action = match risk {
+                vellum_work::sla::Risk::Orange => {
+                    Some(EventAction::SlaHighRisk)
+                }
+                vellum_work::sla::Risk::Red => Some(EventAction::SlaBreached),
+                _ => None,
+            };
+            action.map(|action| {
+                make(
+                    EventType::IssueSla,
+                    action,
+                    Some(issue.team.to_string()),
+                    snapshot(issue),
+                    None,
+                    issue_url(&issue.key.to_string()),
+                )
+            })
+        }
+        WorkEvent::ProjectCreated { project } => Some(make(
+            EventType::Project,
+            EventAction::Create,
+            None,
+            json!({ "id": project.to_string() }),
+            None,
+            None,
+        )),
+        WorkEvent::ProjectChanged { project, changes } => Some(make(
+            EventType::Project,
+            EventAction::Update,
+            None,
+            json!({ "id": project.to_string(), "changes": changes }),
+            None,
+            None,
+        )),
+        WorkEvent::ProjectUpdatePosted {
+            project,
+            update,
+            health,
+        } => Some(make(
+            EventType::ProjectUpdate,
+            EventAction::Create,
+            None,
+            json!({
+                "id": update.to_string(),
+                "project": project.to_string(),
+                "health": serde_json::to_value(health).unwrap_or(Value::Null),
+            }),
+            None,
+            None,
+        )),
+        WorkEvent::LabelChanged {
+            team,
+            label,
+            change,
+        } => {
+            let action = match change.as_str() {
+                "created" => EventAction::Create,
+                "deleted" => EventAction::Remove,
+                _ => EventAction::Update,
+            };
+            Some(make(
+                EventType::Label,
+                action,
+                team.as_ref().map(ToString::to_string),
+                json!({
+                    "label": label,
+                    "team": team.as_ref().map(ToString::to_string)
+                }),
+                None,
+                None,
+            ))
+        }
+        WorkEvent::CommentAdded {
+            thread,
+            target,
+            comment: c,
+            ..
+        } => comment(
+            &thread.to_string(),
+            target,
+            Some(c),
+            &c.id.to_string(),
+            EventAction::Create,
+        ),
+        WorkEvent::CommentEdited {
+            thread,
+            target,
+            comment: c,
+            ..
+        } => comment(
+            &thread.to_string(),
+            target,
+            Some(c),
+            &c.id.to_string(),
+            EventAction::Update,
+        ),
+        WorkEvent::CommentDeleted {
+            thread,
+            target,
+            comment: id,
+            ..
+        } => comment(
+            &thread.to_string(),
+            target,
+            None,
+            &id.to_string(),
+            EventAction::Remove,
+        ),
+        _ => None,
+    };
+    out.into_iter().collect()
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, reason = "test fixtures fail loudly")]
@@ -227,7 +545,10 @@ mod tests {
     use std::collections::BTreeMap;
 
     use time::macros::datetime;
-    use vellum_work::{Comments, Ctx, IssuePatch, NewComment, NewIssue, Team, TeamKey, WorkGraph};
+    use vellum_work::{
+        Comments, Ctx, IssuePatch, NewComment, NewIssue, Team, TeamKey,
+        WorkGraph,
+    };
 
     use super::*;
 
@@ -238,6 +559,7 @@ mod tests {
             self.0.issue(&id).map(|i| IssueInfo {
                 key: i.key().to_string(),
                 title: i.title.clone(),
+                team: i.team.to_string(),
                 subscribers: i.subscribers.clone(),
             })
         }
@@ -257,10 +579,15 @@ mod tests {
     }
 
     /// Kind to recipients, for every notification of `events`.
-    fn sent(graph: &WorkGraph, events: &[WorkEvent]) -> BTreeMap<NotificationKind, Vec<String>> {
+    fn sent(
+        graph: &WorkGraph,
+        events: &[WorkEvent],
+    ) -> BTreeMap<NotificationKind, Vec<String>> {
         events
             .iter()
-            .flat_map(|e| notifications(e, &Graph(graph), Timestamp::UNIX_EPOCH))
+            .flat_map(|e| {
+                notifications(e, &Graph(graph), Timestamp::UNIX_EPOCH)
+            })
             .map(|a| (a.notification.kind, a.to))
             .collect()
     }
@@ -295,7 +622,8 @@ mod tests {
         };
         let reassigned = graph.update_issue(&id, patch, &ctx("ada")).unwrap();
         assert_eq!(
-            sent(&graph, &reassigned.events).get(&NotificationKind::IssueAssigned),
+            sent(&graph, &reassigned.events)
+                .get(&NotificationKind::IssueAssigned),
             Some(&vec!["cy".to_owned()])
         );
 
@@ -310,7 +638,9 @@ mod tests {
         let notes: Vec<Addressed> = added
             .events
             .iter()
-            .flat_map(|e| notifications(e, &Graph(&graph), Timestamp::UNIX_EPOCH))
+            .flat_map(|e| {
+                notifications(e, &Graph(&graph), Timestamp::UNIX_EPOCH)
+            })
             .collect();
         let mention = notes
             .iter()
@@ -318,7 +648,7 @@ mod tests {
             .unwrap();
         assert_eq!(mention.to, ["dee"]);
         assert_eq!(mention.notification.subject, "ENG-1");
-        assert_eq!(mention.notification.url, "/issue/ENG-1");
+        assert_eq!(mention.notification.url, "/issues/ENG-1");
         assert_eq!(mention.notification.actor.as_deref(), Some("cy"));
         // The author never hears about their own comment, and the
         // mentioned person gets one line, not two.
@@ -340,6 +670,109 @@ mod tests {
         let moved = sent(&graph, &done.events);
         let to = moved.get(&NotificationKind::StateChanged).unwrap();
         assert!(to.contains(&"cy".to_owned()), "{to:?}");
+    }
+
+    #[test]
+    fn work_events_become_webhook_events_and_doc_comments_stay_inside() {
+        let mut graph = WorkGraph::new();
+        let eng = TeamKey::parse("ENG").unwrap();
+        graph
+            .insert_team(
+                Team::new(
+                    "01JC00000000000000000000E1".parse().unwrap(),
+                    eng.clone(),
+                    "Engineering",
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        let id = IssueId::generate();
+        let created = graph
+            .create_issue(NewIssue::new(id, eng, "Fix login"), &ctx("ada"))
+            .unwrap();
+        let hooks: Vec<WebhookEvent> = created
+            .events
+            .iter()
+            .flat_map(|e| {
+                webhook_events(e, &Graph(&graph), Timestamp::UNIX_EPOCH)
+            })
+            .collect();
+        let issue = hooks
+            .iter()
+            .find(|e| e.event_type == EventType::Issue)
+            .unwrap();
+        assert_eq!(issue.action, EventAction::Create);
+        assert_eq!(issue.team.as_deref(), Some("ENG"));
+        assert_eq!(issue.data["key"], "ENG-1");
+        assert_eq!(issue.url.as_deref(), Some("/issues/ENG-1"));
+        assert!(hooks.iter().all(|e| e.validate().is_ok()));
+
+        let patch = IssuePatch {
+            title: Some("Fix login redirect".to_owned()),
+            ..IssuePatch::default()
+        };
+        let updated = graph.update_issue(&id, patch, &ctx("ada")).unwrap();
+        let update = updated
+            .events
+            .iter()
+            .flat_map(|e| {
+                webhook_events(e, &Graph(&graph), Timestamp::UNIX_EPOCH)
+            })
+            .find(|e| e.event_type == EventType::Issue)
+            .unwrap();
+        assert_eq!(update.action, EventAction::Update);
+        assert_eq!(update.updated_from.unwrap()["title"], "Fix login");
+
+        let mut comments = Comments::new();
+        let on_issue = comments
+            .add(
+                NewComment::new(
+                    vellum_kernel::CommentId::generate(),
+                    Target::Issue { issue: id },
+                    "Looks good",
+                ),
+                &[],
+                &ctx("bo"),
+            )
+            .unwrap();
+        let sent: Vec<WebhookEvent> = on_issue
+            .events
+            .iter()
+            .flat_map(|e| {
+                webhook_events(e, &Graph(&graph), Timestamp::UNIX_EPOCH)
+            })
+            .collect();
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].event_type, EventType::Comment);
+        assert_eq!(sent[0].data["issue"], "ENG-1");
+        assert_eq!(sent[0].data["body"], "Looks good");
+
+        let on_doc = comments
+            .add(
+                NewComment::new(
+                    vellum_kernel::CommentId::generate(),
+                    Target::Doc {
+                        doc: vellum_kernel::DocId::generate(),
+                        block: None,
+                    },
+                    "Private note",
+                ),
+                &[],
+                &ctx("bo"),
+            )
+            .unwrap();
+        assert!(
+            on_doc
+                .events
+                .iter()
+                .flat_map(|e| webhook_events(
+                    e,
+                    &Graph(&graph),
+                    Timestamp::UNIX_EPOCH
+                ))
+                .next()
+                .is_none()
+        );
     }
 
     #[test]

@@ -134,13 +134,18 @@ impl fmt::Display for ChapterPath {
 }
 
 impl Serialize for ChapterPath {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&self.0)
     }
 }
 
 impl<'de> Deserialize<'de> for ChapterPath {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         let raw = String::deserialize(deserializer)?;
         Self::parse(&raw).map_err(serde::de::Error::custom)
     }
@@ -150,7 +155,8 @@ impl<'de> Deserialize<'de> for ChapterPath {
 /// the same root, `/`-separated).
 #[must_use]
 pub fn relative(from_dir: &str, target: &str) -> String {
-    let from: Vec<&str> = from_dir.split('/').filter(|s| !s.is_empty()).collect();
+    let from: Vec<&str> =
+        from_dir.split('/').filter(|s| !s.is_empty()).collect();
     let to: Vec<&str> = target.split('/').filter(|s| !s.is_empty()).collect();
     let common = from.iter().zip(&to).take_while(|(a, b)| a == b).count();
     let ups = from.len().saturating_sub(common);
@@ -163,19 +169,24 @@ pub fn relative(from_dir: &str, target: &str) -> String {
 /// Returns `None` when the link climbs above the root or is not relative.
 #[must_use]
 pub fn resolve(from_dir: &str, href: &str) -> Option<String> {
-    if href.is_empty() || href.starts_with('/') || href.contains("://") || href.starts_with('#') {
+    if href.is_empty()
+        || href.starts_with('/')
+        || href.contains("://")
+        || href.starts_with('#')
+    {
         return None;
     }
     if href.split_once(':').is_some_and(|(scheme, _)| {
         !scheme.is_empty()
-            && scheme
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+            && scheme.chars().all(|c| {
+                c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.')
+            })
     }) {
         // mailto:, tel: and other schemes.
         return None;
     }
-    let mut parts: Vec<&str> = from_dir.split('/').filter(|s| !s.is_empty()).collect();
+    let mut parts: Vec<&str> =
+        from_dir.split('/').filter(|s| !s.is_empty()).collect();
     for segment in href.split('/') {
         match segment {
             "" | "." => {}
@@ -246,7 +257,10 @@ mod tests {
             "notes.txt",
             "a/.md",
         ] {
-            assert!(ChapterPath::parse(bad).is_err(), "{bad} should be rejected");
+            assert!(
+                ChapterPath::parse(bad).is_err(),
+                "{bad} should be rejected"
+            );
         }
     }
 

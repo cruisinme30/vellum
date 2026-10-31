@@ -23,7 +23,8 @@ use yrs::{ClientID, ReadTxn as _, StateVector, Transact as _};
 
 use crate::config::CollabConfig;
 use crate::hub::{
-    Access, CloseReason, Deps, JoinRequest, Outbound, PeerId, Registry, RoomEntry, RoomKey,
+    Access, CloseReason, Deps, JoinRequest, Outbound, PeerId, Registry,
+    RoomEntry, RoomKey,
 };
 use crate::metrics::label;
 use crate::persist::{self, Job, Notify};
@@ -83,7 +84,12 @@ struct Peer {
     trace: Option<TraceParent>,
 }
 
-pub fn spawn(key: RoomKey, generation: u64, deps: Arc<Deps>, registry: Arc<Registry>) -> RoomEntry {
+pub fn spawn(
+    key: RoomKey,
+    generation: u64,
+    deps: Arc<Deps>,
+    registry: Arc<Registry>,
+) -> RoomEntry {
     let (cmd, cmd_rx) = mpsc::channel(COMMAND_QUEUE);
     let (ctl, ctl_rx) = mpsc::unbounded_channel();
     let room = Room {
@@ -164,7 +170,10 @@ impl Room {
             cmd_rx.close();
             while let Ok(command) = cmd_rx.try_recv() {
                 reject(command, || {
-                    JoinOutcome::Failed(Error::new(err.kind(), err.message().to_owned()))
+                    JoinOutcome::Failed(Error::new(
+                        err.kind(),
+                        err.message().to_owned(),
+                    ))
                 });
             }
             return;
@@ -179,7 +188,10 @@ impl Room {
                 control = ctl_rx.recv(), if control_open => match control {
                     Some(control) => {
                         if let Some(ack) = self.on_control(control) {
-                            self.close(VersionReason::Shutdown, &mut cmd_rx).await;
+                            self.close(
+                                VersionReason::Shutdown,
+                                &mut cmd_rx
+                            ).await;
                             let _gone = ack.send(());
                             break;
                         }
@@ -196,8 +208,13 @@ impl Room {
                     }
                     None => break,
                 },
-                () = sleep_until(deadline.unwrap_or_else(far_future)), if deadline.is_some() => {
-                    if matches!(self.on_timer(), Next::Close) && self.try_close(&mut cmd_rx).await {
+                () = sleep_until(
+                    deadline.unwrap_or_else(far_future)
+                ), if deadline.is_some() => {
+                    if matches!(
+                        self.on_timer(),
+                        Next::Close
+                    ) && self.try_close(&mut cmd_rx).await {
                         break;
                     }
                 }
@@ -209,7 +226,8 @@ impl Room {
     async fn load(&mut self) -> Result<()> {
         let mut records = self.deps.store.load(self.key).await?;
         if records.is_empty()
-            && let Some(markdown) = self.deps.files.read_markdown(self.key).await?
+            && let Some(markdown) =
+                self.deps.files.read_markdown(self.key).await?
         {
             let seed = tree::new_doc();
             tree::write(&seed, &self.deps.codec.parse_markdown(&markdown)?);
@@ -224,11 +242,17 @@ impl Room {
         {
             let mut txn = self.awareness.doc().transact_mut();
             for record in records {
-                let update = protocol::decode_update(&record.update).map_err(|err| {
-                    Error::new(ErrorKind::Internal, "the update log is corrupt").with_source(err)
-                })?;
+                let update =
+                    protocol::decode_update(&record.update).map_err(|err| {
+                        Error::new(
+                            ErrorKind::Internal,
+                            "the update log is corrupt",
+                        )
+                        .with_source(err)
+                    })?;
                 txn.apply_update(update).map_err(|err| {
-                    Error::new(ErrorKind::Internal, "the update log is corrupt").with_source(err)
+                    Error::new(ErrorKind::Internal, "the update log is corrupt")
+                        .with_source(err)
                 })?;
             }
         }
@@ -272,7 +296,10 @@ impl Room {
     }
 
     /// Closes the room if nobody is joining. Returns whether it closed.
-    async fn try_close(&mut self, cmd_rx: &mut mpsc::Receiver<Command>) -> bool {
+    async fn try_close(
+        &mut self,
+        cmd_rx: &mut mpsc::Receiver<Command>,
+    ) -> bool {
         self.flush();
         if self.dirty {
             self.write_version(VersionReason::Closed, Notify::default());
@@ -298,7 +325,11 @@ impl Room {
     }
 
     /// Shuts down: writes everything, then closes every connection.
-    async fn close(&mut self, reason: VersionReason, cmd_rx: &mut mpsc::Receiver<Command>) {
+    async fn close(
+        &mut self,
+        reason: VersionReason,
+        cmd_rx: &mut mpsc::Receiver<Command>,
+    ) {
         self.registry.remove(self.key, self.generation);
         cmd_rx.close();
         // Edits already queued are applied before the final version.
@@ -314,7 +345,8 @@ impl Room {
         }
         self.barrier().await;
         for (_, peer) in self.peers.drain() {
-            let _full_or_gone = peer.tx.try_send(Outbound::Close(CloseReason::Shutdown));
+            let _full_or_gone =
+                peer.tx.try_send(Outbound::Close(CloseReason::Shutdown));
             self.deps.metrics.peers.add(-1, &[]);
         }
     }
@@ -328,7 +360,8 @@ impl Room {
         self.flush();
         self.barrier().await;
         for (_, peer) in self.peers.drain() {
-            let _full_or_gone = peer.tx.try_send(Outbound::Close(CloseReason::Shutdown));
+            let _full_or_gone =
+                peer.tx.try_send(Outbound::Close(CloseReason::Shutdown));
             self.deps.metrics.peers.add(-1, &[]);
         }
     }
@@ -343,7 +376,9 @@ impl Room {
     fn on_control(&mut self, control: Control) -> Option<oneshot::Sender<()>> {
         match control {
             Control::Leave(peer) => self.remove_peer(peer, None),
-            Control::SetAccess { user, access } => self.set_access(user, access),
+            Control::SetAccess { user, access } => {
+                self.set_access(user, access);
+            }
             Control::Shutdown(ack) => return Some(ack),
         }
         None
@@ -377,8 +412,19 @@ impl Room {
         }
     }
 
-    fn join(&mut self, id: PeerId, request: &JoinRequest, tx: mpsc::Sender<Outbound>) {
-        let span = info_span!("collab.join", room = %self.key, peer = id.0, user = %request.user, access = ?request.access);
+    fn join(
+        &mut self,
+        id: PeerId,
+        request: &JoinRequest,
+        tx: mpsc::Sender<Outbound>,
+    ) {
+        let span = info_span!(
+            "collab.join",
+            room = %self.key,
+            peer = id.0,
+            user = %request.user,
+            access = ?request.access
+        );
         if let Some(trace) = request.traceparent {
             trace.parent(&span);
         }
@@ -397,7 +443,8 @@ impl Room {
         self.empty_since = None;
 
         let state_vector = self.awareness.doc().transact().state_vector();
-        let mut greeting = vec![Message::Sync(SyncMessage::SyncStep1(state_vector))];
+        let mut greeting =
+            vec![Message::Sync(SyncMessage::SyncStep1(state_vector))];
         if let Ok(states) = self.awareness.update()
             && !states.clients.is_empty()
         {
@@ -424,7 +471,13 @@ impl Room {
             self.remove_peer(id, Some(CloseReason::Protocol));
             return;
         };
-        let span = info_span!("collab.message", room = %self.key, peer = id.0, bytes = frame.len(), messages = messages.len());
+        let span = info_span!(
+            "collab.message",
+            room = %self.key,
+            peer = id.0,
+            bytes = frame.len(),
+            messages = messages.len()
+        );
         if let Some(trace) = peer.trace {
             trace.parent(&span);
         }
@@ -456,11 +509,15 @@ impl Room {
                     .doc()
                     .transact()
                     .encode_state_as_update_v1(&state_vector);
-                let reply = protocol::encode(&[Message::Sync(SyncMessage::SyncStep2(update))]);
+                let reply = protocol::encode(&[Message::Sync(
+                    SyncMessage::SyncStep2(update),
+                )]);
                 self.send_to(id, reply.into());
                 true
             }
-            Message::Sync(SyncMessage::SyncStep2(update) | SyncMessage::Update(update)) => {
+            Message::Sync(
+                SyncMessage::SyncStep2(update) | SyncMessage::Update(update),
+            ) => {
                 if access.can_write() {
                     self.apply_update(Some(id), &update)
                 } else {
@@ -520,19 +577,21 @@ impl Room {
             return false;
         };
         let doc = self.awareness.doc();
-        let applied = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let mut txn = doc.transact_mut();
-            txn.apply_update(update)
-                .is_ok()
-                .then(|| txn.encode_update_v1())
-        }));
+        let applied =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let mut txn = doc.transact_mut();
+                txn.apply_update(update)
+                    .is_ok()
+                    .then(|| txn.encode_update_v1())
+            }));
         let delta = match applied {
             Ok(Some(delta)) => delta,
             Ok(None) => return false,
             Err(_) => {
                 // yrs panicked half-way through an update: the document
                 // can no longer be trusted. Restart from the log.
-                error!(room = %self.key, "applying an update panicked; restarting the room");
+                error!(room = %self.key, "applying an update panicked; \
+                    restarting the room");
                 self.poisoned = true;
                 return false;
             }
@@ -557,8 +616,10 @@ impl Room {
         {
             let _new = self.editors.insert(user);
         }
-        let frame: Bytes =
-            protocol::encode(&[Message::Sync(SyncMessage::Update(delta.clone()))]).into();
+        let frame: Bytes = protocol::encode(&[Message::Sync(
+            SyncMessage::Update(delta.clone()),
+        )])
+        .into();
         self.pending.push(delta);
         let _ = self.pending_since.get_or_insert(now);
         self.dirty = true;
@@ -569,7 +630,9 @@ impl Room {
     fn on_awareness(&mut self, id: PeerId, update: AwarenessUpdate) {
         let max_bytes = self.config().max_awareness_bytes;
         let max_clients = self.config().max_clients_per_peer;
-        let Some(mut claimed) = self.peers.get(&id).map(|peer| peer.clients.len()) else {
+        let Some(mut claimed) =
+            self.peers.get(&id).map(|peer| peer.clients.len())
+        else {
             return;
         };
         let mut accepted = HashMap::new();
@@ -610,7 +673,8 @@ impl Room {
                 }
             }
         }
-        let frame: Bytes = protocol::encode(&[Message::Awareness(filtered)]).into();
+        let frame: Bytes =
+            protocol::encode(&[Message::Awareness(filtered)]).into();
         self.broadcast(&frame, Some(id));
         if membership_changed {
             self.broadcast_peers();
@@ -675,7 +739,12 @@ impl Room {
                 .metrics
                 .dropped_peers
                 .add(1, &label("reason", reason.as_str()));
-            warn!(room = %self.key, peer = id.0, reason = reason.as_str(), "dropped a connection");
+            warn!(
+                room = %self.key,
+                peer = id.0,
+                reason = reason.as_str(),
+                "dropped a connection"
+            );
         }
         if !peer.clients.is_empty() {
             for client in &peer.clients {
@@ -686,7 +755,8 @@ impl Room {
                 .awareness
                 .update_with_clients(peer.clients.iter().copied())
             {
-                let frame: Bytes = protocol::encode(&[Message::Awareness(removed)]).into();
+                let frame: Bytes =
+                    protocol::encode(&[Message::Awareness(removed)]).into();
                 self.broadcast(&frame, None);
             }
             self.broadcast_peers();
@@ -714,7 +784,8 @@ impl Room {
 
     fn broadcast_peers(&mut self) {
         let payload = protocol::encode_peers(&self.peer_entries());
-        let frame: Bytes = protocol::encode(&[Message::Custom(MSG_PEERS, payload)]).into();
+        let frame: Bytes =
+            protocol::encode(&[Message::Custom(MSG_PEERS, payload)]).into();
         self.broadcast(&frame, None);
     }
 
@@ -735,10 +806,9 @@ impl Room {
     }
 
     fn send_to(&mut self, id: PeerId, frame: Bytes) {
-        let delivered = self
-            .peers
-            .get(&id)
-            .is_some_and(|peer| peer.tx.try_send(Outbound::Frame(frame)).is_ok());
+        let delivered = self.peers.get(&id).is_some_and(|peer| {
+            peer.tx.try_send(Outbound::Frame(frame)).is_ok()
+        });
         if !delivered {
             self.remove_peer(id, Some(CloseReason::SlowConsumer));
         }
@@ -762,7 +832,8 @@ impl Room {
         match merged {
             Ok(update) => self.to_writer(Job::Append(update)),
             Err(err) => {
-                warn!(room = %self.key, %err, "cannot merge a batch; writing it unmerged");
+                warn!(room = %self.key, %err, "cannot merge a batch; writing \
+                    it unmerged");
                 for update in batch {
                     self.to_writer(Job::Append(update));
                 }
@@ -785,7 +856,8 @@ impl Room {
             }
         };
         self.dirty = false;
-        let editors: Vec<UserId> = mem::take(&mut self.editors).into_iter().collect();
+        let editors: Vec<UserId> =
+            mem::take(&mut self.editors).into_iter().collect();
         if self.last_markdown.as_deref() == Some(markdown.as_str()) {
             // Nothing changed since the last version: acknowledge only.
             self.to_writer(Job::Ack(notify));

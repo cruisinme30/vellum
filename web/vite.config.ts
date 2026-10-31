@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 import type { Connect, Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 
+import { inlineAsset } from "./src/platform/inline-assets";
 import { vellumServiceWorker } from "./src/platform/pwa/vite-plugin";
 
 // `VELLUM_SERVER=http://127.0.0.1:8080 pnpm dev` runs the app against a
@@ -14,10 +15,12 @@ const proxy =
   server === undefined
     ? undefined
     : Object.fromEntries(
-        ["/api", "/auth", "/oauth", "/.well-known", "/collab"].map((path) => [
-          path,
-          { target: server, changeOrigin: false, ws: path === "/collab" },
-        ]),
+        ["/api", "/auth", "/oauth", "/saml", "/.well-known", "/collab"].map(
+          (path) => [
+            path,
+            { target: server, changeOrigin: false, ws: path === "/collab" },
+          ],
+        ),
       );
 
 /**
@@ -25,7 +28,11 @@ const proxy =
  * "is a Vellum server here?" check themselves, so the demo starts without
  * a failed request in the console (the UI suite counts those as errors).
  */
-const answerDemoStatus: Connect.NextHandleFunction = (request, response, next) => {
+const answerDemoStatus: Connect.NextHandleFunction = (
+  request,
+  response,
+  next,
+) => {
   if (request.url?.split("?")[0] !== "/api/v1/auth/status") {
     next();
     return;
@@ -45,12 +52,19 @@ const demoMode = (): Plugin => ({
 });
 
 export default defineConfig({
-  plugins: [react(), vellumServiceWorker(), ...(proxy === undefined ? [demoMode()] : [])],
+  plugins: [
+    react(),
+    vellumServiceWorker(),
+    ...(proxy === undefined ? [demoMode()] : []),
+  ],
   ...(proxy === undefined ? {} : { server: { proxy } }),
   build: {
     sourcemap: true,
-    // The editor chunk (Tiptap, ProseMirror, Yjs) is about 560 kB; it loads lazily.
+    // The editor chunk (Tiptap, ProseMirror, Yjs) is about 560 kB; it loads
+    // lazily.
     chunkSizeWarningLimit: 600,
+    // Fonts stay files: the CSP blocks `data:` fonts (#569).
+    assetsInlineLimit: inlineAsset,
   },
   test: {
     environment: "jsdom",
@@ -59,7 +73,12 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.{ts,tsx}"],
-      exclude: ["src/**/*.test.{ts,tsx}", "src/main.tsx", "src/test/**", "src/platform/pwa/sw.ts"],
+      exclude: [
+        "src/**/*.test.{ts,tsx}",
+        "src/main.tsx",
+        "src/test/**",
+        "src/platform/pwa/sw.ts",
+      ],
       thresholds: { lines: 85, functions: 85, branches: 85, statements: 85 },
     },
   },

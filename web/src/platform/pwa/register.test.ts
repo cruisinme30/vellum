@@ -54,24 +54,27 @@ describe("registerServiceWorker", () => {
     });
   });
 
-  it("announces a new version, activates it on request and reloads once", async () => {
-    const { container, reload, onUpdateReady, options } = setup();
-    const handle = await registerServiceWorker(options);
-    expect(handle?.updateReady).toBe(false);
-    const next = new FakeWorker();
-    container.registration.installing = next;
-    container.registration.dispatchEvent(new Event("updatefound"));
-    next.state = "installed";
-    next.dispatchEvent(new Event("statechange"));
-    expect(onUpdateReady).toHaveBeenCalledTimes(1);
-    expect(handle?.updateReady).toBe(true);
-    container.registration.waiting = next;
-    handle?.applyUpdate();
-    expect(next.postMessage).toHaveBeenCalledWith("skip-waiting");
-    container.dispatchEvent(new Event("controllerchange"));
-    container.dispatchEvent(new Event("controllerchange"));
-    expect(reload).toHaveBeenCalledTimes(1);
-  });
+  it(
+    "announces a new version, activates it on request and reloads " + "once",
+    async () => {
+      const { container, reload, onUpdateReady, options } = setup();
+      const handle = await registerServiceWorker(options);
+      expect(handle?.updateReady).toBe(false);
+      const next = new FakeWorker();
+      container.registration.installing = next;
+      container.registration.dispatchEvent(new Event("updatefound"));
+      next.state = "installed";
+      next.dispatchEvent(new Event("statechange"));
+      expect(onUpdateReady).toHaveBeenCalledTimes(1);
+      expect(handle?.updateReady).toBe(true);
+      container.registration.waiting = next;
+      handle?.applyUpdate();
+      expect(next.postMessage).toHaveBeenCalledWith("skip-waiting");
+      container.dispatchEvent(new Event("controllerchange"));
+      container.dispatchEvent(new Event("controllerchange"));
+      expect(reload).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it("treats the first install as no update and does not reload", async () => {
     const { container, reload, onUpdateReady, options } = setup(NULL);
@@ -85,6 +88,26 @@ describe("registerServiceWorker", () => {
     expect(onUpdateReady).not.toHaveBeenCalled();
     expect(reload).not.toHaveBeenCalled();
   });
+
+  it(
+    "treats a first install that claimed the page before its events arrived " +
+      "as no update",
+    async () => {
+      // WebKit can deliver "installed" after the worker activated and
+      // `clients.claim()` made it the page's controller.
+      const { container, reload, onUpdateReady, options } = setup(NULL);
+      await registerServiceWorker(options);
+      const first = new FakeWorker();
+      container.registration.installing = first;
+      container.registration.dispatchEvent(new Event("updatefound"));
+      container.controller = first;
+      first.state = "installed";
+      first.dispatchEvent(new Event("statechange"));
+      container.dispatchEvent(new Event("controllerchange"));
+      expect(onUpdateReady).not.toHaveBeenCalled();
+      expect(reload).not.toHaveBeenCalled();
+    },
+  );
 
   it("reports a version already waiting at start-up", async () => {
     const { container, onUpdateReady, options } = setup();
@@ -104,7 +127,9 @@ describe("registerServiceWorker", () => {
 
   it("gives up quietly when registration fails or is unavailable", async () => {
     const { container, options } = setup();
-    container.register.mockImplementationOnce(() => Promise.reject(new Error("blocked")));
+    container.register.mockImplementationOnce(() =>
+      Promise.reject(new Error("blocked")),
+    );
     expect(await registerServiceWorker(options)).toBeUndefined();
     expect(await registerServiceWorker({})).toBeUndefined();
   });

@@ -45,10 +45,14 @@ pub mod tree;
 pub mod ws;
 
 pub use config::CollabConfig;
-pub use hub::{Access, CloseReason, Connection, Hub, JoinRequest, Outbound, PeerSender, RoomKey};
+pub use hub::{
+    Access, CloseReason, Connection, Hub, JoinRequest, Outbound, PeerSender,
+    RoomKey,
+};
 pub use markdown::FormatCodec;
 
 pub use ports::{
-    DocumentFiles, MarkdownCodec, MarkdownVersion, Seq, StoredUpdate, UpdateStore, VersionReason,
+    DocumentFiles, MarkdownCodec, MarkdownVersion, Seq, StoredUpdate,
+    UpdateStore, VersionReason,
 };
 pub use tree::{DocTree, Element, Node, TextRun};

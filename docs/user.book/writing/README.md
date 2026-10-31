@@ -55,7 +55,8 @@ vellum: 1
 
 ::: facts
 
-- `id`: the page's identity, a ULID; it never changes, so you can rename or move the page freely
+- `id`: the page's identity, a ULID; it never changes, so you can rename or move
+  the page freely
 - `title`: the page title, shown in the tree and in links
 - `icon` and `cover`: an emoji or image for the header
 - `status`: draft, in-review, verified or outdated
@@ -107,12 +108,18 @@ changes.
 
 ## In this part
 
-- [Text and links](text.md): emphasis, links, wikilinks, mentions, dates and issue keys.
-- [Structure, lists and tables](structure.md): headings, lists, tasks, quotes, code, math and tables.
-- [Callouts and containers](containers.md): callouts, toggles, columns, tabs and nesting.
+- [Text and links](text.md): emphasis, links, wikilinks, mentions, dates and
+  issue keys.
+- [Structure, lists and tables](structure.md): headings, lists, tasks, quotes,
+  code, math and tables.
+- [Callouts and containers](containers.md): callouts, toggles, columns, tabs and
+  nesting.
 - [Numbers and facts](numbers.md): stats, facts, progress, steps and cards.
 - [Charts and data tables](charts.md): eight chart types and sortable tables.
-- [Plans, timelines and risk](plans.md): timelines, roadmaps, risk matrices and boards.
-- [Images, links and embeds](media.md): images, link cards, embeds and page grids.
+- [Plans, timelines and risk](plans.md): timelines, roadmaps, risk matrices and
+  boards.
+- [Images, links and embeds](media.md): images, link cards, embeds and page
+  grids.
 - [Interactive blocks](interactive.md): calculators and live collection views.
-- [Where things render](rendering.md): how each block looks on GitHub, in PDF and in Word.
+- [Where things render](rendering.md): how each block looks on GitHub, in PDF
+  and in Word.

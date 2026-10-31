@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 # The fast suite: gates every pull request into develop, again in the merge
-# queue, and is part of the full suite for main. Branch protection requires the "Fast suite" check.
+# queue, and is part of the full suite for main. Branch protection requires the
+# "Fast suite" check.
 name: "Checks: fast suite"
 
 on:
@@ -22,6 +23,26 @@ on:
           coverage) and the whole UI suite itself, so they are not run twice.
         type: boolean
         default: false
+
+# A newer run on the same pull request into develop cancels the older one
+# (Gourav, 2026-10-29), so a batch pull request has one live run. Edits to
+# the title or description wait instead, then check only the description.
+# A newer push to develop cancels the older push's run too (Gourav,
+# 2026-10-29: CI is expensive), since only develop's tip matters; the
+# develop health alarm ignores cancelled runs. Release pull requests into
+# main, the merge queue and the full suite never cancel: each gets a group
+# of its own.
+concurrency:
+  group: >-
+    ${{ github.event_name == 'pull_request' && github.base_ref == 'develop'
+    && format('fast-suite-pr-{0}', github.event.pull_request.number)
+    || github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    && 'fast-suite-develop'
+    || format('fast-suite-{0}', github.run_id) }}
+  cancel-in-progress: >-
+    ${{ (github.event_name == 'pull_request' && github.base_ref == 'develop'
+    && github.event.action != 'edited')
+    || (github.event_name == 'push' && github.ref == 'refs/heads/develop') }}
 
 permissions:
   contents: read
@@ -49,6 +70,7 @@ jobs:
       desktop: ${{ steps.areas.outputs.desktop }}
       files: ${{ steps.areas.outputs.files }}
       ui: ${{ steps.areas.outputs.ui }}
+      warm: ${{ steps.areas.outputs.warm }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -72,32 +94,64 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           passed=0
+          warm=false
           if [[ "${EVENT}" == "pull_request" && "${ACTION}" == "edited" ]]; then
-            passed="$(gh api "repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs?head_sha=${SHA}&status=success" \
+            runs="repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs"
+            passed="$(gh api "${runs}?head_sha=${SHA}&status=success" \
               --jq '.total_count' || echo 0)"
           fi
+          # A merge commit on develop whose tree is exactly its pull
+          # request's head was already tested on that pull request (the
+          # integrator's batches), so its push run checks nothing again.
+          if [[ "${EVENT}" == "push" ]] && git rev-parse \
+            --verify --quiet HEAD^2 >/dev/null &&
+            [[ "$(git rev-parse 'HEAD^{tree}')" == \
+              "$(git rev-parse 'HEAD^2^{tree}')" ]]; then
+            pr_head="$(git rev-parse HEAD^2)"
+            runs="repos/${GH_REPO}/actions/workflows/${WORKFLOW}/runs"
+            passed="$(gh api "${runs}?head_sha=${pr_head}&status=success" \
+              --jq '.total_count' || echo 0)"
+          fi
+          if ((passed > 0)) && [[ "${EVENT}" == "push" ]] &&
+            git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh \
+              | grep -qx 'rust=true'; then
+            # Only develop saves the Rust caches (D138), so the Rust jobs
+            # still build, without checking again, to keep them warm for
+            # the next batch (ADR 0049, D215).
+            warm=true
+          fi
+          echo "warm=${warm}" | tee -a "${GITHUB_OUTPUT}"
           if ((passed > 0)); then
             echo "This commit already passed; checking the description only."
-            printf 'rust=false\nweb=false\ndesktop=false\nui=false\nfiles=false\n' | tee -a "${GITHUB_OUTPUT}"
-          elif [[ "${EVENT}" == "pull_request" && "${BASE}" == "develop" ]]; then
-            git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
+            printf '%s=false\n' rust web desktop ui files \
+              | tee -a "${GITHUB_OUTPUT}"
+          elif [[ "${EVENT}" == "pull_request" \
+            && "${BASE}" == "develop" ]]; then
+            git diff --name-only HEAD^1 HEAD | scripts/ci/changed-areas.sh \
+              | tee -a "${GITHUB_OUTPUT}"
             echo "files=true" | tee -a "${GITHUB_OUTPUT}"
-          elif [[ "${EVENT}" == "push" && -n "${BEFORE}" && "${BEFORE}" != 0000000* ]] &&
+          elif [[ "${EVENT}" == "push" && -n "${BEFORE}" \
+            && "${BEFORE}" != 0000000* ]] &&
             git fetch --quiet --depth=1 origin "${BEFORE}"; then
             # A push to develop checks only the areas its commits touch.
-            git diff --name-only "${BEFORE}" HEAD | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
+            git diff --name-only "${BEFORE}" HEAD \
+              | scripts/ci/changed-areas.sh | tee -a "${GITHUB_OUTPUT}"
             echo "files=true" | tee -a "${GITHUB_OUTPUT}"
           elif [[ "${FULL}" == "true" ]]; then
             # The full suite runs every UI test in every browser itself.
-            printf 'rust=true\nweb=true\ndesktop=true\nui=false\nfiles=true\n' | tee -a "${GITHUB_OUTPUT}"
+            printf 'rust=true\nweb=true\ndesktop=true\nui=false\nfiles=true\n' \
+              | tee -a "${GITHUB_OUTPUT}"
           else
-            printf 'rust=true\nweb=true\ndesktop=true\nui=true\nfiles=true\n' | tee -a "${GITHUB_OUTPUT}"
+            printf 'rust=true\nweb=true\ndesktop=true\nui=true\nfiles=true\n' \
+              | tee -a "${GITHUB_OUTPUT}"
           fi
 
   rust:
     name: Rust
     needs: changes
-    if: needs.changes.outputs.rust == 'true'
+    if: >-
+      needs.changes.outputs.rust == 'true' || needs.changes.outputs.warm ==
+      'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -105,6 +159,14 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install
+      # The runner has 14 GB free; the workspace's cached build for lints
+      # and docs restores to more than that once the cache archive sits
+      # next to it. The preinstalled Android SDK, .NET and GHC (about
+      # 15 GB) are unused here.
+      - name: Free runner disk for the Rust cache
+        run: >-
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          /usr/local/.ghcup && df -h /
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           # Only develop saves the cache (ADR 0035, D138). Pull requests
@@ -113,27 +175,74 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/develop' }}
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
-          tool: cargo-nextest,cargo-deny,cargo-audit,mdbook
+          tool: cargo-deny,cargo-audit,mdbook
       - name: Format
+        if: needs.changes.outputs.warm != 'true'
         run: cargo fmt --all --check
       - name: Clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - name: Docs
         run: cargo doc --workspace --no-deps --locked
-      - name: Tests
-        # The full suite runs these same tests in its coverage job.
-        if: ${{ !inputs.full-suite }}
-        run: cargo nextest run --workspace --locked --profile ci
       - name: Crate boundaries
+        if: needs.changes.outputs.warm != 'true'
         run: cargo xtask boundaries
       - name: Block model is generated from schema/
+        if: needs.changes.outputs.warm != 'true'
         run: cargo xtask schema --check
       - name: Help books and their corpus
+        if: needs.changes.outputs.warm != 'true'
         run: cargo xtask help
       - name: Licences, bans, sources and advisories
+        if: needs.changes.outputs.warm != 'true'
         run: cargo deny --locked check
       - name: RustSec audit
+        if: needs.changes.outputs.warm != 'true'
         run: cargo audit --deny warnings
+
+  rust-tests:
+    # Its own job, so building and running the tests (the longest step)
+    # starts at once instead of after clippy, docs and the policy checks
+    # (ADR 0049, D215). The full suite runs these same tests in its
+    # coverage job.
+    name: Rust tests
+    needs: changes
+    if: >-
+      (needs.changes.outputs.rust == 'true' || needs.changes.outputs.warm ==
+      'true') && !inputs.full-suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      # The runner has 14 GB free; the workspace's cached build for lints
+      # and docs restores to more than that once the cache archive sits
+      # next to it. The preinstalled Android SDK, .NET and GHC (about
+      # 15 GB) are unused here.
+      - name: Free runner disk for the Rust cache
+        run: >-
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          /usr/local/.ghcup && df -h /
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          # The cache key includes the job, so tests keep their own
+          # build artefacts apart from clippy's. Only develop saves.
+          save-if: ${{ github.ref == 'refs/heads/develop' }}
+      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+        with:
+          # The books tests build a published tree with mdBook.
+          tool: cargo-nextest,mdbook
+      - name: Tests
+        env:
+          WARM: ${{ needs.changes.outputs.warm }}
+        run: |
+          if [[ "${WARM}" == "true" ]]; then
+            # A warm-up run builds the tests for the cache without running them.
+            cargo nextest run --workspace --locked --profile ci --no-run
+          else
+            cargo nextest run --workspace --locked --profile ci
+          fi
 
   web:
     name: Web
@@ -170,8 +279,11 @@ jobs:
       - name: Dependency audit
         run: pnpm audit
 
-  ui:
-    name: UI layout (quick)
+  website:
+    # The site is built once for every UI shard: build-site.sh compiles
+    # vellum-render's site_blocks example to draw the docs' diagrams
+    # (ADR 0071, D309), which should not happen four times.
+    name: Website build for the UI suite
     needs: changes
     if: needs.changes.outputs.ui == 'true'
     runs-on: ubuntu-24.04
@@ -179,7 +291,45 @@ jobs:
     env:
       # Keep in step with site.yml.
       MDBOOK_VERSION: 0.5.4
-      MDBOOK_SHA256: 3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
+      MDBOOK_SHA256: >-
+        3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install mdBook
+        run: |
+          tarball="mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
+          curl -sSfLo "${RUNNER_TEMP}/${tarball}" \
+            "https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/${tarball}"
+          echo "${MDBOOK_SHA256}  ${RUNNER_TEMP}/${tarball}" | sha256sum --check
+          tar -xzf "${RUNNER_TEMP}/${tarball}" -C "${RUNNER_TEMP}" mdbook
+          echo "MDBOOK=${RUNNER_TEMP}/mdbook" >> "${GITHUB_ENV}"
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: site
+          # Only develop saves the cache (ADR 0035, D138).
+          save-if: ${{ github.ref == 'refs/heads/develop' }}
+      - run: scripts/ci/build-site.sh _site
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: website
+          path: _site
+
+  ui:
+    # Four shards of four workers each (ADR 0049, D214). 334 tests took
+    # 7.3 minutes on one runner; by 5:50 PM PT on 2026-10-29 there were
+    # 962, and two shards took 8 to 9 minutes each.
+    name: UI layout (quick ${{ matrix.shard }}/4)
+    needs: [changes, website]
+    if: needs.changes.outputs.ui == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -193,16 +343,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm --dir web install --frozen-lockfile
-      - name: Install mdBook
-        run: |
-          tarball="mdbook-v${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz"
-          curl -sSfLo "${RUNNER_TEMP}/${tarball}" \
-            "https://github.com/rust-lang/mdBook/releases/download/v${MDBOOK_VERSION}/${tarball}"
-          echo "${MDBOOK_SHA256}  ${RUNNER_TEMP}/${tarball}" | sha256sum --check
-          tar -xzf "${RUNNER_TEMP}/${tarball}" -C "${RUNNER_TEMP}" mdbook
-          echo "MDBOOK=${RUNNER_TEMP}/mdbook" >> "${GITHUB_ENV}"
-      - name: Build the website
-        run: scripts/ci/build-site.sh _site
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: website
+          path: _site
       - run: pnpm --dir web exec playwright install --with-deps chromium
       - name: Layout, focus and loading checks (ADR 0031)
         working-directory: web
@@ -211,11 +355,13 @@ jobs:
           UI_BROWSERS: chromium
           UI_VIEWPORTS: phone,laptop
           UI_SITE_DIR: ../_site
-        run: pnpm exec playwright test e2e/ui
+        run: >-
+          pnpm exec playwright test e2e/ui --shard=${{ matrix.shard }}/4
+          --workers=4
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: ui-quick-report
+          name: ui-quick-report-${{ matrix.shard }}
           path: |
             web/playwright-report
             web/test-results
@@ -280,11 +426,16 @@ jobs:
         with:
           python-version: "3.13"
       - name: Install linters
-        run: pip install yamllint==1.37.1 sqlfluff==3.4.2 zizmor==1.31.1
+        # Every package pinned by hash (Scorecard "Pinned-Dependencies").
+        run: >-
+          pip install --require-hashes --no-deps -r
+          .github/requirements/hygiene.txt
       - name: YAML
         run: yamllint --strict .
       - name: Shell
-        run: shellcheck -x scripts/*/*.sh deploy/*/*.sh .githooks/*
+        run: >-
+          shellcheck -x scripts/*/*.sh deploy/*/*.sh deploy/packages/linux/*.sh
+          site/*.sh .githooks/*
       - name: Workflow security (zizmor)
         # ADR 0032, D126: template injection, excessive token permissions,
         # unpinned or impostor actions, credential persistence, cooldowns.
@@ -300,15 +451,17 @@ jobs:
           VALE_VERSION: 3.25.1
         run: |
           base="https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}"
-          curl -sSfL "${base}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" | tar -xz -C "${RUNNER_TEMP}" vale
-          "${RUNNER_TEMP}/vale" --glob='!{**/node_modules/**,target/**,LICENSES/**,LICENSE,corpus/**}' .
+          curl -sSfL "${base}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" \
+            | tar -xz -C "${RUNNER_TEMP}" vale
+          skip='!{**/node_modules/**,target/**,'
+          skip+='LICENSES/**,LICENSE,corpus/**}'
+          "${RUNNER_TEMP}/vale" --glob="${skip}" .
       - name: Local links
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
+          # Excluded paths are in lychee.toml, shared with `cargo xtask fast`.
           args: >-
-            --offline --no-progress --include-fragments
-            --exclude-path LICENSES --exclude-path web/node_modules
-            --exclude-path corpus '**/*.md'
+            --offline --no-progress --include-fragments '**/*.md'
           fail: true
       - name: Secrets
         # The pull request already scanned these commits; the action does
@@ -346,10 +499,12 @@ jobs:
           if [[ "${BASE}" == "main" && "${BRANCH}" == "develop" ]]; then
             echo "Release pull request from develop."
           elif ! check_branch "${BRANCH}"; then
-            echo "::error::Branch '${BRANCH}' must be named <type>/<topic>, e.g. feat/typed-ids"
+            echo "::error::Branch '${BRANCH}' must be named <type>/<topic>," \
+              "e.g. feat/typed-ids"
             exit 1
           fi
-          if [[ "${AUTHOR_TYPE}" == "Bot" ]] && check_bot_subject "${TITLE}"; then
+          if [[ "${AUTHOR_TYPE}" == "Bot" ]] &&
+            check_bot_subject "${TITLE}"; then
             echo "Bot title: type checked, length not limited."
           elif ! check_subject "${TITLE}"; then
             echo "::error::Title is not a Conventional Commit: ${TITLE}"
@@ -363,7 +518,8 @@ jobs:
       - name: Commit template and DCO sign-off
         run: >-
           scripts/ci/check-commits.sh
-          ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }}
+          ${{ github.event.pull_request.base.sha }}
+          ${{ github.event.pull_request.head.sha }}
 
   traceability:
     name: Issue and decision record
@@ -407,11 +563,24 @@ jobs:
   fast-suite:
     name: Fast suite
     if: always()
-    needs: [changes, rust, web, desktop, ui, hygiene, commits, traceability, dependencies]
+    needs:
+      - changes
+      - rust
+      - rust-tests
+      - web
+      - desktop
+      - website
+      - ui
+      - hygiene
+      - commits
+      - traceability
+      - dependencies
     runs-on: ubuntu-24.04
     steps:
       # A job skipped by the changed-areas filter counts as not applicable.
       - name: Every fast check passed or was not applicable
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        if: >-
+          contains(needs.*.result, 'failure') || contains(needs.*.result,
+          'cancelled')
         run: exit 1
       - run: echo "Fast suite passed."

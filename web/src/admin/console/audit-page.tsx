@@ -6,9 +6,16 @@ import { useState, type ComponentProps } from "react";
 import { failureText } from "../../data/failure";
 import { useLoaded } from "../../data/use-loaded";
 import { useT } from "../../i18n/i18n";
+import { CopyDiagnostic } from "../../shell/copy-diagnostic";
 
-import { formText, type AdminConsoleApi, type AuditRecord, type ChainReport } from "./api";
+import {
+  formText,
+  type AdminConsoleApi,
+  type AuditRecord,
+  type ChainReport,
+} from "./api";
 import { AdminScreen } from "./context";
+import { ScrollRegion } from "./scroll-region";
 
 /** Records per page. */
 const PAGE = 50;
@@ -31,7 +38,11 @@ function AuditRow({ record }: { readonly record: AuditRecord }) {
   const { event } = record;
   const who = event.actor.user_id ?? event.actor.kind;
   return (
-    <tr className={event.outcome === "success" ? undefined : "vl-admin-row-problem"}>
+    <tr
+      className={
+        event.outcome === "success" ? undefined : "vl-admin-row-problem"
+      }
+    >
       <td>{record.seq}</td>
       <td>
         <time dateTime={record.at}>{TIME.format(new Date(record.at))}</time>
@@ -51,7 +62,7 @@ function AuditTable({ records }: { readonly records: readonly AuditRecord[] }) {
     return <p>{t("admin-audit-empty")}</p>;
   }
   return (
-    <div className="vl-admin-scroll">
+    <ScrollRegion label={t("admin-audit-caption")}>
       <table className="vl-admin-table">
         <caption>{t("admin-audit-caption")}</caption>
         <thead>
@@ -71,7 +82,7 @@ function AuditTable({ records }: { readonly records: readonly AuditRecord[] }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </ScrollRegion>
   );
 }
 
@@ -117,7 +128,11 @@ function ChainTools({ api }: { readonly api: AdminConsoleApi }) {
           run(async () => {
             const jsonl = await api.exportAudit();
             if (download !== undefined) URL.revokeObjectURL(download);
-            setDownload(URL.createObjectURL(new Blob([jsonl], { type: "application/jsonl" })));
+            setDownload(
+              URL.createObjectURL(
+                new Blob([jsonl], { type: "application/jsonl" }),
+              ),
+            );
           });
         }}
       >
@@ -143,6 +158,7 @@ function ChainTools({ api }: { readonly api: AdminConsoleApi }) {
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
     </div>
@@ -178,6 +194,7 @@ function AuditRecords({
     return (
       <p className="vl-field-error" role="alert">
         {loaded.message}
+        <CopyDiagnostic message={loaded.message} />
       </p>
     );
   }
@@ -214,7 +231,11 @@ function AuditRecords({
   );
 }
 
-function AuditFilters({ onApply }: { readonly onApply: (filters: Filters) => void }) {
+function AuditFilters({
+  onApply,
+}: {
+  readonly onApply: (filters: Filters) => void;
+}) {
   const t = useT();
   const submit: NonNullable<ComponentProps<"form">["onSubmit"]> = (event) => {
     event.preventDefault();
@@ -243,12 +264,20 @@ export function AuditPage() {
   const t = useT();
   const [filters, setFilters] = useState<Filters>({ action: "", user: "" });
   return (
-    <AdminScreen title={t("admin-audit")} intro={t("admin-audit-intro")}>
+    <AdminScreen
+      help="admin.audit"
+      title={t("admin-audit")}
+      intro={t("admin-audit-intro")}
+    >
       {(api) => (
         <>
           <ChainTools api={api} />
           <AuditFilters onApply={setFilters} />
-          <AuditRecords key={`${filters.action}\n${filters.user}`} api={api} filters={filters} />
+          <AuditRecords
+            key={`${filters.action}\n${filters.user}`}
+            api={api}
+            filters={filters}
+          />
         </>
       )}
     </AdminScreen>

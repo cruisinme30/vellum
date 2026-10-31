@@ -1,7 +1,13 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderApp } from "../test/render-app";
@@ -11,11 +17,16 @@ import { COLLECTION } from "./mock-data";
 
 async function renderBoard() {
   const collections = createMockCollectionsStore();
-  const rendered = renderApp(`/data/${COLLECTION.issues}?view=Board`, undefined, collections);
+  const rendered = renderApp(
+    `/data/${COLLECTION.issues}?view=Board`,
+    undefined,
+    collections,
+  );
   await screen.findByRole("region", { name: /^Backlog/ });
   const column = (name: string) =>
     screen.getByRole("region", { name: new RegExp(String.raw`^${name} \d`) });
-  const card = (title: string) => screen.getByRole("button", { name: new RegExp(`^${title}`) });
+  const card = (title: string) =>
+    screen.getByRole("button", { name: new RegExp(`^${title}`) });
   const titlesIn = (name: string) =>
     within(column(name))
       .queryAllByRole("button", { name: /^(?!Move )/ })
@@ -45,41 +56,48 @@ describe("BoardView", () => {
       ["In review", "1"],
       ["Done", "2"],
     ] as const) {
-      expect(within(column(name)).getByRole("heading", { level: 2 }).textContent).toBe(
-        `${name} ${count}`,
-      );
+      expect(
+        within(column(name)).getByRole("heading", { level: 2 }).textContent,
+      ).toBe(`${name} ${count}`);
     }
-    expect(titlesIn("In review")).toEqual(["Gateway returns 502 on cold start"]);
+    expect(titlesIn("In review")).toEqual([
+      "Gateway returns 502 on cold start",
+    ]);
     expect(screen.getByText(/Drag a card to another column/)).toBeDefined();
     // The grouping property is not repeated on the cards.
     expect(within(column("Done")).queryByText("Status")).toBeNull();
     expect(within(column("Done")).getAllByText("Owner")).toHaveLength(2);
   });
 
-  it("moves a card with Alt+Right and Alt+Left, keeping focus on it", async () => {
-    const { user, card, titlesIn } = await renderBoard();
-    act(() => {
-      card("Gateway returns 502").focus();
-    });
-    await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
-    await waitFor(() => {
-      expect(titlesIn("Done")).toContain("Gateway returns 502 on cold start");
-    });
-    expect(document.activeElement).toBe(card("Gateway returns 502"));
-    expect(screen.getByRole("status").textContent).toBe(
-      "Moved Gateway returns 502 on cold start to Done.",
-    );
-    await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
-    await user.keyboard("{Alt>}{ArrowLeft}{/Alt}");
-    await waitFor(() => {
-      expect(titlesIn("In review")).toContain("Gateway returns 502 on cold start");
-    });
-    act(() => {
-      card("Token bucket").focus();
-    });
-    await user.keyboard("{ArrowRight}");
-    expect(titlesIn("In progress")).toContain("Token bucket per tenant");
-  });
+  it(
+    "moves a card with Alt+Right and Alt+Left, keeping focus on " + "it",
+    async () => {
+      const { user, card, titlesIn } = await renderBoard();
+      act(() => {
+        card("Gateway returns 502").focus();
+      });
+      await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
+      await waitFor(() => {
+        expect(titlesIn("Done")).toContain("Gateway returns 502 on cold start");
+      });
+      expect(document.activeElement).toBe(card("Gateway returns 502"));
+      expect(screen.getByRole("status").textContent).toBe(
+        "Moved Gateway returns 502 on cold start to Done.",
+      );
+      await user.keyboard("{Alt>}{ArrowRight}{/Alt}");
+      await user.keyboard("{Alt>}{ArrowLeft}{/Alt}");
+      await waitFor(() => {
+        expect(titlesIn("In review")).toContain(
+          "Gateway returns 502 on cold start",
+        );
+      });
+      act(() => {
+        card("Token bucket").focus();
+      });
+      await user.keyboard("{ArrowRight}");
+      expect(titlesIn("In progress")).toContain("Token bucket per tenant");
+    },
+  );
 
   it("moves a card from its Move to menu", async () => {
     const { user, column, titlesIn } = await renderBoard();
@@ -93,12 +111,18 @@ describe("BoardView", () => {
         .getAllByRole("menuitem")
         .map((index) => index.textContent),
     ).toEqual(["Move to Backlog", "Move to In progress", "Move to Done"]);
-    expect(document.activeElement).toBe(within(menu).getAllByRole("menuitem")[0]);
+    expect(document.activeElement).toBe(
+      within(menu).getAllByRole("menuitem")[0],
+    );
     await user.keyboard("{ArrowUp}{ArrowDown}{End}{Home}{ArrowDown}{Enter}");
     await waitFor(() => {
-      expect(titlesIn("In progress")).toContain("Gateway returns 502 on cold start");
+      expect(titlesIn("In progress")).toContain(
+        "Gateway returns 502 on cold start",
+      );
     });
-    const again = screen.getByRole("button", { name: "Move Gateway returns 502 on cold start" });
+    const again = screen.getByRole("button", {
+      name: "Move Gateway returns 502 on cold start",
+    });
     await user.click(again);
     await user.click(screen.getByRole("menuitem", { name: "Move to Done" }));
     await waitFor(() => {
@@ -108,7 +132,9 @@ describe("BoardView", () => {
 
   it("closes the menu with Escape and Space picks", async () => {
     const { user, column } = await renderBoard();
-    const move = within(column("Done")).getAllByRole("button", { name: /^Move / })[0];
+    const move = within(column("Done")).getAllByRole("button", {
+      name: /^Move /,
+    })[0];
     if (!move) {
       throw new Error("no move button");
     }
@@ -123,7 +149,9 @@ describe("BoardView", () => {
     await user.click(move);
     await user.keyboard(" ");
     await waitFor(() => {
-      expect(within(column("Backlog")).getAllByRole("button", { name: /^Move / })).toHaveLength(4);
+      expect(
+        within(column("Backlog")).getAllByRole("button", { name: /^Move / }),
+      ).toHaveLength(4);
     });
   });
 
@@ -142,22 +170,29 @@ describe("BoardView", () => {
     });
   });
 
-  it("ignores drops of other things and onto the card's own column", async () => {
-    const { card, column, collections } = await renderBoard();
-    const spy = vi.spyOn(collections, "updateRow");
-    fireEvent.dragOver(column("Done"), { dataTransfer: dataTransfer(["text/plain"]) });
-    expect(column("Done").dataset["over"]).toBeUndefined();
-    fireEvent.drop(column("Done"), { dataTransfer: dataTransfer() });
-    const transfer = dataTransfer();
-    fireEvent.dragStart(card("Token bucket"), { dataTransfer: transfer });
-    fireEvent.drop(column("In progress"), { dataTransfer: transfer });
-    expect(spy).not.toHaveBeenCalled();
-  });
+  it(
+    "ignores drops of other things and onto the card's own " + "column",
+    async () => {
+      const { card, column, collections } = await renderBoard();
+      const spy = vi.spyOn(collections, "updateRow");
+      fireEvent.dragOver(column("Done"), {
+        dataTransfer: dataTransfer(["text/plain"]),
+      });
+      expect(column("Done").dataset["over"]).toBeUndefined();
+      fireEvent.drop(column("Done"), { dataTransfer: dataTransfer() });
+      const transfer = dataTransfer();
+      fireEvent.dragStart(card("Token bucket"), { dataTransfer: transfer });
+      fireEvent.drop(column("In progress"), { dataTransfer: transfer });
+      expect(spy).not.toHaveBeenCalled();
+    },
+  );
 
   it("opens a card's row with a click, Enter or Space", async () => {
     const { user, card } = await renderBoard();
     await user.click(card("Token bucket"));
-    expect(await screen.findByRole("dialog", { name: "Token bucket per tenant" })).toBeDefined();
+    expect(
+      await screen.findByRole("dialog", { name: "Token bucket per tenant" }),
+    ).toBeDefined();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(card("Token bucket"));
@@ -170,7 +205,9 @@ describe("BoardView", () => {
 
   it("says when a move is refused", async () => {
     const { user, card, collections } = await renderBoard();
-    vi.spyOn(collections, "updateRow").mockRejectedValueOnce(new Error("no write access"));
+    vi.spyOn(collections, "updateRow").mockRejectedValueOnce(
+      new Error("no write access"),
+    );
     act(() => {
       card("Token bucket").focus();
     });
@@ -188,7 +225,9 @@ describe("BoardView", () => {
       const found = await info(id);
       return {
         ...found,
-        views: found.views.map((v) => (v.name === "Board" ? { ...v, group: "left" } : v)),
+        views: found.views.map((v) =>
+          v.name === "Board" ? { ...v, group: "left" } : v,
+        ),
       };
     });
     vi.spyOn(collections, "query").mockImplementation((input) =>

@@ -64,7 +64,11 @@ impl PushSubscription {
     /// # Errors
     ///
     /// [`PushError::InvalidKeys`] for malformed keys.
-    pub fn from_browser(endpoint: Url, p256dh: &str, auth: &str) -> Result<Self, PushError> {
+    pub fn from_browser(
+        endpoint: Url,
+        p256dh: &str,
+        auth: &str,
+    ) -> Result<Self, PushError> {
         let p256dh = unb64url(p256dh).ok_or(PushError::InvalidKeys)?;
         let auth = unb64url(auth).ok_or(PushError::InvalidKeys)?;
         if PublicKey::from_sec1_bytes(&p256dh).is_err() || auth.len() != 16 {
@@ -95,7 +99,10 @@ fn random_secret_key() -> Result<SecretKey, PushError> {
     Err(PushError::Random)
 }
 
-fn expand<const N: usize>(hkdf: &Hkdf<Sha256>, info: &[u8]) -> Result<[u8; N], PushError> {
+fn expand<const N: usize>(
+    hkdf: &Hkdf<Sha256>,
+    info: &[u8],
+) -> Result<[u8; N], PushError> {
     let mut out = [0_u8; N];
     hkdf.expand(info, &mut out).map_err(|_| PushError::Crypto)?;
     Ok(out)
@@ -106,7 +113,10 @@ fn expand<const N: usize>(hkdf: &Hkdf<Sha256>, info: &[u8]) -> Result<[u8; N], P
 /// # Errors
 ///
 /// [`PushError`] for bad keys, oversize payloads or a failed RNG.
-pub fn encrypt(subscription: &PushSubscription, payload: &[u8]) -> Result<Vec<u8>, PushError> {
+pub fn encrypt(
+    subscription: &PushSubscription,
+    payload: &[u8],
+) -> Result<Vec<u8>, PushError> {
     encrypt_with(
         subscription,
         payload,
@@ -125,16 +135,22 @@ fn encrypt_with(
     if payload.len() > MAX_PAYLOAD {
         return Err(PushError::TooLarge);
     }
-    let receiver =
-        PublicKey::from_sec1_bytes(&subscription.p256dh).map_err(|_| PushError::InvalidKeys)?;
+    let receiver = PublicKey::from_sec1_bytes(&subscription.p256dh)
+        .map_err(|_| PushError::InvalidKeys)?;
     let sender_public = sender.public_key().to_sec1_bytes();
-    let shared = p256::ecdh::diffie_hellman(sender.to_nonzero_scalar(), receiver.as_affine());
+    let shared = p256::ecdh::diffie_hellman(
+        sender.to_nonzero_scalar(),
+        receiver.as_affine(),
+    );
 
     // RFC 8291 §3.3–3.4: combine the ECDH secret with the auth secret.
     let mut key_info = b"WebPush: info\0".to_vec();
     key_info.extend_from_slice(&subscription.p256dh);
     key_info.extend_from_slice(&sender_public);
-    let prk_key = Hkdf::<Sha256>::new(Some(&subscription.auth), shared.raw_secret_bytes());
+    let prk_key = Hkdf::<Sha256>::new(
+        Some(&subscription.auth),
+        shared.raw_secret_bytes(),
+    );
     let ikm: [u8; 32] = expand(&prk_key, &key_info)?;
 
     // RFC 8188 §2.2–2.3: content-encryption key and nonce.
@@ -144,13 +160,16 @@ fn encrypt_with(
 
     let mut plaintext = payload.to_vec();
     plaintext.push(0x02); // delimiter of the last (only) record
-    let cipher = Aes128Gcm::new_from_slice(&cek).map_err(|_| PushError::Crypto)?;
+    let cipher =
+        Aes128Gcm::new_from_slice(&cek).map_err(|_| PushError::Crypto)?;
     let ciphertext = cipher
         .encrypt(&nonce.into(), plaintext.as_slice())
         .map_err(|_| PushError::Crypto)?;
 
-    let key_id_len = u8::try_from(sender_public.len()).map_err(|_| PushError::Crypto)?;
-    let mut body = Vec::with_capacity(21 + sender_public.len() + ciphertext.len());
+    let key_id_len =
+        u8::try_from(sender_public.len()).map_err(|_| PushError::Crypto)?;
+    let mut body =
+        Vec::with_capacity(21 + sender_public.len() + ciphertext.len());
     body.extend_from_slice(&salt);
     body.extend_from_slice(&RECORD_SIZE.to_be_bytes());
     body.push(key_id_len);
@@ -187,8 +206,12 @@ impl VapidKey {
     /// # Errors
     ///
     /// [`PushError::InvalidKeys`] if the bytes are not a P-256 scalar.
-    pub fn from_bytes(secret: &[u8], subject: String) -> Result<Self, PushError> {
-        let signing = SigningKey::from_slice(secret).map_err(|_| PushError::InvalidKeys)?;
+    pub fn from_bytes(
+        secret: &[u8],
+        subject: String,
+    ) -> Result<Self, PushError> {
+        let signing = SigningKey::from_slice(secret)
+            .map_err(|_| PushError::InvalidKeys)?;
         Ok(Self { signing, subject })
     }
 
@@ -221,7 +244,11 @@ impl VapidKey {
     /// # Errors
     ///
     /// [`PushError::InvalidKeys`] if the endpoint has no origin.
-    pub fn authorization(&self, endpoint: &Url, now: Timestamp) -> Result<String, PushError> {
+    pub fn authorization(
+        &self,
+        endpoint: &Url,
+        now: Timestamp,
+    ) -> Result<String, PushError> {
         let origin = endpoint.origin().ascii_serialization();
         if origin == "null" {
             return Err(PushError::InvalidKeys);
@@ -326,9 +353,13 @@ mod tests {
 
     fn rfc_subscription() -> Result<PushSubscription, PushError> {
         PushSubscription::from_browser(
-            Url::parse("https://push.example.net/push/JzLQ3raZJfFBR0aqvOMsLrt54w4rJUsV")
-                .map_err(|_| PushError::InvalidKeys)?,
-            "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs7Vd8pZGH6SRpkNtoIAiw4",
+            Url::parse(
+                "https://push.example.net/push/JzLQ3raZJfFBR0aqvOMsLrt54\
+                w4rJUsV",
+            )
+            .map_err(|_| PushError::InvalidKeys)?,
+            "BCVxsr7N_eNgVRqvHtD0zTZsEc6-VV-JvLexhqUzORcxaOzi6-AYWXvTBHm4bjyPjs\
+                7Vd8pZGH6SRpkNtoIAiw4",
             "BTBZMqHH6r4Tts7J_aSIgg",
         )
     }
@@ -336,8 +367,10 @@ mod tests {
     /// RFC 8291 Appendix A.
     #[test]
     fn rfc8291_test_vector() -> Result<(), PushError> {
-        let sender = SecretKey::from_slice(&decode("yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw"))
-            .map_err(|_| PushError::InvalidKeys)?;
+        let sender = SecretKey::from_slice(&decode(
+            "yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw",
+        ))
+        .map_err(|_| PushError::InvalidKeys)?;
         let salt: [u8; 16] = decode("DGv6ra1nlYgDCS1FRnbzlw")
             .try_into()
             .map_err(|_| PushError::InvalidKeys)?;
@@ -349,17 +382,23 @@ mod tests {
         )?;
         assert_eq!(
             b64url(&body),
-            "DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTpK4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN"
+            "DGv6ra1nlYgDCS1FRnbzlwAAEABBBP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlml\
+                MoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A_yl95bQpu6cVPTp\
+                K4Mqgkf1CXztLVBSt2Ks3oZwbuwXPXLWyouBWLVWGNWQexSgSxsj_Qulcy4a-fN"
         );
         Ok(())
     }
 
     #[test]
     fn rejects_bad_keys_and_large_payloads() -> Result<(), PushError> {
-        let endpoint =
-            Url::parse("https://push.example.net/x").map_err(|_| PushError::InvalidKeys)?;
+        let endpoint = Url::parse("https://push.example.net/x")
+            .map_err(|_| PushError::InvalidKeys)?;
         assert_eq!(
-            PushSubscription::from_browser(endpoint, "AAAA", "BTBZMqHH6r4Tts7J_aSIgg"),
+            PushSubscription::from_browser(
+                endpoint,
+                "AAAA",
+                "BTBZMqHH6r4Tts7J_aSIgg"
+            ),
             Err(PushError::InvalidKeys)
         );
         let big = vec![0_u8; MAX_PAYLOAD + 1];
@@ -373,7 +412,8 @@ mod tests {
     #[test]
     fn vapid_header_verifies() -> Result<(), PushError> {
         let vapid = VapidKey::generate("mailto:ops@northstar.dev".to_owned())?;
-        let reloaded = VapidKey::from_bytes(&vapid.secret_bytes(), vapid.subject.clone())?;
+        let reloaded =
+            VapidKey::from_bytes(&vapid.secret_bytes(), vapid.subject.clone())?;
         assert_eq!(reloaded.public_key(), vapid.public_key());
 
         let subscription = rfc_subscription()?;
@@ -394,11 +434,12 @@ mod tests {
             .and_then(|rest| rest.split_once(", k="))
             .ok_or(PushError::InvalidKeys)?;
         assert_eq!(key, vapid.public_key());
-        let (signing_input, signature) = token.rsplit_once('.').ok_or(PushError::InvalidKeys)?;
-        let verifying =
-            VerifyingKey::from_sec1_bytes(&decode(key)).map_err(|_| PushError::InvalidKeys)?;
-        let signature =
-            Signature::from_slice(&decode(signature)).map_err(|_| PushError::InvalidKeys)?;
+        let (signing_input, signature) =
+            token.rsplit_once('.').ok_or(PushError::InvalidKeys)?;
+        let verifying = VerifyingKey::from_sec1_bytes(&decode(key))
+            .map_err(|_| PushError::InvalidKeys)?;
+        let signature = Signature::from_slice(&decode(signature))
+            .map_err(|_| PushError::InvalidKeys)?;
         assert!(
             verifying
                 .verify(signing_input.as_bytes(), &signature)

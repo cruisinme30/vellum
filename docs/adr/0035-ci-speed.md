@@ -13,7 +13,8 @@ vellum: 1
 - Status: accepted
 - Decisions: `D138`, `D139`, `D140`, `D165`, `D166`, `D167`
 - Issue: `#264`, `#446`
-- Pull requests: `chore/ci-speed`, `chore/ci-dedupe-tests`, `chore/release-ci-speed`
+- Pull requests: `chore/ci-speed`, `chore/ci-dedupe-tests`,
+  `chore/release-ci-speed`
 
 :::
 

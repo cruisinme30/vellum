@@ -33,8 +33,12 @@ use vellum_kernel::{BlockId, Error, ErrorKind, ShareToken, UserId};
 use crate::checklist::{self, Checklist};
 use crate::model::{Source, TaskFields};
 use crate::raw::{RawRequest, RawResponse};
-use crate::service::{Done, NoInput, SecretView, TasksService, edit_error, invalid, parse_task_id};
-use crate::timeblock::{self, Blocked, CALENDAR_NAME, Remote, Step, SyncState, TimeBlock};
+use crate::service::{
+    Done, NoInput, SecretView, TasksService, edit_error, invalid, parse_task_id,
+};
+use crate::timeblock::{
+    self, Blocked, CALENDAR_NAME, Remote, Step, SyncState, TimeBlock,
+};
 
 /// Where Google sends the person back after consent.
 pub const CALLBACK: &str = "/connect/google/callback";
@@ -145,10 +149,17 @@ pub trait GoogleCalendar: Send + Sync + 'static {
 /// Where connections are kept.
 pub trait GoogleLinks: Send + Sync + 'static {
     /// A person's connection.
-    fn link(&self, user: UserId) -> BoxFuture<'_, Result<Option<GoogleLink>, Error>>;
+    fn link(
+        &self,
+        user: UserId,
+    ) -> BoxFuture<'_, Result<Option<GoogleLink>, Error>>;
 
     /// Stores (or with `None`, removes) a person's connection.
-    fn set_link(&self, user: UserId, link: Option<GoogleLink>) -> BoxFuture<'_, Result<(), Error>>;
+    fn set_link(
+        &self,
+        user: UserId,
+        link: Option<GoogleLink>,
+    ) -> BoxFuture<'_, Result<(), Error>>;
 
     /// Everyone connected, for the timer.
     fn linked(&self) -> BoxFuture<'_, Result<Vec<UserId>, Error>>;
@@ -192,8 +203,14 @@ impl Google {
         }
     }
 
-    fn remember(&self, state: String, pending: Pending, now: Timestamp) -> Result<(), Error> {
-        let poisoned = || Error::new(ErrorKind::Internal, "consent links lock poisoned");
+    fn remember(
+        &self,
+        state: String,
+        pending: Pending,
+        now: Timestamp,
+    ) -> Result<(), Error> {
+        let poisoned =
+            || Error::new(ErrorKind::Internal, "consent links lock poisoned");
         let mut map = self.pending.lock().map_err(|_| poisoned())?;
         map.retain(|_, p| p.expires > now);
         if map.len() >= MAX_PENDING
@@ -242,7 +259,8 @@ pub struct SyncView {
 }
 
 fn base64url(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+    const ALPHABET: &[u8; 64] =
+        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
     let mut out = String::new();
     for chunk in bytes.chunks(3) {
         let b = [
@@ -250,7 +268,8 @@ fn base64url(bytes: &[u8]) -> String {
             chunk.get(1).copied().unwrap_or(0),
             chunk.get(2).copied().unwrap_or(0),
         ];
-        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
+        let n =
+            (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
         let chars = chunk.len() + 1;
         for i in 0..chars {
             let index = (n >> (18 - 6 * i)) & 63;
@@ -266,7 +285,9 @@ fn base64url(bytes: &[u8]) -> String {
 fn encode(value: &str) -> String {
     let mut out = String::new();
     for byte in value.bytes() {
-        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b'~') {
+        if byte.is_ascii_alphanumeric()
+            || matches!(byte, b'-' | b'_' | b'.' | b'~')
+        {
             out.push(char::from(byte));
         } else {
             let _ = write!(out, "%{byte:02X}");
@@ -345,7 +366,11 @@ impl TasksService {
     /// # Errors
     ///
     /// Fails when the connection store does.
-    pub async fn google_status(&self, user: UserId, _input: NoInput) -> Result<GoogleView, Error> {
+    pub async fn google_status(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<GoogleView, Error> {
         let Some(google) = &self.google else {
             return Ok(GoogleView {
                 configured: false,
@@ -364,7 +389,11 @@ impl TasksService {
     ///
     /// `unavailable` when the server has no Google client.
     #[expect(clippy::unused_async, reason = "every operation handler is async")]
-    pub async fn google_connect(&self, user: UserId, _input: NoInput) -> Result<SecretView, Error> {
+    pub async fn google_connect(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<SecretView, Error> {
         let google = self.google()?;
         let state = random()?;
         let verifier = random()?;
@@ -406,18 +435,25 @@ impl TasksService {
     /// # Errors
     ///
     /// `unavailable` when the server has no Google client.
-    pub async fn google_disconnect(&self, user: UserId, _input: NoInput) -> Result<Done, Error> {
+    pub async fn google_disconnect(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<Done, Error> {
         let google = self.google()?;
         let Some(link) = google.links.link(user).await? else {
             return Ok(Done {});
         };
-        if let Err(error) = google.api.revoke(link.refresh_token.clone()).await {
+        if let Err(error) = google.api.revoke(link.refresh_token.clone()).await
+        {
             tracing::warn!(%error, "Google grant not revoked");
         }
         google.links.set_link(user, None).await?;
         let me = self.me(user).await?;
         for task in self.gather(user, &me.profile.handle).await? {
-            if task.fields.event.is_some() && matches!(task.source, Source::Checklist { .. }) {
+            if task.fields.event.is_some()
+                && matches!(task.source, Source::Checklist { .. })
+            {
                 self.set_fields(user, &task.source.key(), |f| f.event = None)
                     .await?;
             }
@@ -435,9 +471,9 @@ impl TasksService {
         let _ = self
             .edit(user, doc, |file| {
                 let list = Checklist::parse(&file.text);
-                let item = list
-                    .find(block)
-                    .ok_or_else(|| Error::new(ErrorKind::NotFound, "no such task"))?;
+                let item = list.find(block).ok_or_else(|| {
+                    Error::new(ErrorKind::NotFound, "no such task")
+                })?;
                 let mut fields = item.fields.clone();
                 change(&mut fields);
                 checklist::update(&file.text, block, &item.title, &fields)
@@ -455,7 +491,11 @@ impl TasksService {
     /// `unavailable` when the server has no Google client,
     /// `invalid_input` when the person has not connected, or a Google or
     /// workspace failure. Progress made before a failure is kept.
-    pub async fn google_sync(&self, user: UserId, _input: NoInput) -> Result<SyncView, Error> {
+    pub async fn google_sync(
+        &self,
+        user: UserId,
+        _input: NoInput,
+    ) -> Result<SyncView, Error> {
         let google = self.google()?;
         let mut link = google
             .links
@@ -573,7 +613,12 @@ impl TasksService {
                 block,
             } => {
                 let task = self.adopt(user, &event, &title, block).await?;
-                let body = timeblock::event_body(&task, block, zone, &self.task_link(&task.task));
+                let body = timeblock::event_body(
+                    &task,
+                    block,
+                    zone,
+                    &self.task_link(&task.task),
+                );
                 google
                     .api
                     .patch(grant, calendar, event.clone(), body)
@@ -585,21 +630,39 @@ impl TasksService {
                 let Some(block) = task.block else {
                     return Ok(());
                 };
-                let body = timeblock::event_body(&task, block, zone, &self.task_link(&task.task));
+                let body = timeblock::event_body(
+                    &task,
+                    block,
+                    zone,
+                    &self.task_link(&task.task),
+                );
                 let event = google.api.insert(grant, calendar, body).await?;
-                let _ = link.state.pushed.insert(event.clone(), task.fingerprint());
-                self.set_fields(user, &task.task, |f| f.event = Some(event.clone()))
-                    .await?;
+                let _ =
+                    link.state.pushed.insert(event.clone(), task.fingerprint());
+                self.set_fields(user, &task.task, |f| {
+                    f.event = Some(event.clone());
+                })
+                .await?;
                 view.created += 1;
             }
             Step::Patch { event, task } => {
                 let Some(block) = task.block else {
                     return Ok(());
                 };
-                let body = timeblock::event_body(&task, block, zone, &self.task_link(&task.task));
-                match google.api.patch(grant, calendar, event.clone(), body).await {
+                let body = timeblock::event_body(
+                    &task,
+                    block,
+                    zone,
+                    &self.task_link(&task.task),
+                );
+                match google
+                    .api
+                    .patch(grant, calendar, event.clone(), body)
+                    .await
+                {
                     Ok(()) => {
-                        let _ = link.state.pushed.insert(event, task.fingerprint());
+                        let _ =
+                            link.state.pushed.insert(event, task.fingerprint());
                         view.updated += 1;
                     }
                     Err(err) if err.kind() == ErrorKind::NotFound => {
@@ -661,7 +724,10 @@ impl TasksService {
 
     /// The consent callback: stores the connection, creates the calendar
     /// and runs the first sync, then sends the person back to My Work.
-    pub(crate) async fn google_callback(&self, request: &RawRequest) -> Result<RawResponse, Error> {
+    pub(crate) async fn google_callback(
+        &self,
+        request: &RawRequest,
+    ) -> Result<RawResponse, Error> {
         let back = |outcome: &str| {
             RawResponse::redirect(&format!(
                 "{}/my-work?google={outcome}",
@@ -669,7 +735,8 @@ impl TasksService {
             ))
         };
         if request.method != "GET" {
-            return Ok(RawResponse::text(405, "method not allowed").with_header("Allow", "GET"));
+            return Ok(RawResponse::text(405, "method not allowed")
+                .with_header("Allow", "GET"));
         }
         let google = self.google()?;
         let state = query_param(&request.query, "state").unwrap_or_default();
@@ -691,7 +758,11 @@ impl TasksService {
             None => {
                 google
                     .api
-                    .create_calendar(refresh_token.clone(), CALENDAR_NAME.to_owned(), zone)
+                    .create_calendar(
+                        refresh_token.clone(),
+                        CALENDAR_NAME.to_owned(),
+                        zone,
+                    )
                     .await?
             }
         };
@@ -726,7 +797,13 @@ impl TasksService {
         for user in google.links.linked().await? {
             match self.google_sync(user, NoInput {}).await {
                 Ok(_) => synced += 1,
-                Err(error) => tracing::warn!(%error, %user, "Google Calendar sync failed"),
+                Err(error) => {
+                    tracing::warn!(
+                        %error,
+                        %user,
+                        "Google Calendar sync failed"
+                    );
+                }
             }
         }
         Ok(synced)

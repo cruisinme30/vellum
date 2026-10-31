@@ -17,7 +17,8 @@ current="$(gh pr view "${PR}" --json labels --jq '.labels[].name')"
 replace_group() {
   local prefix="$1" wanted="$2" label
   while read -r label; do
-    if [[ -n "${label}" && "${label}" == "${prefix}"* && "${label}" != "${wanted}" ]]; then
+    if [[ -n "${label}" && "${label}" == "${prefix}"* \
+      && "${label}" != "${wanted}" ]]; then
       gh pr edit "${PR}" --remove-label "${label}"
     fi
   done <<<"${current}"
@@ -35,7 +36,9 @@ fi
 
 # Size from changed lines, excluding generated files.
 lines="$(gh pr view "${PR}" --json files --jq \
-  '[.files[] | select(.path | test("(^|/)(Cargo\\.lock|pnpm-lock\\.yaml)$|^LICENSES?/") | not)
+  '[.files[]
+     | select(.path
+       | test("(^|/)(Cargo\\.lock|pnpm-lock\\.yaml)$|^LICENSES?/") | not)
    | .additions + .deletions] | add // 0')"
 if ((lines < 50)); then size=xs
 elif ((lines < 200)); then size=s
@@ -54,7 +57,8 @@ missing=()
 grep -q '^type/' <<<"${labels}" || missing+=("type/*")
 grep -q '^area/' <<<"${labels}" || missing+=("area/*")
 if ((${#missing[@]} > 0)); then
-  echo "::error::Missing ${missing[*]} label(s). Fix the title, or add an area/* label by hand."
+  echo "::error::Missing ${missing[*]} label(s). Fix the title, or add an" \
+      "area/* label by hand."
   exit 1
 fi
 echo "Labels: $(tr '\n' ' ' <<<"${labels}")"

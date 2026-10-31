@@ -40,39 +40,61 @@ pub struct Snippet {
 pub fn snippets(base_url: &str) -> Vec<Snippet> {
     let mcp = format!("{}/mcp", base_url.trim_end_matches('/'));
     let stdio = json!({ "mcpServers": { "vellum": {
-        "command": "vellum", "args": ["mcp"], "env": { "VELLUM_TOKEN": "<paste your token>" }
+        "command": "vellum", "args": [
+            "mcp"
+        ], "env": { "VELLUM_TOKEN": "<paste your token>" }
     } } });
     vec![
         Snippet {
             client: "claude-desktop",
             title: "Claude Desktop",
-            instructions: format!("Settings → Connectors → Add custom connector, and enter {mcp}; Claude signs you in with OAuth. When Vellum runs on this computer, you can use stdio instead: add this to claude_desktop_config.json:"),
+            instructions: format!(
+                "Settings → Connectors → Add custom \
+                connector, and enter {mcp}; Claude signs you in with OAuth. \
+                When Vellum runs on this computer, you can use stdio instead: \
+                add this to claude_desktop_config.json:"
+            ),
             language: "json",
             code: serde_json::to_string_pretty(&stdio).unwrap_or_default(),
         },
         Snippet {
             client: "claude-code",
             title: "Claude Code",
-            instructions: "Run in a terminal. Claude Code opens the browser to sign in the first time.".into(),
+            instructions:
+                "Run in a terminal. Claude Code opens the browser to \
+                sign in the first time."
+                    .into(),
             language: "shell",
             code: format!("claude mcp add --transport http vellum {mcp}"),
         },
         Snippet {
             client: "cursor",
             title: "Cursor",
-            instructions: "Add to ~/.cursor/mcp.json (or .cursor/mcp.json in a project). Cursor signs you in with OAuth.".into(),
+            instructions:
+                "Add to ~/.cursor/mcp.json (or .cursor/mcp.json in a \
+                project). Cursor signs you in with OAuth."
+                    .into(),
             language: "json",
-            code: serde_json::to_string_pretty(&json!({ "mcpServers": { "vellum": { "url": mcp } } })).unwrap_or_default(),
+            code: serde_json::to_string_pretty(
+                &json!({ "mcpServers": { "vellum": { "url": mcp } } }),
+            )
+            .unwrap_or_default(),
         },
         Snippet {
             client: "generic",
             title: "Any MCP client",
-            instructions: "Streamable HTTP, protocol 2026-07-28 (2025-11-25 also accepted). OAuth 2.1: the server's Protected Resource Metadata names the authorization server. On the machine that runs Vellum, `vellum mcp` serves stdio with VELLUM_TOKEN set to an API token.".into(),
+            instructions: "Streamable HTTP, protocol 2026-07-28 (2025-11-25 \
+                also accepted). OAuth 2.1: the server's Protected Resource \
+                Metadata names the authorization server. On the machine that \
+                runs Vellum, `vellum mcp` serves stdio with VELLUM_TOKEN set \
+                to an API token."
+                .into(),
             language: "json",
             code: serde_json::to_string_pretty(&json!({
                 "url": mcp,
                 "transport": "streamable-http",
-                "protectedResourceMetadata": format!("{}/.well-known/oauth-protected-resource/mcp", base_url.trim_end_matches('/'))
+                "protectedResourceMetadata": format!("{}/.well-known/oauth-prot\
+                    ected-resource/mcp", base_url.trim_end_matches('/'))
             }))
             .unwrap_or_default(),
         },
@@ -116,7 +138,8 @@ async fn rpc(
     method: &str,
     params: Value,
 ) -> Result<Value, String> {
-    let msg = Incoming::from_value(request_body(id, method, params)).map_err(|(_, e)| e.message)?;
+    let msg = Incoming::from_value(request_body(id, method, params))
+        .map_err(|(_, e)| e.message)?;
     match state.server.handle(msg, ctx).await {
         Reply::Result { result, .. } => Ok(result),
         Reply::Error { error, .. } => Err(error.message),
@@ -126,25 +149,31 @@ async fn rpc(
 
 /// Runs the connection check for a bearer token, through the same code
 /// path a client uses.
-#[expect(
-    clippy::too_many_lines,
-    reason = "the checks run in sequence and stop at the first failure"
-)]
-pub async fn test_connection(state: &McpHttp, headers: &HeaderMap) -> ConnectionReport {
+pub async fn test_connection(
+    state: &McpHttp,
+    headers: &HeaderMap,
+) -> ConnectionReport {
     let mut checks = Vec::new();
     let principal = match state.authenticate(headers).await {
         Ok(p) => {
             checks.push(check(
                 "token",
                 true,
-                format!("Signed in as {} through {}.", p.user_name, p.client_name),
+                format!(
+                    "Signed in as {} through {}.",
+                    p.user_name, p.client_name
+                ),
             ));
             p
         }
         Err(e) => {
             let detail = e.map_or_else(
                 || "No token was sent.".to_owned(),
-                |e| format!("{e}. Create a new token in Settings → Connected apps."),
+                |e| {
+                    format!(
+                        "{e}. Create a new token in Settings → Connected apps."
+                    )
+                },
             );
             checks.push(check("token", false, detail));
             return ConnectionReport {
@@ -232,7 +261,8 @@ pub async fn test_connection(state: &McpHttp, headers: &HeaderMap) -> Connection
         checks.push(check(
             "read",
             false,
-            "The token lacks the read scope, so the client cannot search or read.",
+            "The token lacks the read scope, so the client cannot search or \
+                read.",
         ));
         return ConnectionReport {
             ok: false,
@@ -247,8 +277,11 @@ pub async fn test_connection(state: &McpHttp, headers: &HeaderMap) -> Connection
     }
 }
 
-pub(crate) async fn snippets_handler(State(state): State<Arc<McpHttp>>) -> Response {
-    axum::Json(json!({ "snippets": snippets(&state.config.resource.base_url) })).into_response()
+pub(crate) async fn snippets_handler(
+    State(state): State<Arc<McpHttp>>,
+) -> Response {
+    axum::Json(json!({ "snippets": snippets(&state.config.resource.base_url) }))
+        .into_response()
 }
 
 pub(crate) async fn test_connection_handler(

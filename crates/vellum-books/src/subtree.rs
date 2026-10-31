@@ -53,7 +53,10 @@ impl Subtree {
 
     /// Gives every section a fresh id and points id links inside the
     /// subtree at the new ids. Returns `old → new`.
-    pub fn reidentify(&mut self, ids: &mut dyn IdSource) -> BTreeMap<NodeId, NodeId> {
+    pub fn reidentify(
+        &mut self,
+        ids: &mut dyn IdSource,
+    ) -> BTreeMap<NodeId, NodeId> {
         let map: BTreeMap<NodeId, NodeId> = self
             .entries
             .keys()
@@ -65,7 +68,8 @@ impl Subtree {
             .collect();
         for (new, entry) in &self.entries {
             if let Some(text) = self.files.get_mut(&entry.path) {
-                let with_id = markdown::set_front_matter(text, "id", new.as_str());
+                let with_id =
+                    markdown::set_front_matter(text, "id", new.as_str());
                 *text = retarget_ids(&with_id, &map);
             }
         }
@@ -74,7 +78,10 @@ impl Subtree {
 }
 
 /// Rewrites `vellum://doc/<old>` links to `<new>` for every id in `map`.
-pub(crate) fn retarget_ids(text: &str, map: &BTreeMap<NodeId, NodeId>) -> String {
+pub(crate) fn retarget_ids(
+    text: &str,
+    map: &BTreeMap<NodeId, NodeId>,
+) -> String {
     markdown::map_links(text, |link, _| {
         let (id, fragment) = NodeId::from_uri(&link.dest)?;
         let new = map.get(&id)?;
@@ -110,7 +117,8 @@ impl Book {
             .chapter(&slot)
             .cloned()
             .ok_or_else(|| BookError::UnknownPosition(slot.to_string()))?;
-        let inside: BTreeSet<NodeId> = self.ids_under(&slot).into_iter().collect();
+        let inside: BTreeSet<NodeId> =
+            self.ids_under(&slot).into_iter().collect();
         let chapter_ids: BTreeMap<&str, &NodeId> = self
             .manifest
             .nodes
@@ -137,10 +145,15 @@ impl Book {
                 let (target, fragment) = split_fragment(&link.dest);
                 let resolved = path::resolve(&dir, target)?;
                 match chapter_ids.get(resolved.as_str()) {
-                    Some(target_id) if !inside.contains(*target_id) => Some(LinkEdit {
-                        dest: Some(with_fragment(&target_id.uri(), fragment)),
-                        ..LinkEdit::default()
-                    }),
+                    Some(target_id) if !inside.contains(*target_id) => {
+                        Some(LinkEdit {
+                            dest: Some(with_fragment(
+                                &target_id.uri(),
+                                fragment,
+                            )),
+                            ..LinkEdit::default()
+                        })
+                    }
                     Some(_) => None,
                     None => {
                         let _ = assets.insert(resolved);
@@ -213,10 +226,15 @@ impl Book {
     /// Returns an error when the place does not exist or is not allowed,
     /// when the subtree would nest deeper than `max_depth`, or when one of
     /// its ids is already in this book (copy with fresh ids instead).
-    pub fn graft(&mut self, mut subtree: Subtree, place: &Place) -> Result<Slot> {
+    pub fn graft(
+        &mut self,
+        mut subtree: Subtree,
+        place: &Place,
+    ) -> Result<Slot> {
         if let Some(id) = subtree.entries.keys().find(|id| self.contains(id)) {
             return Err(BookError::NotAllowed(format!(
-                "section {id} is already in this book; copy it with fresh ids instead"
+                "section {id} is already in this book; copy it with fresh ids \
+                    instead"
             )));
         }
         let dest = self.place(place)?;
@@ -242,7 +260,11 @@ impl Book {
             } else {
                 stem
             };
-            let temp = ops::unique("", &format!("{}.md", path::slugify(stem)), &taken)?;
+            let temp = ops::unique(
+                "",
+                &format!("{}.md", path::slugify(stem)),
+                &taken,
+            )?;
             let _ = taken.insert(temp.as_str().to_owned());
             let _ = parked.insert(source.clone(), temp);
         }
@@ -259,7 +281,13 @@ impl Book {
             let Some(temp) = parked.get(&source) else {
                 continue;
             };
-            let edits = ops::rewrite_relative(&text, source.dir(), "", &parked, &sources);
+            let edits = ops::rewrite_relative(
+                &text,
+                source.dir(),
+                "",
+                &parked,
+                &sources,
+            );
             let _ = self
                 .files
                 .insert(temp.clone(), markdown::apply(&text, edits));
@@ -295,7 +323,10 @@ impl Book {
     }
 }
 
-fn relocate_chapter(chapter: &mut Chapter, map: &BTreeMap<ChapterPath, ChapterPath>) {
+fn relocate_chapter(
+    chapter: &mut Chapter,
+    map: &BTreeMap<ChapterPath, ChapterPath>,
+) {
     if let Some(new) = chapter.location.as_ref().and_then(|p| map.get(p)) {
         chapter.location = Some(new.clone());
     }
@@ -452,10 +483,13 @@ mod tests {
             target.path_of(&id(5)).unwrap().as_str(),
             "on-call/architecture/services.md"
         );
-        // services linked to ../glossary.md, which stayed behind: now an id link.
+        // services linked to ../glossary.md, which stayed behind: now an id
+        // link.
         let services = target.text(&id(5)).unwrap();
         assert!(
-            services.contains("[the glossary](vellum://doc/01JBK0000000000000000000A6)"),
+            services.contains(
+                "[the glossary](vellum://doc/01JBK0000000000000000000A6)"
+            ),
             "{services}"
         );
         assert!(
@@ -485,10 +519,12 @@ mod tests {
         let new_week = transfer.ids.get(&id(3)).unwrap();
         assert!(target.contains(new_onboarding));
         assert_eq!(
-            markdown::front_matter(target.text(new_week).unwrap(), "id").as_deref(),
+            markdown::front_matter(target.text(new_week).unwrap(), "id")
+                .as_deref(),
             Some(new_week.as_str())
         );
-        // The week page linked to Services (outside the copy): still the original.
+        // The week page linked to Services (outside the copy): still the
+        // original.
         assert!(
             target
                 .text(new_week)
@@ -498,7 +534,10 @@ mod tests {
         // The source is untouched.
         assert_eq!(source, handbook());
         // The draft child came along.
-        assert_eq!(target.toc().find(new_onboarding).unwrap().children.len(), 2);
+        assert_eq!(
+            target.toc().find(new_onboarding).unwrap().children.len(),
+            2
+        );
     }
 
     #[test]

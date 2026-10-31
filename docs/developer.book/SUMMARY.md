@@ -30,3 +30,4 @@
 - [Contributing](contributing/README.md)
   - [Engineering standards](contributing/standards.md)
   - [Maintaining the help books](contributing/help-books.md)
+  - [Video storyboard](contributing/videos.md)

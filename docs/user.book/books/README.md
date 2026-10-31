@@ -13,14 +13,23 @@ numbers them and exports them as one document.
 
 ## Create a book {#create}
 
-1. Select **New → Book** and give it a title, such as "Engineering handbook".
-2. Add sections with **+** in the book's left navigation.
-3. Drag sections to reorder them, or onto another section to nest them.
+1. Select **New → Book**, or **New book** on the Books screen. Give it a
+   title, such as "Engineering handbook", choose the drive it goes in
+   (My Drive or a shared drive), and select **Create book**. The book
+   opens, empty.
+2. Select **Add the first section**, then add more with **Add section
+   after** or **Add subsection** above the section you are reading.
+3. Drag a section onto the top or bottom edge of another to put it
+   before or after, or onto its middle to nest it. From the keyboard,
+   press Alt+Shift with an arrow: up and down reorder, right nests under
+   the section above, left moves out.
 4. Select a section to write it like any other page.
 
-To turn an existing long page into a book, open **⋯ → Convert to book**.
-Vellum makes a section of every `##` heading. **⋯ → Merge into one page**
-turns a section and its children back into headings.
+**Headings to sections** makes a child section of every heading in the
+section; **Sections to headings** folds its children back in, and links
+to them now point at the headings. **Duplicate** copies a section with
+everything under it, and **Move to another book** moves or copies it
+into another book (a move keeps links working).
 
 ## A book is a folder
 
@@ -77,14 +86,15 @@ limit to six in **Book settings**.
 
 ## Section permissions {#permissions}
 
-A section inherits the book's access. In **Section settings** the book
-owner can narrow access to a section, name its owners and name the
-reviewers who must approve changes to it. Readers who cannot see a
+A section inherits the book's access. In **Section access** a book manager can
+narrow access to a section (as `user:` or `group:` IDs), name its owners and
+name the reviewers who must approve changes to it. Readers who cannot see a
 section see the rest of the book, numbered without it.
 
 ## History and snapshots {#history}
 
-Each section keeps its own history, and the book keeps a history of its
-order and structure. **⋯ → Take snapshot** names the whole book as it
-stands, such as "v1.0"; compare two snapshots to see every change
-across all sections.
+Each section keeps its own history, and **Outline history** keeps every
+change to the book's order and structure; **Restore this order** puts
+the sections back as they were. In **Snapshots**, **Take snapshot**
+names the whole book as it stands, such as "v1.0"; **Compare** shows
+every change between two snapshots, or between one and the book now.

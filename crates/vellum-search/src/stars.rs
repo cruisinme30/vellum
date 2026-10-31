@@ -17,8 +17,8 @@ use vellum_kernel::{DocId, UserId};
 use crate::access::Stars;
 use crate::error::{Result, SearchError};
 
-const STARRED: &str =
-    "SELECT doc_id FROM user_doc_state WHERE user_id = $1 AND starred_at IS NOT NULL";
+const STARRED: &str = "SELECT doc_id FROM user_doc_state WHERE user_id = $1 \
+    AND starred_at IS NOT NULL";
 
 fn failed(error: &sqlx::Error) -> SearchError {
     SearchError::Source(format!("could not read stars: {error}"))
@@ -43,7 +43,11 @@ impl Stars for Index {
             )
             .await
             .map_err(|e| failed(&e))?,
-            _ => return Err(SearchError::Source("unsupported index backend".into())),
+            _ => {
+                return Err(SearchError::Source(
+                    "unsupported index backend".into(),
+                ));
+            }
         };
         Ok(rows
             .into_iter()
@@ -63,8 +67,8 @@ mod tests {
             panic!("expected SQLite");
         };
         let _ = sqlx::query(
-            "INSERT INTO user_doc_state (space_id, user_id, doc_id, starred_at) \
-             VALUES ($1, $2, $3, $4)",
+            "INSERT INTO user_doc_state (space_id, user_id, doc_id, \
+             starred_at) VALUES ($1, $2, $3, $4)",
         )
         .bind(Uuid::from_u128(1))
         .bind(Uuid::from_u128(user.as_u128()))
@@ -78,9 +82,12 @@ mod tests {
     #[tokio::test]
     async fn reads_only_the_users_current_stars() {
         let dir = tempfile::tempdir().unwrap();
-        let index = Index::open(&IndexConfig::sqlite(dir.path().join("index.db"), None))
-            .await
-            .unwrap();
+        let index = Index::open(&IndexConfig::sqlite(
+            dir.path().join("index.db"),
+            None,
+        ))
+        .await
+        .unwrap();
         let (ada, grace) = (UserId::from_u128(0x30), UserId::from_u128(0x31));
         let (runbook, budget, issue) = (
             DocId::from_u128(0x40),
@@ -92,7 +99,10 @@ mod tests {
         star(&index, grace, budget, Some(2)).await;
 
         assert_eq!(index.starred(ada).await.unwrap(), HashSet::from([runbook]));
-        assert_eq!(index.starred(grace).await.unwrap(), HashSet::from([budget]));
+        assert_eq!(
+            index.starred(grace).await.unwrap(),
+            HashSet::from([budget])
+        );
         assert!(
             index
                 .starred(UserId::from_u128(0x99))

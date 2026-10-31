@@ -137,7 +137,10 @@ pub fn parse(yaml: &str, diagnostics: &mut Vec<Diagnostic>) -> FrontMatter {
     if yaml.trim().is_empty() {
         return FrontMatter::Fields(Map::new());
     }
-    let value = match serde_saphyr::from_str_with_options::<Value>(yaml, yaml_options()) {
+    let value = match serde_saphyr::from_str_with_options::<Value>(
+        yaml,
+        yaml_options(),
+    ) {
         Ok(value) => value,
         Err(error) => {
             // The YAML starts on line 2 of the file, after the `---` line.
@@ -260,7 +263,9 @@ pub fn write(front_matter: &FrontMatter, out: &mut String) {
         FrontMatter::Fields(map) => match serde_saphyr::to_string(map) {
             Ok(yaml) => out.push_str(&yaml),
             // A parsed mapping always serializes; keep the file valid anyway.
-            Err(error) => tracing::error!(%error, "front matter could not be written"),
+            Err(error) => {
+                tracing::error!(%error, "front matter could not be written");
+            }
         },
         FrontMatter::Raw(raw) => {
             out.push_str(raw);
@@ -276,8 +281,10 @@ pub fn write(front_matter: &FrontMatter, out: &mut String) {
 mod tests {
     use super::*;
 
-    const PAGE: &str = "---\nvellum: 1\ntags: [launch, q4]\ntitle: Northstar launch plan\n\
-                        id: 01JB7Z3K8Q4W5N6P7R8S9T0V1X\nreviewer: priya\nstatus: in-review\n---\n# Body\n";
+    const PAGE: &str = "---\nvellum: 1\ntags: [launch, q4]\n\
+                        title: Northstar launch plan\n\
+                        id: 01JB7Z3K8Q4W5N6P7R8S9T0V1X\nreviewer: priya\n\
+                        status: in-review\n---\n# Body\n";
 
     #[test]
     fn splits_and_orders_known_keys_first() {
@@ -295,8 +302,9 @@ mod tests {
         write(&fm, &mut out);
         assert_eq!(
             out,
-            "---\nid: 01JB7Z3K8Q4W5N6P7R8S9T0V1X\ntitle: Northstar launch plan\nstatus: in-review\n\
-             tags:\n- launch\n- q4\nvellum: 1\nreviewer: priya\n---\n"
+            "---\nid: 01JB7Z3K8Q4W5N6P7R8S9T0V1X\n\
+             title: Northstar launch plan\nstatus: in-review\ntags:\n- launch\n\
+             - q4\nvellum: 1\nreviewer: priya\n---\n"
         );
     }
 

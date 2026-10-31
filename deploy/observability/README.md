@@ -6,17 +6,17 @@ SPDX-License-Identifier: AGPL-3.0-only
 # Observability
 
 Vellum explains itself without any of this: Admin → Requests shows the last
-10,000 requests as waterfalls, Admin → Routes shows rate, errors and
-latency per route against its budget, and `vellum profile` draws a flame
-graph. This folder is for running Vellum next to a metrics and tracing
-stack. Decision record: ADR 0021.
+10,000 requests as waterfalls, Admin → Routes shows rate, errors and latency per
+route against its budget, Admin → Usage counts people, pages, storage and
+activity, and `vellum profile` draws a flame graph. This folder is for running
+Vellum next to a metrics and tracing stack. Decision record: ADR 0021.
 
 | File | What it does |
 | --- | --- |
 | `otel-collector.yaml` | Receives OTLP from Vellum, exposes metrics to Prometheus and forwards traces and logs. |
 | `prometheus/scrape.yaml` | Scrapes the collector and loads the rules. |
 | `prometheus/rules.yaml` | RED recording rules, SLO burn-rate alerts, route budget and backup alerts. |
-| `grafana/dashboards/` | RED and saturation per route, SLOs and error budgets, browser experience. |
+| `grafana/dashboards/` | RED and saturation per route, SLOs and error budgets, browser experience, and usage (people, content, storage, activity, live editing, blob store). |
 | `grafana/provisioning/` | Loads the dashboards and the Prometheus data source. |
 
 ## Connect Vellum

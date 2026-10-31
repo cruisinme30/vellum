@@ -4,7 +4,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { ClientReport } from "./client-telemetry";
-import { startClientTelemetry, type TelemetryEnvironment } from "./client-telemetry-start";
+import {
+  startClientTelemetry,
+  type TelemetryEnvironment,
+} from "./client-telemetry-start";
 
 const TP = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
 
@@ -25,7 +28,8 @@ function environment(withObserver: boolean) {
   }
   const document = {
     visibilityState: "visible" as DocumentVisibilityState,
-    addEventListener: (name: string, listener: () => void) => listeners.set(name, listener),
+    addEventListener: (name: string, listener: () => void) =>
+      listeners.set(name, listener),
     removeEventListener: (name: string) => listeners.delete(name),
   };
   const telemetryEnvironment = {
@@ -44,7 +48,9 @@ function environment(withObserver: boolean) {
     },
     location: { pathname: "/home" },
     document,
-    Observer: withObserver ? (FakeObserver as unknown as typeof PerformanceObserver) : undefined,
+    Observer: withObserver
+      ? (FakeObserver as unknown as typeof PerformanceObserver)
+      : undefined,
     send: (r: ClientReport) => {
       sent.push(r);
       return Promise.resolve(true);
@@ -84,7 +90,13 @@ describe("startClientTelemetry", () => {
             initiatorType: "fetch",
             serverTiming: [{ name: "traceparent", description: TP }],
           },
-          { name: "/api/v1/y", startTime: 1, requestStart: 2, duration: 5, initiatorType: "fetch" },
+          {
+            name: "/api/v1/y",
+            startTime: 1,
+            requestStart: 2,
+            duration: 5,
+            initiatorType: "fetch",
+          },
         ],
       } as unknown as PerformanceObserverEntryList,
       {} as PerformanceObserver,
@@ -109,7 +121,10 @@ describe("startClientTelemetry", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response(undefined, { status: 202 }));
     const { env, listeners, document } = environment(false);
-    const withoutSend = { ...env, send: undefined } as unknown as TelemetryEnvironment;
+    const withoutSend = {
+      ...env,
+      send: undefined,
+    } as unknown as TelemetryEnvironment;
     startClientTelemetry(withoutSend);
     document.visibilityState = "hidden";
     listeners.get("visibilitychange")?.();

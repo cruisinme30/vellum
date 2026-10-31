@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-sealed-store"
-description = "A BlobStore decorator that seals every object with envelope encryption, with plaintext spaces as an explicit opt-out."
+description = """\
+    A BlobStore decorator that seals every object with envelope encryption, \
+    with plaintext spaces as an explicit opt-out."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -12,14 +12,29 @@ import * as Y from "yjs";
 import type { CollabConnector, CollabSession, UpdateCache } from "./provider";
 
 type Message =
-  | { readonly kind: "hello"; readonly from: number; readonly vector: Uint8Array }
-  | { readonly kind: "update"; readonly from: number; readonly update: Uint8Array }
-  | { readonly kind: "awareness"; readonly from: number; readonly update: Uint8Array };
+  | {
+      readonly kind: "hello";
+      readonly from: number;
+      readonly vector: Uint8Array;
+    }
+  | {
+      readonly kind: "update";
+      readonly from: number;
+      readonly update: Uint8Array;
+    }
+  | {
+      readonly kind: "awareness";
+      readonly from: number;
+      readonly update: Uint8Array;
+    };
 
 /** A broadcast channel, injectable for tests. */
 export type ChannelFactory = (
   name: string,
-) => Pick<BroadcastChannel, "postMessage" | "close" | "addEventListener" | "removeEventListener">;
+) => Pick<
+  BroadcastChannel,
+  "postMessage" | "close" | "addEventListener" | "removeEventListener"
+>;
 
 const REMOTE = Symbol("remote");
 
@@ -35,7 +50,8 @@ const isMessage = (data: unknown): data is Message =>
 export function createLocalConnector(
   options: { cache?: UpdateCache; channel?: ChannelFactory } = {},
 ): CollabConnector {
-  const channelFor: ChannelFactory = options.channel ?? ((name) => new BroadcastChannel(name));
+  const channelFor: ChannelFactory =
+    options.channel ?? ((name) => new BroadcastChannel(name));
 
   return {
     open(documentId): CollabSession {
@@ -84,7 +100,11 @@ export function createLocalConnector(
         }
       };
       const onAwareness = (
-        { added, updated, removed }: Record<"added" | "updated" | "removed", number[]>,
+        {
+          added,
+          updated,
+          removed,
+        }: Record<"added" | "updated" | "removed", number[]>,
         origin: unknown,
       ) => {
         if (origin !== REMOTE) {
@@ -110,7 +130,11 @@ export function createLocalConnector(
         );
         document_.on("update", onUpdate);
         awareness.on("update", onAwareness);
-        send({ kind: "hello", from: document_.clientID, vector: Y.encodeStateVector(document_) });
+        send({
+          kind: "hello",
+          from: document_.clientID,
+          vector: Y.encodeStateVector(document_),
+        });
       })();
 
       return {

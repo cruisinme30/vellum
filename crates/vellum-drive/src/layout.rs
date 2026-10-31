@@ -11,6 +11,7 @@
 //!   .vellum-folder.yaml                 folder (or space) id, icon, settings
 //!   Title.md                            a page
 //!   Title/                              the pages nested under it (D168)
+//!   Title/.attachments/                 the files uploaded to it (D211)
 //!   .vellum-order.yaml                  the order of a container's items (D169)
 //!   Name/                               a folder
 //!   Name.book/book.yaml                 a book
@@ -32,6 +33,8 @@ pub const FOLDER_FILE: &str = ".vellum-folder.yaml";
 pub const ORDER_FILE: &str = ".vellum-order.yaml";
 /// The manifest inside a book folder.
 pub const BOOK_FILE: &str = "book.yaml";
+/// The table of contents inside a book folder.
+pub const BOOK_SUMMARY_FILE: &str = "SUMMARY.md";
 /// The schema inside a collection folder.
 pub const COLLECTION_FILE: &str = "schema.yaml";
 /// File name of a trash entry's manifest.
@@ -138,7 +141,10 @@ pub fn versions_dir(doc: ObjectId) -> DriveResult<BlobPath> {
 ///
 /// # Errors
 /// Never fails for valid IDs; the result is propagated for uniformity.
-pub fn version_paths(doc: ObjectId, version: VersionId) -> DriveResult<(BlobPath, BlobPath)> {
+pub fn version_paths(
+    doc: ObjectId,
+    version: VersionId,
+) -> DriveResult<(BlobPath, BlobPath)> {
     let dir = versions_dir(doc)?;
     Ok((
         dir.join(&format!("{version}.md"))?,
@@ -186,6 +192,9 @@ pub fn file_name(kind: NodeKind, title: &str, counter: u32) -> String {
 /// the path of the file that carries its ID.
 #[must_use]
 pub fn classify(path: &BlobPath) -> Option<(NodeKind, BlobPath)> {
+    if vellum_store::layout::in_attachments(path) {
+        return None;
+    }
     let name = path.file_name();
     let dir = path.parent();
     if name == FOLDER_FILE {
@@ -196,7 +205,9 @@ pub fn classify(path: &BlobPath) -> Option<(NodeKind, BlobPath)> {
         if name == BOOK_FILE && dir_name.ends_with(NodeKind::Book.suffix()) {
             return Some((NodeKind::Book, dir.clone()));
         }
-        if name == COLLECTION_FILE && dir_name.ends_with(NodeKind::Collection.suffix()) {
+        if name == COLLECTION_FILE
+            && dir_name.ends_with(NodeKind::Collection.suffix())
+        {
             return Some((NodeKind::Collection, dir.clone()));
         }
     }
@@ -244,7 +255,11 @@ pub fn title_from_path(kind: NodeKind, path: &BlobPath) -> String {
 ///
 /// # Errors
 /// Fails if `path` is not under `from` or the result is invalid.
-pub fn rebase(path: &BlobPath, from: &BlobPath, to: &BlobPath) -> DriveResult<BlobPath> {
+pub fn rebase(
+    path: &BlobPath,
+    from: &BlobPath,
+    to: &BlobPath,
+) -> DriveResult<BlobPath> {
     if path == from {
         return Ok(to.clone());
     }
@@ -252,7 +267,9 @@ pub fn rebase(path: &BlobPath, from: &BlobPath, to: &BlobPath) -> DriveResult<Bl
         .as_str()
         .strip_prefix(from.as_str())
         .and_then(|r| r.strip_prefix('/'))
-        .ok_or_else(|| DriveError::Invalid(format!("{path} is not under {from}")))?;
+        .ok_or_else(|| {
+            DriveError::Invalid(format!("{path} is not under {from}"))
+        })?;
     Ok(to.join(rest)?)
 }
 
@@ -355,8 +372,8 @@ mod tests {
 
     #[test]
     fn space_roots_round_trip() {
-        let root =
-            space_root(SpaceKind::SharedDrive, "eng").unwrap_or_else(|e| unreachable!("{e}"));
+        let root = space_root(SpaceKind::SharedDrive, "eng")
+            .unwrap_or_else(|e| unreachable!("{e}"));
         assert_eq!(root.as_str(), "drives/shared/eng");
         assert_eq!(
             parse_space_root(&root),
@@ -380,6 +397,7 @@ mod tests {
         assert_eq!(page_dir(&p("d/Plan.md")), Some(p("d/Plan")));
         assert_eq!(page_dir(&p("Plan.MD")), Some(p("Plan")));
         assert_eq!(page_dir(&p("d/F")), None);
+        assert_eq!(classify(&p("d/Plan/.attachments/notes.md")), None);
         let (from, to) = (p("d/Plan.md"), p("e/Goal.md"));
         assert_eq!(
             rebase_member(NodeKind::Page, &p("d/Plan/a/b.md"), &from, &to).ok(),
@@ -389,8 +407,14 @@ mod tests {
             rebase_member(NodeKind::Page, &from, &from, &to).ok(),
             Some(to.clone())
         );
-        assert!(rebase_member(NodeKind::Page, &p("d/Other/x.md"), &from, &to).is_err());
-        assert!(rebase_member(NodeKind::Folder, &p("d/Plan/x.md"), &from, &to).is_err());
+        assert!(
+            rebase_member(NodeKind::Page, &p("d/Other/x.md"), &from, &to)
+                .is_err()
+        );
+        assert!(
+            rebase_member(NodeKind::Folder, &p("d/Plan/x.md"), &from, &to)
+                .is_err()
+        );
     }
 
     #[test]

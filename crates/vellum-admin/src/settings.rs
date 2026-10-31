@@ -74,7 +74,8 @@ impl Default for ObservabilitySettings {
     fn default() -> Self {
         Self {
             trace_buffer_capacity: vellum_observe::store::DEFAULT_CAPACITY,
-            trace_buffer_mib: vellum_observe::store::DEFAULT_BYTE_BUDGET / (1024 * 1024),
+            trace_buffer_mib: vellum_observe::store::DEFAULT_BYTE_BUDGET
+                / (1024 * 1024),
             slow_request_ms: 1000,
             budgets: vellum_observe::Budgets::default(),
         }
@@ -118,6 +119,12 @@ pub struct SecuritySettings {
     pub fresh_auth_minutes: u32,
     /// Session lifetime in hours.
     pub session_hours: u32,
+    /// What a page save containing a likely secret does (R-SE-6, D296).
+    pub secret_scanning: SecretScanning,
+    /// Exceptions to secret scanning: a rule id (such as `jwt`) skips that
+    /// kind of secret, anything else skips secrets containing that text
+    /// (a documented example key, say).
+    pub secret_allow: Vec<String>,
 }
 
 impl Default for SecuritySettings {
@@ -125,6 +132,127 @@ impl Default for SecuritySettings {
         Self {
             fresh_auth_minutes: 5,
             session_hours: 336,
+            secret_scanning: SecretScanning::default(),
+            secret_allow: Vec::new(),
+        }
+    }
+}
+
+impl SecuritySettings {
+    /// Checks the secret-scanning allow-list.
+    fn allow_problems(&self, problems: &mut Vec<String>) {
+        let bad = |entry: &String| {
+            let entry = entry.trim();
+            entry.len() < 3
+                || entry.len() > 200
+                || entry.chars().any(char::is_control)
+        };
+        if self.secret_allow.len() > MAX_SECRET_ALLOW
+            || self.secret_allow.iter().any(bad)
+        {
+            problems.push(format!(
+                "security.secret_allow takes at most {MAX_SECRET_ALLOW} \
+                    entries of 3 to 200 printable characters"
+            ));
+        }
+    }
+}
+
+/// Secret scanning on save (R-SE-6, D296).
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Default,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum SecretScanning {
+    /// Pages are not scanned.
+    Off,
+    /// The save goes through; the editor warns and the finding is audited.
+    #[default]
+    Warn,
+    /// The save is refused until the secret is removed.
+    Block,
+}
+
+/// Most entries in the secret-scanning allow-list.
+pub const MAX_SECRET_ALLOW: usize = 100;
+
+/// Search (R-AI-7, R-SR-5; ADR 0011 D300).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct SearchSettings {
+    /// Ranks results with the local embedding model as well as keywords,
+    /// when the server has one (`VELLUM_EMBEDDINGS`). Off, search is
+    /// keyword-only; pages keep getting vectors, so turning it on again
+    /// takes effect at once.
+    pub hybrid: bool,
+}
+
+impl Default for SearchSettings {
+    fn default() -> Self {
+        Self { hybrid: true }
+    }
+}
+
+/// The organisation's look (R-TH-1, R-TH-4; ADR 0007 D245).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(default, deny_unknown_fields)]
+pub struct AppearanceSettings {
+    /// The seed colour every built-in theme is derived from, `#rrggbb`.
+    /// People can still pick their own accent in the app.
+    pub seed: String,
+    /// The theme exports (PDF, HTML, Word) use: a light theme, since
+    /// paper is white.
+    pub export_theme: String,
+    /// The theme of published sites; `auto` follows the reader's system
+    /// light or dark setting.
+    pub site_theme: String,
+}
+
+/// The theme ids exports may use.
+pub const EXPORT_THEMES: [&str; 3] = ["light", "high-contrast", "sepia"];
+/// The theme ids published sites may use.
+pub const SITE_THEMES: [&str; 6] =
+    ["auto", "light", "dark", "high-contrast", "sepia", "dim"];
+
+impl Default for AppearanceSettings {
+    fn default() -> Self {
+        Self {
+            seed: "#4f5b92".to_owned(),
+            export_theme: "light".to_owned(),
+            site_theme: "auto".to_owned(),
+        }
+    }
+}
+
+impl AppearanceSettings {
+    fn problems(&self, problems: &mut Vec<String>) {
+        let seed = self.seed.as_bytes();
+        if seed.len() != 7
+            || seed.first() != Some(&b'#')
+            || !seed.iter().skip(1).all(u8::is_ascii_hexdigit)
+        {
+            problems
+                .push("appearance.seed must be a #rrggbb colour".to_owned());
+        }
+        if !EXPORT_THEMES.contains(&self.export_theme.as_str()) {
+            problems.push(format!(
+                "appearance.export_theme must be one of {}",
+                EXPORT_THEMES.join(", ")
+            ));
+        }
+        if !SITE_THEMES.contains(&self.site_theme.as_str()) {
+            problems.push(format!(
+                "appearance.site_theme must be one of {}",
+                SITE_THEMES.join(", ")
+            ));
         }
     }
 }
@@ -143,6 +271,10 @@ pub struct AdminSettings {
     pub backups: BackupSettings,
     /// Admin-session security.
     pub security: SecuritySettings,
+    /// The organisation's seed colour and export and site themes.
+    pub appearance: AppearanceSettings,
+    /// Hybrid ranking.
+    pub search: SearchSettings,
 }
 
 impl Default for AdminSettings {
@@ -153,6 +285,8 @@ impl Default for AdminSettings {
             observability: ObservabilitySettings::default(),
             backups: BackupSettings::default(),
             security: SecuritySettings::default(),
+            appearance: AppearanceSettings::default(),
+            search: SearchSettings::default(),
         }
     }
 }
@@ -178,19 +312,34 @@ impl AdminSettings {
     pub fn validate(&self) -> Result<()> {
         let mut problems = Vec::new();
         let name = self.organisation.trim();
-        if name.is_empty() || name.chars().count() > 100 || name.chars().any(char::is_control) {
-            problems.push("organisation must be 1 to 100 printable characters".to_owned());
+        if name.is_empty()
+            || name.chars().count() > 100
+            || name.chars().any(char::is_control)
+        {
+            problems.push(
+                "organisation must be 1 to 100 printable characters".to_owned(),
+            );
         }
         let t = &self.telemetry;
-        if t.install_id.len() != 32 || !t.install_id.bytes().all(|b| b.is_ascii_hexdigit()) {
-            problems.push("telemetry.install_id must be 32 hex digits".to_owned());
+        if t.install_id.len() != 32
+            || !t.install_id.bytes().all(|b| b.is_ascii_hexdigit())
+        {
+            problems
+                .push("telemetry.install_id must be 32 hex digits".to_owned());
         }
         match (&t.endpoint, t.enabled) {
-            (Some(url), _) if !url.starts_with("https://") || url.len() > 2048 => {
-                problems.push("telemetry.endpoint must be an https:// URL".to_owned());
+            (Some(url), _)
+                if !url.starts_with("https://") || url.len() > 2048 =>
+            {
+                problems.push(
+                    "telemetry.endpoint must be an https:// URL".to_owned(),
+                );
             }
             (None, true) => {
-                problems.push("telemetry.endpoint is required to enable telemetry".to_owned());
+                problems.push(
+                    "telemetry.endpoint is required to enable telemetry"
+                        .to_owned(),
+                );
             }
             _ => {}
         }
@@ -245,8 +394,12 @@ impl AdminSettings {
             1,
             31,
         );
-        if b.destination.trim().is_empty() || b.destination.split(['/', '\\']).any(|p| p == "..") {
-            problems.push("backups.destination must be a path without '..'".to_owned());
+        if b.destination.trim().is_empty()
+            || b.destination.split(['/', '\\']).any(|p| p == "..")
+        {
+            problems.push(
+                "backups.destination must be a path without '..'".to_owned(),
+            );
         }
         let s = &self.security;
         check(
@@ -263,6 +416,8 @@ impl AdminSettings {
             1,
             720,
         );
+        s.allow_problems(&mut problems);
+        self.appearance.problems(&mut problems);
         if problems.is_empty() {
             Ok(())
         } else {
@@ -282,7 +437,11 @@ pub struct FieldChange {
     pub to: serde_json::Value,
 }
 
-fn flatten(prefix: &str, value: &serde_json::Value, out: &mut BTreeMap<String, serde_json::Value>) {
+fn flatten(
+    prefix: &str,
+    value: &serde_json::Value,
+    out: &mut BTreeMap<String, serde_json::Value>,
+) {
     if let serde_json::Value::Object(map) = value {
         for (k, v) in map {
             let path = if prefix.is_empty() {
@@ -328,13 +487,20 @@ pub trait SettingsStore: Send + Sync {
     async fn load(&self) -> Result<Versioned>;
     /// Saves `settings` if the stored version is still `expected_version`;
     /// returns the new version.
-    async fn save(&self, expected_version: u64, settings: &AdminSettings) -> Result<u64>;
+    async fn save(
+        &self,
+        expected_version: u64,
+        settings: &AdminSettings,
+    ) -> Result<u64>;
 }
 
 fn conflict(expected: u64, actual: u64) -> Error {
     Error::new(
         ErrorKind::Conflict,
-        format!("settings changed since version {expected} (now {actual}); reload and retry"),
+        format!(
+            "settings changed since version {expected} (now {actual}); reload \
+                and retry"
+        ),
     )
 }
 
@@ -358,7 +524,11 @@ impl SettingsStore for MemorySettingsStore {
             }))
     }
 
-    async fn save(&self, expected_version: u64, settings: &AdminSettings) -> Result<u64> {
+    async fn save(
+        &self,
+        expected_version: u64,
+        settings: &AdminSettings,
+    ) -> Result<u64> {
         settings.validate()?;
         let mut current = self.current.lock().await;
         let actual = current.as_ref().map_or(0, |v| v.version);
@@ -394,7 +564,11 @@ impl FileSettingsStore {
     async fn read(&self) -> Result<Versioned> {
         match tokio::fs::read(&self.path).await {
             Ok(bytes) => serde_json::from_slice(&bytes).map_err(|e| {
-                Error::new(ErrorKind::Internal, "the settings file is not valid").with_source(e)
+                Error::new(
+                    ErrorKind::Internal,
+                    "the settings file is not valid",
+                )
+                .with_source(e)
             }),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 // First start: persist fresh defaults so the install id stays
@@ -406,9 +580,11 @@ impl FileSettingsStore {
                 self.write(&fresh).await?;
                 Ok(fresh)
             }
-            Err(e) => Err(
-                Error::new(ErrorKind::Unavailable, "cannot read the settings file").with_source(e),
-            ),
+            Err(e) => Err(Error::new(
+                ErrorKind::Unavailable,
+                "cannot read the settings file",
+            )
+            .with_source(e)),
         }
     }
 
@@ -423,7 +599,8 @@ impl FileSettingsStore {
             })?;
         }
         let bytes = serde_json::to_vec_pretty(v).map_err(|e| {
-            Error::new(ErrorKind::Internal, "cannot encode settings").with_source(e)
+            Error::new(ErrorKind::Internal, "cannot encode settings")
+                .with_source(e)
         })?;
         crate::fsutil::write_atomic(&self.path, &bytes).await
     }
@@ -436,7 +613,11 @@ impl SettingsStore for FileSettingsStore {
         self.read().await
     }
 
-    async fn save(&self, expected_version: u64, settings: &AdminSettings) -> Result<u64> {
+    async fn save(
+        &self,
+        expected_version: u64,
+        settings: &AdminSettings,
+    ) -> Result<u64> {
         settings.validate()?;
         let _guard = self.lock.lock().await;
         let current = self.read().await?;
@@ -461,6 +642,10 @@ mod tests {
         let s = AdminSettings::default();
         s.validate().unwrap();
         assert!(!s.telemetry.enabled);
+        assert!(s.search.hybrid, "hybrid ranking is on when a model is set");
+        let old: AdminSettings =
+            serde_json::from_str(r#"{"organisation":"Northstar"}"#).unwrap();
+        assert!(old.search.hybrid, "settings saved before D300 keep it on");
         assert_ne!(new_install_id(), new_install_id());
     }
 
@@ -494,6 +679,68 @@ mod tests {
         let mut http = AdminSettings::default();
         http.telemetry.endpoint = Some("http://insecure".into());
         assert!(http.validate().unwrap_err().message().contains("https://"));
+    }
+
+    #[test]
+    fn secret_scanning_warns_by_default_and_its_allow_list_is_bounded() {
+        let s = AdminSettings::default();
+        assert_eq!(s.security.secret_scanning, SecretScanning::Warn);
+        // Settings saved before the field existed read as the default.
+        let old: SecuritySettings = serde_json::from_str(
+            r#"{"fresh_auth_minutes": 5, "session_hours": 336}"#,
+        )
+        .unwrap();
+        assert_eq!(old.secret_scanning, SecretScanning::Warn);
+        let block: SecuritySettings = serde_json::from_str(
+            r#"{"secret_scanning": "block", "secret_allow": ["jwt"]}"#,
+        )
+        .unwrap();
+        assert_eq!(block.secret_scanning, SecretScanning::Block);
+        let mut bad = AdminSettings::default();
+        bad.security.secret_allow = vec!["x".into()];
+        assert!(
+            bad.validate()
+                .unwrap_err()
+                .message()
+                .contains("secret_allow")
+        );
+        bad.security.secret_allow = vec!["jwt".into(); MAX_SECRET_ALLOW + 1];
+        assert!(bad.validate().is_err());
+        bad.security.secret_allow =
+            vec!["jwt".into(), "AKIAIOSFODNN7EXAMPLE".into()];
+        bad.validate().unwrap();
+    }
+
+    #[test]
+    fn appearance_is_checked() {
+        let mut s = AdminSettings::default();
+        s.appearance.seed = "#ABCDEF".into();
+        s.appearance.export_theme = "sepia".into();
+        s.appearance.site_theme = "dim".into();
+        s.validate().unwrap();
+        for (seed, export, site, needle) in [
+            ("red", "light", "auto", "appearance.seed"),
+            ("#12345", "light", "auto", "appearance.seed"),
+            ("#12345g", "light", "auto", "appearance.seed"),
+            ("#123456", "dark", "auto", "export_theme"),
+            ("#123456", "light", "neon", "site_theme"),
+        ] {
+            s.appearance = AppearanceSettings {
+                seed: seed.into(),
+                export_theme: export.into(),
+                site_theme: site.into(),
+            };
+            let err = s.validate().unwrap_err();
+            assert!(
+                err.message().contains(needle),
+                "{needle}: {}",
+                err.message()
+            );
+        }
+        // Settings saved before appearance existed still load.
+        let old: AdminSettings =
+            serde_json::from_str(r#"{"organisation":"Northstar"}"#).unwrap();
+        assert_eq!(old.appearance, AppearanceSettings::default());
     }
 
     #[test]

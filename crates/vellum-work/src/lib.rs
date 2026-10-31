@@ -37,6 +37,7 @@ pub mod label;
 pub mod mention;
 pub mod my_issues;
 pub mod project;
+pub mod recur;
 pub mod scale;
 pub mod sla;
 pub mod suggest;
@@ -47,17 +48,24 @@ pub mod triage;
 pub mod view;
 pub mod workflow;
 
-pub use comment::{BlockRef, Comment, CommentChanges, Comments, NewComment, Target, Thread};
+pub use comment::{
+    BlockRef, Comment, CommentChanges, Comments, Mention, NewComment, Target,
+    Thread,
+};
 pub use cycle::{Cycle, CycleKey, CycleSettings};
 pub use doclink::{BackLink, IssueEmbed};
 pub use error::{Result, WorkError};
 pub use event::{IssueSnapshot, WorkEvent};
 pub use filter::{Condition, Field, Filter, Op};
 pub use graph::{Changes, Ctx, IssuePatch, NewIssue, WorkGraph};
-pub use id::{InitiativeId, IssueId, MilestoneId, ProjectId, TeamId, UpdateId, UserRef, ViewId};
+pub use id::{
+    InitiativeId, IssueId, MilestoneId, ProjectId, TeamId, UpdateId, UserRef,
+    ViewId,
+};
 pub use intake::IntakeForm;
 pub use issue::{Issue, IssueKey, Relation, RelationKind};
 pub use project::{Health, Initiative, Project, ProjectUpdate};
+pub use recur::Repeat;
 pub use scale::{Estimate, EstimateScale, Priority};
 pub use suggest::{TriageBrief, TriageSuggestion};
 pub use team::{Team, TeamKey};

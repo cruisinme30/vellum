@@ -12,7 +12,13 @@ import {
   writeMeta,
 } from "./persistence";
 import type { SyncTransport } from "./transport";
-import type { JsonValue, Mutators, PendingMutation, ReadTx, RejectedMutation } from "./types";
+import type {
+  JsonValue,
+  Mutators,
+  PendingMutation,
+  ReadTx,
+  RejectedMutation,
+} from "./types";
 import { View } from "./view";
 
 /** Options for {@link LocalStore.open}. */
@@ -21,7 +27,10 @@ export interface LocalStoreOptions {
   readonly mutators: Mutators;
   readonly transport: SyncTransport;
   /** Told about every mutation the server refused, to show the person. */
-  readonly onRejected?: (rejected: RejectedMutation, mutation: PendingMutation | undefined) => void;
+  readonly onRejected?: (
+    rejected: RejectedMutation,
+    mutation: PendingMutation | undefined,
+  ) => void;
   /** Told when IndexedDB refuses a write (quota, private mode). */
   readonly onDiskError?: (error: unknown) => void;
   /** Clock, for tests. */
@@ -87,7 +96,8 @@ export class LocalStore implements ReadTx {
       await writeMeta(options.database, { clientId });
     }
     const confirmed = Number(snapshot.meta.get("confirmed") ?? "0");
-    const nextId = Math.max(confirmed, ...pending.map((mutation) => mutation.id)) + 1;
+    const nextId =
+      Math.max(confirmed, ...pending.map((mutation) => mutation.id)) + 1;
     const cursor = snapshot.meta.get("cursor") ?? "";
     return new LocalStore(options, { clientId, pending, nextId, cursor, view });
   }
@@ -128,7 +138,8 @@ export class LocalStore implements ReadTx {
       this.#listeners.set(collection, set);
     }
     return () => {
-      for (const collection of collections) this.#listeners.get(collection)?.delete(listener);
+      for (const collection of collections)
+        this.#listeners.get(collection)?.delete(listener);
     };
   }
 
@@ -149,9 +160,13 @@ export class LocalStore implements ReadTx {
     this.#nextId += 1;
     this.#pending.push(mutation);
     this.#notify(touched);
-    telemetry().histogram("vellum.client.mutation.perceived_ms", performance.now() - started, {
-      mutator: name,
-    });
+    telemetry().histogram(
+      "vellum.client.mutation.perceived_ms",
+      performance.now() - started,
+      {
+        mutator: name,
+      },
+    );
     this.#persist(() => enqueue(this.#options.database, mutation));
     return mutation;
   }
@@ -188,18 +203,33 @@ export class LocalStore implements ReadTx {
     let pulled = 0;
     let more = true;
     while (more) {
-      const pull = await this.#options.transport.pull(this.#clientId, this.#cursor);
-      this.#pending = this.#pending.filter((mutation) => mutation.id > pull.lastMutationId);
+      const pull = await this.#options.transport.pull(
+        this.#clientId,
+        this.#cursor,
+      );
+      this.#pending = this.#pending.filter(
+        (mutation) => mutation.id > pull.lastMutationId,
+      );
       this.#cursor = pull.cursor;
-      const touched = this.#view.rebase(pull.patches, pull.reset, this.#pending);
-      this.#persist(() => commitPull(this.#options.database, pull, pull.lastMutationId));
+      const touched = this.#view.rebase(
+        pull.patches,
+        pull.reset,
+        this.#pending,
+      );
+      this.#persist(() =>
+        commitPull(this.#options.database, pull, pull.lastMutationId),
+      );
       this.#notify(touched);
       pulled += pull.patches.length;
       more = pull.more === true;
     }
-    telemetry().histogram("vellum.client.sync.round_trip_ms", performance.now() - started, {
-      pushed: batch.length,
-    });
+    telemetry().histogram(
+      "vellum.client.sync.round_trip_ms",
+      performance.now() - started,
+      {
+        pushed: batch.length,
+      },
+    );
     await this.flushed();
     return { pushed: batch.length, pulled, pending: this.#pending.length };
   }
@@ -208,7 +238,9 @@ export class LocalStore implements ReadTx {
     if (rejected.length === 0) return;
     const ids = new Set(rejected.map((entry) => entry.id));
     for (const entry of rejected) {
-      telemetry().count("vellum.client.mutation.rejected", { code: entry.code });
+      telemetry().count("vellum.client.mutation.rejected", {
+        code: entry.code,
+      });
       this.#options.onRejected?.(
         entry,
         this.#pending.find((mutation) => mutation.id === entry.id),

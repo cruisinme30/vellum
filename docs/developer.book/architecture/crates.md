@@ -16,12 +16,9 @@ storage.
 layer = "foundation"
 ```
 
-```graphviz
-digraph layers {
-  rankdir=LR;
-  node [shape=box, style=rounded];
-  kernel -> contracts -> foundation -> engine -> service -> edge -> app;
-}
+```mermaid
+flowchart LR
+  kernel --> contracts --> foundation --> engine --> service --> edge --> app
 ```
 
 | Layer | Crates | Holds |
@@ -57,7 +54,8 @@ real adapter.
 ::: facts
 
 - `web/`: the React and Tiptap web app
-- `schema/`: the single source of the block model, generating Rust and ProseMirror types
+- `schema/`: the single source of the block model, generating Rust and
+  ProseMirror types
 - `corpus/`: golden files for the dialect, rendering and export
 - `deploy/`: Compose files, the Helm chart and example environments
 - `docs/`: these help books and the architecture decision records

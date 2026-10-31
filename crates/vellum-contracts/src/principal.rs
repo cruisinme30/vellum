@@ -21,7 +21,9 @@ use vellum_kernel::{Error, ErrorKind, ShareId, Timestamp, UserId};
 ///
 /// The set matches the MCP scopes in the brief: `read`, `write:draft`,
 /// `write:direct`, `work` and `admin`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Scope {
     /// Read anything the user can see.
@@ -83,7 +85,9 @@ impl Scope {
             Self::Read => Self::Read.bit(),
             Self::WriteDraft => Self::WriteDraft.bit() | Self::Read.bit(),
             Self::WriteDirect => {
-                Self::WriteDirect.bit() | Self::WriteDraft.bit() | Self::Read.bit()
+                Self::WriteDirect.bit()
+                    | Self::WriteDraft.bit()
+                    | Self::Read.bit()
             }
             Self::Work => Self::Work.bit() | Self::Read.bit(),
             Self::Admin => ScopeSet::FULL.0,
@@ -105,18 +109,28 @@ impl FromStr for Scope {
         Self::ALL
             .into_iter()
             .find(|scope| scope.as_str() == text)
-            .ok_or_else(|| Error::new(ErrorKind::InvalidInput, format!("unknown scope `{text}`")))
+            .ok_or_else(|| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("unknown scope `{text}`"),
+                )
+            })
     }
 }
 
 impl Serialize for Scope {
-    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: serde::Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
 impl<'de> Deserialize<'de> for Scope {
-    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         let text = String::deserialize(deserializer)?;
         text.parse().map_err(serde::de::Error::custom)
     }
@@ -179,7 +193,9 @@ impl FromIterator<Scope> for ScopeSet {
 }
 
 /// How the caller proved who they are.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum CredentialKind {
     /// No credential.
@@ -284,8 +300,9 @@ impl Principal {
     ///
     /// [`ErrorKind::Unauthenticated`] when no user is signed in.
     pub fn require_user(&self) -> Result<UserId, Error> {
-        self.user
-            .ok_or_else(|| Error::new(ErrorKind::Unauthenticated, "sign in to continue"))
+        self.user.ok_or_else(|| {
+            Error::new(ErrorKind::Unauthenticated, "sign in to continue")
+        })
     }
 
     /// Checks that the credential carries `scope`.
@@ -318,11 +335,15 @@ impl Principal {
     ///
     /// [`ErrorKind::Unauthenticated`] with the message `reauthentication
     /// required`, which clients answer by prompting for the password or SSO.
-    pub fn require_fresh(&self, max_age: Duration, now: Timestamp) -> Result<(), Error> {
+    pub fn require_fresh(
+        &self,
+        max_age: Duration,
+        now: Timestamp,
+    ) -> Result<(), Error> {
         let limit = i64::try_from(max_age.as_millis()).unwrap_or(i64::MAX);
-        let fresh = self
-            .authenticated_at
-            .is_some_and(|at| now.unix_ms().saturating_sub(at.unix_ms()) <= limit);
+        let fresh = self.authenticated_at.is_some_and(|at| {
+            now.unix_ms().saturating_sub(at.unix_ms()) <= limit
+        });
         if fresh {
             Ok(())
         } else {
@@ -407,7 +428,8 @@ mod tests {
             user.require_fresh(window, Timestamp::from_unix_ms(1_299_999)?)
                 .is_ok()
         );
-        let stale = user.require_fresh(window, Timestamp::from_unix_ms(1_300_001)?);
+        let stale =
+            user.require_fresh(window, Timestamp::from_unix_ms(1_300_001)?);
         assert_eq!(
             stale.err().map(|e| e.message().to_owned()).as_deref(),
             Some(REAUTHENTICATION_REQUIRED)

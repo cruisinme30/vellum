@@ -14,7 +14,8 @@ with its own table of contents and working cross-references.
 1. Open the handbook and select the chapter "Architecture".
 2. Open **⋯ → Export → PDF**.
 3. Choose **This section and its children**.
-4. Pick the **print** profile for page numbers and running heads, or **screen** for a PDF that looks like the page.
+4. Pick the **print** profile for page numbers and running heads, or **screen**
+   for a PDF that looks like the page.
 5. Select **Export**.
 
 The chapter's sections become 1, 1.1 and 1.2 in the PDF, its headings

@@ -94,7 +94,11 @@ pub(crate) fn record_calendar(kind: &'static str, bytes: usize) {
         .record(count(bytes), &[KeyValue::new("kind", kind)]);
 }
 
-pub(crate) fn record_import(source: &'static str, outcome: &'static str, n: usize) {
+pub(crate) fn record_import(
+    source: &'static str,
+    outcome: &'static str,
+    n: usize,
+) {
     instruments().imported.add(
         count(n),
         &[

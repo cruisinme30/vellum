@@ -30,10 +30,14 @@ gitGraph
 
 ::: steps
 
-1. **Branch** from `develop` as `<type>/<topic>`, such as `feat/typed-ids` or `docs/help-books`.
-2. **Commit** with Conventional Commits, a body that says why, and `git commit -s` for the sign-off.
-3. **Open a pull request** into `develop` that fills in every section of the template.
-4. **Pass the fast suite**: formatting, linters, tests, crate boundaries, supply chain, commit rules and labels.
+1. **Branch** from `develop` as `<type>/<topic>`, such as `feat/typed-ids` or
+   `docs/help-books`.
+2. **Commit** with Conventional Commits, a body that says why, and
+   `git commit -s` for the sign-off.
+3. **Open a pull request** into `develop` that fills in every section of the
+   template.
+4. **Pass the fast suite**: formatting, linters, tests, crate boundaries, supply
+   chain, commit rules and labels.
 5. **Merge** with a squash once the suite is green.
 
 :::
@@ -41,6 +45,25 @@ gitGraph
 `develop` merges into `main` when the full suite passes: coverage,
 release build, end-to-end and accessibility tests, and external links.
 Releases are tagged on `main`.
+
+From a pushed branch to a release:
+
+```mermaid
+flowchart LR
+  B[feat/... branch, signed and signed off] --> I[Integration batch]
+  I --> D[develop: fast suite]
+  D --> N[Nightly and chaos runs]
+  D --> R[Release pull request: full suite, CodeQL]
+  R --> M[main: one signed snapshot]
+  M --> T[Tag vX.Y.Z: signed binaries, images and the website]
+```
+
+| Stage | What runs | Blocks a release when red |
+| --- | --- | --- |
+| Pull request into `develop` | Formatting, lints, tests, boundaries, commit rules | Yes |
+| `develop` | The fast suite again on the merged result | Yes |
+| Nightly | Fuzzing, load, chaos and the browser matrix | Yes |
+| Release pull request | The full suite, coverage, CodeQL, external links | Yes |
 
 ## One feature per pull request {#one-feature}
 

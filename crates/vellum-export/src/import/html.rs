@@ -12,7 +12,8 @@
 
 use scraper::{ElementRef, Node};
 use vellum_format::{
-    Alignment, Attributes, Block, Container, Fence, Inline, List, ListItem, Table,
+    Alignment, Attributes, Block, Container, Fence, Inline, List, ListItem,
+    Table,
 };
 
 /// Deepest element nesting followed, to bound recursion on hostile input.
@@ -79,8 +80,9 @@ fn class_starting(element: ElementRef<'_>, prefix: &str) -> Option<String> {
 fn node(element: ElementRef<'_>, out: &mut Out, depth: usize) {
     let name = element.value().name();
     match name {
-        "script" | "style" | "noscript" | "template" | "head" | "form" | "button" | "input"
-        | "select" | "textarea" | "iframe" | "object" | "svg" => {}
+        "script" | "style" | "noscript" | "template" | "head" | "form"
+        | "button" | "input" | "select" | "textarea" | "iframe" | "object"
+        | "svg" => {}
         "h1" | "h2" | "h3" | "h4" | "h5" | "h6" => {
             let level = name.get(1..).and_then(|n| n.parse().ok()).unwrap_or(2);
             let content = tidy(inline_children(element, depth));
@@ -120,9 +122,9 @@ fn node(element: ElementRef<'_>, out: &mut Out, depth: usize) {
                         .attr("data-inline-task-status")
                         .map(|s| s == "complete")
                         .or_else(|| {
-                            has_class(li, "checked")
-                                .then_some(true)
-                                .or_else(|| has_class(li, "unchecked").then_some(false))
+                            has_class(li, "checked").then_some(true).or_else(
+                                || has_class(li, "unchecked").then_some(false),
+                            )
                         });
                     ListItem {
                         attrs: vellum_format::Attributes::default(),
@@ -190,8 +192,9 @@ fn node(element: ElementRef<'_>, out: &mut Out, depth: usize) {
             }
         }
         "div" | "section" | "aside" => {
-            if let Some(kind) = class_starting(element, "confluence-information-macro-")
-                .filter(|k| !matches!(k.as_str(), "body" | "icon"))
+            if let Some(kind) =
+                class_starting(element, "confluence-information-macro-")
+                    .filter(|k| !matches!(k.as_str(), "body" | "icon"))
             {
                 let tone = match kind.as_str() {
                     "note" => "warn",
@@ -199,10 +202,10 @@ fn node(element: ElementRef<'_>, out: &mut Out, depth: usize) {
                     "tip" => "tip",
                     _ => "info",
                 };
-                let body = element
-                    .select(&body_selector())
-                    .next()
-                    .map_or_else(|| blocks_at(element, depth), |b| blocks_at(b, depth));
+                let body = element.select(&body_selector()).next().map_or_else(
+                    || blocks_at(element, depth),
+                    |b| blocks_at(b, depth),
+                );
                 out.block(callout(tone, body));
             } else if has_class(element, "expand-container") {
                 let title = element
@@ -221,7 +224,8 @@ fn node(element: ElementRef<'_>, out: &mut Out, depth: usize) {
                     attrs: Attributes::default(),
                     sections: vec![body],
                 }));
-            } else if has_class(element, "code") && has_class(element, "panel") {
+            } else if has_class(element, "code") && has_class(element, "panel")
+            {
                 // A Confluence code macro: the `pre` inside carries the code.
                 out.flush();
                 children(element, out, depth);
@@ -232,8 +236,9 @@ fn node(element: ElementRef<'_>, out: &mut Out, depth: usize) {
                 out.flush();
             }
         }
-        "figure" | "figcaption" | "article" | "main" | "header" | "footer" | "nav" | "dl"
-        | "dd" | "dt" | "li" | "center" | "body" | "html" | "tbody" | "thead" => {
+        "figure" | "figcaption" | "article" | "main" | "header" | "footer"
+        | "nav" | "dl" | "dd" | "dt" | "li" | "center" | "body" | "html"
+        | "tbody" | "thead" => {
             out.flush();
             children(element, out, depth);
             out.flush();
@@ -292,15 +297,19 @@ fn inline(element: ElementRef<'_>, depth: usize) -> Vec<Inline> {
     };
     match name {
         "script" | "style" | "noscript" | "template" => Vec::new(),
-        "strong" | "b" => wrap(inline_children(element, depth), |content| Inline::Strong {
-            content,
+        "strong" | "b" => wrap(inline_children(element, depth), |content| {
+            Inline::Strong { content }
         }),
-        "em" | "i" | "cite" => wrap(inline_children(element, depth), |content| {
-            Inline::Emphasis { content }
-        }),
-        "s" | "del" | "strike" => wrap(inline_children(element, depth), |content| {
-            Inline::Strikethrough { content }
-        }),
+        "em" | "i" | "cite" => {
+            wrap(inline_children(element, depth), |content| {
+                Inline::Emphasis { content }
+            })
+        }
+        "s" | "del" | "strike" => {
+            wrap(inline_children(element, depth), |content| {
+                Inline::Strikethrough { content }
+            })
+        }
         "mark" => wrap(inline_children(element, depth), |content| {
             Inline::Highlight { content }
         }),
@@ -324,7 +333,8 @@ fn inline(element: ElementRef<'_>, depth: usize) -> Vec<Inline> {
             let content = inline_children(element, depth);
             match element.value().attr("href") {
                 Some(href)
-                    if !href.trim().is_empty() && !href.trim().starts_with("javascript:") =>
+                    if !href.trim().is_empty()
+                        && !href.trim().starts_with("javascript:") =>
                 {
                     vec![Inline::Link {
                         url: href.trim().to_owned(),
@@ -379,21 +389,23 @@ fn table(element: ElementRef<'_>, depth: usize) -> Option<Table> {
                 .filter_map(ElementRef::wrap)
                 .filter(|c| matches!(c.value().name(), "td" | "th"))
                 .collect();
-            let header = !cells.is_empty() && cells.iter().all(|c| c.value().name() == "th");
+            let header = !cells.is_empty()
+                && cells.iter().all(|c| c.value().name() == "th");
             (header, cells.into_iter().map(|c| cell(c, depth)).collect())
         })
         .filter(|(_, cells): &(bool, Vec<Vec<Inline>>)| !cells.is_empty())
         .collect();
     let width = rows.iter().map(|(_, cells)| cells.len()).max()?;
     let mut rows = rows.into_iter();
-    let (header, rest): (Vec<Vec<Inline>>, Vec<Vec<Vec<Inline>>>) = match rows.next() {
-        Some((true, cells)) => (cells, rows.map(|(_, c)| c).collect()),
-        Some((false, cells)) => (
-            vec![Vec::new(); width],
-            std::iter::once(cells).chain(rows.map(|(_, c)| c)).collect(),
-        ),
-        None => return None,
-    };
+    let (header, rest): (Vec<Vec<Inline>>, Vec<Vec<Vec<Inline>>>) =
+        match rows.next() {
+            Some((true, cells)) => (cells, rows.map(|(_, c)| c).collect()),
+            Some((false, cells)) => (
+                vec![Vec::new(); width],
+                std::iter::once(cells).chain(rows.map(|(_, c)| c)).collect(),
+            ),
+            None => return None,
+        };
     let pad = |mut cells: Vec<Vec<Inline>>| {
         cells.resize(width, Vec::new());
         cells
@@ -421,7 +433,8 @@ fn flatten_blocks(blocks: &[Block], out: &mut Vec<Inline>) {
             out.push(Inline::HardBreak);
         }
         match block {
-            Block::Paragraph { content, .. } | Block::Heading { content, .. } => {
+            Block::Paragraph { content, .. }
+            | Block::Heading { content, .. } => {
                 out.extend(content.iter().cloned());
             }
             Block::List(list) => {
@@ -430,9 +443,10 @@ fn flatten_blocks(blocks: &[Block], out: &mut Vec<Inline>) {
                         out.push(Inline::HardBreak);
                     }
                     out.push(Inline::Text {
-                        text: list
-                            .start
-                            .map_or_else(|| "• ".to_owned(), |s| format!("{}. ", s + i as u64)),
+                        text: list.start.map_or_else(
+                            || "• ".to_owned(),
+                            |s| format!("{}. ", s + i as u64),
+                        ),
                     });
                     let mut inner = Vec::new();
                     flatten_blocks(&item.blocks, &mut inner);
@@ -550,7 +564,8 @@ fn tidy(inlines: Vec<Inline>) -> Vec<Inline> {
 macro_rules! selector {
     ($name:ident, $css:literal) => {
         fn $name() -> scraper::Selector {
-            static SELECTOR: std::sync::OnceLock<scraper::Selector> = std::sync::OnceLock::new();
+            static SELECTOR: std::sync::OnceLock<scraper::Selector> =
+                std::sync::OnceLock::new();
             SELECTOR
                 .get_or_init(|| {
                     scraper::Selector::parse($css)
@@ -621,8 +636,8 @@ mod tests {
     #[test]
     fn tables_keep_header_and_flatten_cells() {
         let md = convert(
-            "<body><table><tbody><tr><th>Key</th><th>Value</th></tr>\
-             <tr><td><p>a</p><p>b</p></td><td>c | d</td></tr></tbody></table></body>",
+            "<body><table><tbody><tr><th>Key</th><th>Value</th></tr><tr><td><p>\
+             a</p><p>b</p></td><td>c | d</td></tr></tbody></table></body>",
         );
         assert!(md.contains("| Key | Value |"), "{md}");
         assert!(md.contains("c \\| d"), "{md}");
@@ -631,7 +646,8 @@ mod tests {
     #[test]
     fn hostile_markup_is_dropped() {
         let md = convert(
-            r#"<body><script>alert(1)</script><p onclick="x">Hi <a href="javascript:alert(1)">there</a></p></body>"#,
+            "<body><script>alert(1)</script><p onclick=\"x\">Hi \
+            <a href=\"javascript:alert(1)\">there</a></p></body>",
         );
         assert!(!md.contains("alert"), "{md}");
         assert!(md.contains("Hi there"), "{md}");

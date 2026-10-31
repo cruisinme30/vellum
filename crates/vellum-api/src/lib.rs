@@ -6,6 +6,7 @@
 pub mod auth;
 pub mod breaker;
 pub mod config;
+pub mod deadline;
 pub mod error;
 pub mod gateway;
 pub mod graphql;

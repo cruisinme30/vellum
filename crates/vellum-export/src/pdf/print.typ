@@ -29,7 +29,12 @@
     h(1fr)
   },
 )
-#set text(font: theme.fonts.body, size: theme.size * 1pt, fill: c("text"), lang: theme.lang)
+#set text(
+  font: theme.fonts.body,
+  size: theme.size * 1pt,
+  fill: c("text"),
+  lang: theme.lang,
+)
 #set par(justify: false, leading: 0.62em, spacing: 1em)
 #show raw: set text(font: theme.fonts.mono, size: 0.86em)
 #show heading: set text(fill: c("heading"), weight: "bold")
@@ -47,12 +52,20 @@
 #let span(s) = {
   if s.t == "text" {
     let body = if s.at("code", default: false) {
-      box(fill: c("surface"), inset: (x: 2pt), outset: (y: 2pt), radius: 2pt, raw(s.text))
+      box(
+        fill: c("surface"),
+        inset: (x: 2pt),
+        outset: (y: 2pt),
+        radius: 2pt,
+        raw(s.text),
+      )
     } else { [#s.text] }
     if s.at("bold", default: false) { body = strong(body) }
     if s.at("italic", default: false) { body = emph(body) }
     if s.at("strike", default: false) { body = strike(body) }
-    if s.at("highlight", default: false) { body = highlight(fill: rgb("#FFF3A3"), body) }
+    if s.at("highlight", default: false) {
+      body = highlight(fill: rgb("#FFF3A3"), body)
+    }
     if s.at("sub", default: false) { body = sub(body) }
     if s.at("sup", default: false) { body = super(body) }
     body
@@ -72,7 +85,9 @@
 
 #let check(done) = if done { sym.ballot.check } else { sym.ballot }
 
-#let align-of(a) = if a == "right" { right } else if a == "center" { center } else { left }
+#let align-of(a) = if a == "right" { right } else if a == "center" {
+  center
+} else { left }
 
 #let table-node(b) = {
   let n = b.align.len()
@@ -106,9 +121,16 @@
   let blocks(bs) = bs.map(block-node).join()
   if b.t == "heading" {
     let number = b.at("number", default: none)
-    let body = if number == none { spans(b.spans) } else { [#number#h(0.6em)#spans(b.spans)] }
+    let body = if number == none { spans(b.spans) } else {
+      [#number#h(0.6em)#spans(b.spans)]
+    }
     let anchor = b.at("anchor", default: none)
-    let h = heading(level: b.level, outlined: b.outlined, bookmarked: b.outlined, body)
+    let h = heading(
+      level: b.level,
+      outlined: b.outlined,
+      bookmarked: b.outlined,
+      body,
+    )
     if anchor == none { h } else { [#h#label(anchor)] }
   } else if b.t == "paragraph" {
     let anchor = b.at("anchor", default: none)
@@ -145,7 +167,12 @@
   } else if b.t == "math" {
     let source = b.at("typst", default: none)
     if source == none {
-      block(fill: c("surface"), inset: 8pt, radius: 4pt, raw(b.tex, block: true))
+      block(
+        fill: c("surface"),
+        inset: 8pt,
+        radius: 4pt,
+        raw(b.tex, block: true),
+      )
     } else {
       math.equation(block: true, eval(source, mode: "math"))
     }
@@ -169,10 +196,18 @@
       },
     )
   } else if b.t == "titled" {
-    block(sticky: true, below: 0.5em, text(weight: "bold", size: 1.05em, spans(b.title)))
+    block(
+      sticky: true,
+      below: 0.5em,
+      text(weight: "bold", size: 1.05em, spans(b.title)),
+    )
     blocks(b.blocks)
   } else if b.t == "columns" {
-    grid(columns: (1fr,) * b.columns.len(), gutter: 14pt, ..b.columns.map(blocks))
+    grid(
+      columns: (1fr,) * b.columns.len(),
+      gutter: 14pt,
+      ..b.columns.map(blocks),
+    )
   } else if b.t == "stats" {
     grid(
       columns: (1fr,) * calc.max(1, calc.min(4, b.tiles.len())),
@@ -189,7 +224,11 @@
           if t.delta != "" {
             linebreak()
             let trend = t.at("trend", default: none)
-            text(size: 0.9em, fill: if trend == none { c("muted") } else { tone-fg(trend) }, t.delta)
+            text(
+              size: 0.9em,
+              fill: if trend == none { c("muted") } else { tone-fg(trend) },
+              t.delta,
+            )
           }
         },
       )),
@@ -218,7 +257,12 @@
       align: horizon,
       bar.label,
       box(width: 100%, height: 6pt, radius: 3pt, fill: c("surface"),
-        box(width: bar.percent * 1%, height: 6pt, radius: 3pt, fill: c("primary"))),
+        box(
+          width: bar.percent * 1%,
+          height: 6pt,
+          radius: 3pt,
+          fill: c("primary"),
+        )),
       align(right)[#calc.round(bar.percent) %],
     )))
   } else if b.t == "link_card" {
@@ -264,7 +308,10 @@
     text(fill: c("muted"), [As of #flow.as_of])
   })
 } else if flow.show_title and flow.title != "" {
-  block(below: 1.2em, text(size: 2em, weight: "bold", fill: c("heading"), flow.title))
+  block(
+    below: 1.2em,
+    text(size: 2em, weight: "bold", fill: c("heading"), flow.title),
+  )
 }
 
 #flow.blocks.map(block-node).join()

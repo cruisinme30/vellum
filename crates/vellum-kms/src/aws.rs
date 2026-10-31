@@ -15,6 +15,7 @@ use serde_json::json;
 use vellum_crypto::{CryptoError, KekId, KeyProvider, SecretKey, WrappedDek};
 use zeroize::Zeroizing;
 
+use crate::aws_credentials::AwsCredentialProvider;
 use crate::http::{self, b64, unb64};
 use crate::sigv4;
 
@@ -25,9 +26,9 @@ const CONTEXT_KEY: &str = "vellum";
 /// Credentials for signing requests.
 #[derive(Clone)]
 pub struct AwsCredentials {
-    access_key_id: String,
-    secret_access_key: Zeroizing<String>,
-    session_token: Option<Zeroizing<String>>,
+    pub(crate) access_key_id: String,
+    pub(crate) secret_access_key: Zeroizing<String>,
+    pub(crate) session_token: Option<Zeroizing<String>>,
 }
 
 impl fmt::Debug for AwsCredentials {
@@ -60,11 +61,16 @@ impl AwsCredentials {
     /// # Errors
     /// [`CryptoError::Provider`] if either required variable is missing.
     pub fn from_env() -> Result<Self, CryptoError> {
-        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
-        let missing = |name: &str| CryptoError::Provider(format!("{BACKEND}: {name} is not set"));
+        let var =
+            |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let missing = |name: &str| {
+            CryptoError::Provider(format!("{BACKEND}: {name} is not set"))
+        };
         Ok(Self::new(
-            var("AWS_ACCESS_KEY_ID").ok_or_else(|| missing("AWS_ACCESS_KEY_ID"))?,
-            var("AWS_SECRET_ACCESS_KEY").ok_or_else(|| missing("AWS_SECRET_ACCESS_KEY"))?,
+            var("AWS_ACCESS_KEY_ID")
+                .ok_or_else(|| missing("AWS_ACCESS_KEY_ID"))?,
+            var("AWS_SECRET_ACCESS_KEY")
+                .ok_or_else(|| missing("AWS_SECRET_ACCESS_KEY"))?,
             var("AWS_SESSION_TOKEN"),
         ))
     }
@@ -74,7 +80,7 @@ impl AwsCredentials {
 #[derive(Debug)]
 pub struct AwsKms {
     client: reqwest::Client,
-    credentials: AwsCredentials,
+    credentials: AwsCredentialProvider,
     /// Overrides the regional endpoint (VPC endpoints, tests).
     endpoint: Option<String>,
     current: KekId,
@@ -82,7 +88,9 @@ pub struct AwsKms {
 
 impl AwsKms {
     /// A provider whose current KEK is `key_id` (a key id, key ARN or alias
-    /// ARN) in `region`.
+    /// ARN) in `region`. Pass [`AwsCredentials`] for fixed keys, or an
+    /// [`AwsCredentialProvider`] (usually [`AwsCredentialProvider::from_env`])
+    /// for role credentials without static keys.
     ///
     /// # Errors
     /// [`CryptoError::InvalidKekId`] if the region or key id contain
@@ -90,11 +98,11 @@ impl AwsKms {
     pub fn new(
         region: &str,
         key_id: &str,
-        credentials: AwsCredentials,
+        credentials: impl Into<AwsCredentialProvider>,
     ) -> Result<Self, CryptoError> {
         Ok(Self {
             client: http::client()?,
-            credentials,
+            credentials: credentials.into(),
             endpoint: None,
             current: kek_id(region, key_id)?,
         })
@@ -127,6 +135,7 @@ impl AwsKms {
             .unwrap_or_default()
             .to_owned();
         let body = http::to_json(BACKEND, body)?;
+        let credentials = self.credentials.credentials().await?;
         let amz_date = sigv4::amz_date_now();
         let target = format!("TrentService.{target}");
         let mut headers = vec![
@@ -135,7 +144,7 @@ impl AwsKms {
             ("x-amz-date", amz_date.as_str()),
             ("x-amz-target", target.as_str()),
         ];
-        if let Some(token) = &self.credentials.session_token {
+        if let Some(token) = &credentials.session_token {
             headers.push(("x-amz-security-token", token.as_str()));
         }
         let authorization = sigv4::authorization(
@@ -150,8 +159,8 @@ impl AwsKms {
                 amz_date: &amz_date,
                 region,
                 service: "kms",
-                access_key_id: &self.credentials.access_key_id,
-                secret_access_key: &self.credentials.secret_access_key,
+                access_key_id: &credentials.access_key_id,
+                secret_access_key: &credentials.secret_access_key,
             },
         )?;
         let mut request = self.client.post(format!("{endpoint}/")).body(body);
@@ -171,7 +180,11 @@ impl KeyProvider for AwsKms {
         self.current.clone()
     }
 
-    #[tracing::instrument(name = "kms.wrap", skip_all, fields(backend = BACKEND, kek_id = %self.current))]
+    #[tracing::instrument(
+        name = "kms.wrap",
+        skip_all,
+        fields(backend = BACKEND, kek_id = %self.current)
+    )]
     async fn wrap(&self, dek: &SecretKey) -> Result<WrappedDek, CryptoError> {
         let started = Instant::now();
         let result = async {
@@ -196,15 +209,24 @@ impl KeyProvider for AwsKms {
         http::record(BACKEND, "wrap", started, result)
     }
 
-    #[tracing::instrument(name = "kms.unwrap", skip_all, fields(backend = BACKEND, kek_id = %wrapped.kek_id))]
-    async fn unwrap(&self, wrapped: &WrappedDek) -> Result<SecretKey, CryptoError> {
+    #[tracing::instrument(
+        name = "kms.unwrap",
+        skip_all,
+        fields(backend = BACKEND, kek_id = %wrapped.kek_id)
+    )]
+    async fn unwrap(
+        &self,
+        wrapped: &WrappedDek,
+    ) -> Result<SecretKey, CryptoError> {
         let started = Instant::now();
         let result = async {
             let (region, key) = parse(&wrapped.kek_id)?;
             let body = json!({
                 "KeyId": key,
                 "CiphertextBlob": b64(&wrapped.blob),
-                "EncryptionContext": { CONTEXT_KEY: http::aad(&wrapped.kek_id) },
+                "EncryptionContext": {
+                    CONTEXT_KEY: http::aad(&wrapped.kek_id)
+                },
             });
             let response = self.call(region, "Decrypt", &body).await?;
             let plaintext = Zeroizing::new(unb64(
@@ -219,7 +241,9 @@ impl KeyProvider for AwsKms {
 }
 
 fn kek_id(region: &str, key_id: &str) -> Result<KekId, CryptoError> {
-    if !http::safe_segment(region, &[]) || !http::safe_segment(key_id, &[':', '/']) {
+    if !http::safe_segment(region, &[])
+        || !http::safe_segment(key_id, &[':', '/'])
+    {
         return Err(CryptoError::InvalidKekId);
     }
     KekId::new(format!("{PREFIX}{region}:{key_id}"))
@@ -231,7 +255,8 @@ fn parse(id: &KekId) -> Result<(&str, &str), CryptoError> {
         .strip_prefix(PREFIX)
         .and_then(|rest| rest.split_once(':'))
         .filter(|(region, key)| {
-            http::safe_segment(region, &[]) && http::safe_segment(key, &[':', '/'])
+            http::safe_segment(region, &[])
+                && http::safe_segment(key, &[':', '/'])
         })
         .ok_or_else(|| CryptoError::UnknownKek(id.clone()))
 }
@@ -242,7 +267,8 @@ mod tests {
 
     #[test]
     fn kek_ids_round_trip_through_parse() -> Result<(), CryptoError> {
-        let arn = "arn:aws:kms:eu-west-1:111122223333:key/1234abcd-12ab-34cd-56ef-1234567890ab";
+        let arn = "arn:aws:kms:eu-west-1:111122223333:key/1234abcd-12ab-34cd-56\
+            ef-1234567890ab";
         let id = kek_id("eu-west-1", arn)?;
         assert_eq!(parse(&id)?, ("eu-west-1", arn));
         assert!(kek_id("eu west", "k").is_err());

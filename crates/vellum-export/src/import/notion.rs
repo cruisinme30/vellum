@@ -63,7 +63,8 @@ pub(super) fn import(bytes: &[u8]) -> Result<Builder, ImportError> {
         if super::has_ext(&lower, &["md"]) {
             let text = String::from_utf8_lossy(&entry.bytes).into_owned();
             let stem = super::stem(super::file_name(&entry.path));
-            let table = table_index.get(super::links::parent(&entry.path)).copied();
+            let table =
+                table_index.get(super::links::parent(&entry.path)).copied();
             let title = markdown_title(&text, &strip_id(stem));
             let text = if table.is_some() {
                 strip_properties(&text)
@@ -95,7 +96,9 @@ fn strip_path(path: &str) -> String {
     path.split('/')
         .map(|segment| {
             let (stem, ext) = match segment.rsplit_once('.') {
-                Some((stem, ext)) if !stem.is_empty() && ext.len() <= 8 => (stem, Some(ext)),
+                Some((stem, ext)) if !stem.is_empty() && ext.len() <= 8 => {
+                    (stem, Some(ext))
+                }
                 _ => (segment, None),
             };
             let stem = strip_id(stem);
@@ -109,7 +112,9 @@ fn strip_path(path: &str) -> String {
 fn strip_id(name: &str) -> String {
     match name.rsplit_once(' ') {
         Some((title, id))
-            if id.len() == 32 && id.chars().all(|c| c.is_ascii_hexdigit()) && !title.is_empty() =>
+            if id.len() == 32
+                && id.chars().all(|c| c.is_ascii_hexdigit())
+                && !title.is_empty() =>
         {
             title.to_owned()
         }
@@ -142,7 +147,9 @@ fn strip_properties(text: &str) -> String {
             break;
         }
         let is_property = line.split_once(": ").is_some_and(|(key, _)| {
-            !key.is_empty() && key.len() <= 100 && !key.starts_with(['#', '-', '*', '>', '|'])
+            !key.is_empty()
+                && key.len() <= 100
+                && !key.starts_with(['#', '-', '*', '>', '|'])
         });
         if !is_property {
             break;
@@ -164,7 +171,8 @@ mod tests {
     fn ids_are_stripped_from_paths() {
         assert_eq!(
             strip_path(
-                "Engineering 0123456789abcdef0123456789abcdef/Gateway fedcba9876543210fedcba9876543210.md"
+                "Engineering 0123456789abcdef0123456789abcdef/Gateway \
+                    fedcba9876543210fedcba9876543210.md"
             ),
             "Engineering/Gateway.md"
         );
@@ -173,7 +181,8 @@ mod tests {
 
     #[test]
     fn row_properties_are_dropped_from_bodies() {
-        let text = "# Rotate keys\n\nStatus: Done\nOwner: Priya\n\nRotate the signing keys.\n";
+        let text = "# Rotate keys\n\nStatus: Done\nOwner: Priya\n\n\
+            Rotate the signing keys.\n";
         assert_eq!(strip_properties(text), "\nRotate the signing keys.\n");
     }
 }

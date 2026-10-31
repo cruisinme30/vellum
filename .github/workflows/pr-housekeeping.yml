@@ -11,11 +11,31 @@
 name: "Checks: labels and tracker"
 
 on:
-  pull_request_target: # zizmor: ignore[dangerous-triggers] -- runs develop's scripts, never the PR's code
-    types: [opened, synchronize, reopened, edited, labeled, unlabeled, closed]
+  # It runs develop's scripts, never the pull request's code.
+  pull_request_target: # zizmor: ignore[dangerous-triggers] -- no PR code
+    # Only events that can change a result. No labeled or unlabeled: the
+    # Labels job sets labels itself, and re-running on each one used to
+    # fill the runner queue. Edits run a job only when the title (Labels)
+    # or the description (Tracker) changed.
+    types: [opened, synchronize, reopened, ready_for_review, edited, closed]
   # Labels is a required check, so it must also report in the merge queue.
   # The pull request was already labelled; the merge group passes.
   merge_group:
+
+# A new push to a pull request into develop cancels its older Labels run.
+# Closing never cancels, so the Tracker always records it, and release
+# pull requests into main keep every run.
+concurrency:
+  group: >-
+    ${{ github.event_name == 'pull_request_target'
+    && github.base_ref == 'develop'
+    && github.event.action != 'closed'
+    && format('housekeeping-pr-{0}', github.event.pull_request.number)
+    || format('housekeeping-{0}', github.run_id) }}
+  cancel-in-progress: >-
+    ${{ github.event_name == 'pull_request_target'
+    && github.base_ref == 'develop'
+    && github.event.action == 'synchronize' }}
 
 permissions:
   contents: read
@@ -23,7 +43,12 @@ permissions:
 jobs:
   labels:
     name: Labels
-    if: github.event.action != 'closed'
+    if: >-
+      github.event_name == 'merge_group' ||
+      contains(fromJSON(
+        '["opened", "synchronize", "reopened", "ready_for_review"]'),
+        github.event.action) ||
+      (github.event.action == 'edited' && github.event.changes.title != null)
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -59,7 +84,9 @@ jobs:
     name: Tracker
     if: >-
       github.event_name == 'pull_request_target' &&
-      contains(fromJSON('["opened", "reopened", "edited", "closed"]'), github.event.action)
+      (contains(fromJSON('["opened", "reopened", "closed"]'),
+        github.event.action) ||
+      (github.event.action == 'edited' && github.event.changes.body != null))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

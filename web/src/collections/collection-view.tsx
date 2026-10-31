@@ -4,6 +4,7 @@
 import { useCallback, useId, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 
+import { ViewTitle } from "../help/help-link";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 
@@ -11,14 +12,25 @@ import { BoardView } from "./board-view";
 import { CalendarView } from "./calendar-view";
 import { GalleryView, ListView } from "./card-views";
 import { messageOf, useCollections, useLoad, type Loaded } from "./context";
+import { ImportPanel } from "./csv-panels";
+import { PropertiesPanel } from "./property-editor";
 import { RowPanel } from "./row-panel";
+import { download } from "./side-panel";
 import { TableView } from "./table-view";
 import { TimelineView } from "./timeline-view";
-import type { CollectionInfo, ViewKind, ViewResult } from "./types";
+import type { CollectionInfo, ViewInfo, ViewKind, ViewResult } from "./types";
+import { ViewEditor } from "./view-editor";
 import type { ViewProperties } from "./view-properties";
 import { tabId, ViewTabs } from "./view-tabs";
 
-const LAYOUTS: Readonly<Record<ViewKind, (properties: ViewProperties) => React.ReactNode>> = {
+/** The side panel open next to the view, if any: one at a time. */
+type Panel =
+  | { readonly kind: "row"; readonly id: string; readonly fresh: boolean }
+  | { readonly kind: "view" | "new-view" | "properties" | "import" };
+
+const LAYOUTS: Readonly<
+  Record<ViewKind, (properties: ViewProperties) => React.ReactNode>
+> = {
   table: TableView,
   board: BoardView,
   gallery: GalleryView,
@@ -60,8 +72,68 @@ function ViewResultPanel({
   return <Layout info={info} result={result.data} onOpen={onOpen} />;
 }
 
-/** A loaded collection: view tabs, the chosen view, "New row" and the row panel. */
-function CollectionBody({ collection }: { readonly collection: CollectionInfo }) {
+/** The side panel that is open, if any. */
+function OpenPanel({
+  panel,
+  info,
+  view,
+  onShowView,
+  onClose,
+}: {
+  readonly panel: Panel | undefined;
+  readonly info: CollectionInfo;
+  readonly view: ViewInfo | undefined;
+  readonly onShowView: (name?: string) => void;
+  readonly onClose: () => void;
+}) {
+  switch (panel?.kind) {
+    case "row": {
+      return (
+        <RowPanel
+          key={panel.id}
+          info={info}
+          rowId={panel.id}
+          focusTitle={panel.fresh}
+          onClose={onClose}
+        />
+      );
+    }
+    case "view": {
+      return (
+        view && (
+          <ViewEditor
+            key={JSON.stringify(view)}
+            info={info}
+            view={view}
+            onSaved={onShowView}
+            onClose={onClose}
+          />
+        )
+      );
+    }
+    case "new-view": {
+      return <ViewEditor info={info} onSaved={onShowView} onClose={onClose} />;
+    }
+    case "properties": {
+      return <PropertiesPanel info={info} onClose={onClose} />;
+    }
+    case "import": {
+      return <ImportPanel info={info} onClose={onClose} />;
+    }
+    case undefined: {
+      return;
+    }
+  }
+}
+
+/**
+ * A loaded collection: view tabs, the chosen view, "New row" and the row panel.
+ */
+function CollectionBody({
+  collection,
+}: {
+  readonly collection: CollectionInfo;
+}) {
   const t = useT();
   const idBase = useId();
   const panelId = useId();
@@ -74,27 +146,48 @@ function CollectionBody({ collection }: { readonly collection: CollectionInfo })
       ...(viewName === undefined ? {} : { view: viewName }),
     }),
   );
-  const [open, setOpen] = useState<{ id: string; fresh: boolean }>();
-  const [createError, setCreateError] = useState<string>();
+  const [open, setOpen] = useState<Panel>();
+  const [actionError, setActionError] = useState<string>();
   const close = useCallback(() => {
     setOpen(undefined);
   }, []);
   const openRow = useCallback((id: string) => {
-    setOpen({ id, fresh: false });
+    setOpen({ kind: "row", id, fresh: false });
   }, []);
   const activeName = (result.data?.view ?? viewName ?? "").toLowerCase();
   const active = Math.max(
     0,
     collection.views.findIndex((v) => v.name.toLowerCase() === activeName),
   );
+  const activeView = collection.views[active];
   const newRow = async () => {
     try {
       const written = await store.createRow({ collection_id: collection.id });
-      setCreateError(undefined);
-      setOpen(written.row ? { id: written.row.row.id, fresh: true } : undefined);
+      setActionError(undefined);
+      setOpen(
+        written.row
+          ? { kind: "row", id: written.row.row.id, fresh: true }
+          : undefined,
+      );
     } catch (error) {
-      setCreateError(messageOf(error));
+      setActionError(messageOf(error));
     }
+  };
+  const exportCsv = async () => {
+    try {
+      const file = await store.exportCsv({
+        collection_id: collection.id,
+        ...(activeView ? { view: activeView.name } : {}),
+      });
+      setActionError(undefined);
+      download(file.fileName, file.csv);
+    } catch (error) {
+      setActionError(messageOf(error));
+    }
+  };
+  const showView = (name?: string) => {
+    setOpen(undefined);
+    setParameters(name === undefined ? {} : { view: name });
   };
 
   return (
@@ -108,15 +201,49 @@ function CollectionBody({ collection }: { readonly collection: CollectionInfo })
         </ol>
       </nav>
       <div className="vl-collection-head">
-        <h1>{collection.title}</h1>
-        <button type="button" className="vl-filled-button" onClick={() => void newRow()}>
-          <Icon name="add" size={20} />
-          {t("collection-new-row")}
-        </button>
+        <ViewTitle title={collection.title} help="collection.views" />
+        <div className="vl-collection-actions">
+          <button
+            type="button"
+            className="vl-text-button"
+            onClick={() => {
+              setOpen({ kind: "properties" });
+            }}
+          >
+            <Icon name="schema" size={20} />
+            {t("collection-properties")}
+          </button>
+          <button
+            type="button"
+            className="vl-text-button"
+            onClick={() => {
+              setOpen({ kind: "import" });
+            }}
+          >
+            <Icon name="arrow_upward" size={20} />
+            {t("collection-import")}
+          </button>
+          <button
+            type="button"
+            className="vl-text-button"
+            onClick={() => void exportCsv()}
+          >
+            <Icon name="arrow_downward" size={20} />
+            {t("collection-export")}
+          </button>
+          <button
+            type="button"
+            className="vl-filled-button"
+            onClick={() => void newRow()}
+          >
+            <Icon name="add" size={20} />
+            {t("collection-new-row")}
+          </button>
+        </div>
       </div>
-      {createError !== undefined && (
+      {actionError !== undefined && (
         <p className="vl-field-error" role="alert">
-          {createError}
+          {actionError}
         </p>
       )}
       <ViewTabs
@@ -128,6 +255,30 @@ function CollectionBody({ collection }: { readonly collection: CollectionInfo })
           setParameters({ view: name });
         }}
       />
+      <div className="vl-view-actions">
+        {activeView && (
+          <button
+            type="button"
+            className="vl-text-button"
+            onClick={() => {
+              setOpen({ kind: "view" });
+            }}
+          >
+            <Icon name="edit" size={20} />
+            {t("collection-edit-view-button")}
+          </button>
+        )}
+        <button
+          type="button"
+          className="vl-text-button"
+          onClick={() => {
+            setOpen({ kind: "new-view" });
+          }}
+        >
+          <Icon name="add" size={20} />
+          {t("collection-new-view")}
+        </button>
+      </div>
       <div
         id={panelId}
         role="tabpanel"
@@ -136,15 +287,13 @@ function CollectionBody({ collection }: { readonly collection: CollectionInfo })
       >
         <ViewResultPanel info={collection} result={result} onOpen={openRow} />
       </div>
-      {open && (
-        <RowPanel
-          key={open.id}
-          info={collection}
-          rowId={open.id}
-          focusTitle={open.fresh}
-          onClose={close}
-        />
-      )}
+      <OpenPanel
+        panel={open}
+        info={collection}
+        view={activeView}
+        onShowView={showView}
+        onClose={close}
+      />
     </div>
   );
 }

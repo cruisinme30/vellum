@@ -7,11 +7,15 @@
 use std::sync::{Arc, Mutex as StdMutex};
 
 use serde_json::{Value, json};
-use tokio::io::{AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader};
+use tokio::io::{
+    AsyncBufReadExt as _, AsyncReadExt as _, AsyncWriteExt as _, BufReader,
+};
 use tokio::net::TcpListener;
 use url::Url;
 use vellum_kernel::{ErrorKind, UserId};
-use vellum_tasks::google::{Changes, GoogleCalendar as _, GoogleLink, GoogleLinks as _};
+use vellum_tasks::google::{
+    Changes, GoogleCalendar as _, GoogleLink, GoogleLinks as _,
+};
 
 use crate::google_http::{Endpoints, FileLinks, GoogleHttp};
 
@@ -44,7 +48,11 @@ fn answer(seen: &Seen) -> (u16, Value) {
             ) {
                 (Some("authorization_code"), _) => (
                     200,
-                    json!({"access_token": "a0", "refresh_token": "good", "expires_in": 3600}),
+                    json!({
+                        "access_token": "a0",
+                        "refresh_token": "good",
+                        "expires_in": 3600
+                    }),
                 ),
                 (Some("refresh_token"), Some("good")) => {
                     (200, json!({"access_token": "a1", "expires_in": 3600}))
@@ -53,8 +61,16 @@ fn answer(seen: &Seen) -> (u16, Value) {
             }
         }
         ("POST", "/revoke") => (200, json!({})),
-        _ if !matches!(seen.auth.as_deref(), Some("Bearer a0" | "Bearer a1")) => (401, json!({})),
-        ("POST", "/cal/calendars") => (200, json!({"id": "v@group.calendar.google.com"})),
+        _ if !matches!(
+            seen.auth.as_deref(),
+            Some("Bearer a0" | "Bearer a1")
+        ) =>
+        {
+            (401, json!({}))
+        }
+        ("POST", "/cal/calendars") => {
+            (200, json!({"id": "v@group.calendar.google.com"}))
+        }
         ("GET", "/cal/calendars/v@group.calendar.google.com/events") => {
             if form_value(query, "syncToken").as_deref() == Some("old") {
                 (410, json!({}))
@@ -64,16 +80,23 @@ fn answer(seen: &Seen) -> (u16, Value) {
                 (200, json!({"items": [{"id": "e1"}], "nextPageToken": "p2"}))
             }
         }
-        ("POST", "/cal/calendars/v@group.calendar.google.com/events") => (200, json!({"id": "e3"})),
+        ("POST", "/cal/calendars/v@group.calendar.google.com/events") => {
+            (200, json!({"id": "e3"}))
+        }
         ("PATCH", "/cal/calendars/v@group.calendar.google.com/events/e1") => {
             (200, json!({"id": "e1"}))
         }
-        ("DELETE", "/cal/calendars/v@group.calendar.google.com/events/e1") => (204, Value::Null),
+        ("DELETE", "/cal/calendars/v@group.calendar.google.com/events/e1") => {
+            (204, Value::Null)
+        }
         _ => (404, json!({})),
     }
 }
 
-async fn serve_one(stream: tokio::net::TcpStream, log: Log) -> std::io::Result<()> {
+async fn serve_one(
+    stream: tokio::net::TcpStream,
+    log: Log,
+) -> std::io::Result<()> {
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
     let _ = reader.read_line(&mut line).await?;
@@ -114,7 +137,8 @@ async fn serve_one(stream: tokio::net::TcpStream, log: Log) -> std::io::Result<(
         value.to_string()
     };
     let reply = format!(
-        "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{payload}",
+        "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\n\
+            content-length: {}\r\nconnection: close\r\n\r\n{payload}",
         payload.len()
     );
     let mut stream = reader.into_inner();
@@ -144,7 +168,8 @@ async fn fake_google() -> (Endpoints, Log) {
 }
 
 fn client(endpoints: Endpoints) -> GoogleHttp {
-    GoogleHttp::new(endpoints, "client".into(), "secret".into()).expect("client")
+    GoogleHttp::new(endpoints, "client".into(), "secret".into())
+        .expect("client")
 }
 
 #[tokio::test]

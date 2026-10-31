@@ -25,7 +25,9 @@ use crate::team::TeamKey;
 use crate::workflow::Category;
 
 /// A project's lifecycle status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum ProjectStatus {
     /// Not planned yet.
@@ -50,7 +52,18 @@ impl ProjectStatus {
 }
 
 /// A project's health, set by a person in an update.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Health {
     /// On track.
@@ -62,7 +75,9 @@ pub enum Health {
 }
 
 /// How often a project's lead is reminded to post an update.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Cadence {
     /// Every 7 days.
@@ -202,16 +217,23 @@ fn parse_page<T: serde::de::DeserializeOwned>(
         path: path.to_owned(),
         reason,
     };
-    let (front, body) = split_front_matter(text).map_err(|r| err(r.to_owned()))?;
-    let value = serde_saphyr::from_str(front).map_err(|e| err(e.to_string()))?;
+    let (front, body) =
+        split_front_matter(text).map_err(|r| err(r.to_owned()))?;
+    let value =
+        serde_saphyr::from_str(front).map_err(|e| err(e.to_string()))?;
     Ok((value, body.to_owned()))
 }
 
-fn write_page<T: Serialize>(value: &T, body: &str, path: &str) -> Result<String, WorkError> {
-    let front = serde_saphyr::to_string(value).map_err(|e| WorkError::File {
-        path: path.to_owned(),
-        reason: e.to_string(),
-    })?;
+fn write_page<T: Serialize>(
+    value: &T,
+    body: &str,
+    path: &str,
+) -> Result<String, WorkError> {
+    let front =
+        serde_saphyr::to_string(value).map_err(|e| WorkError::File {
+            path: path.to_owned(),
+            reason: e.to_string(),
+        })?;
     Ok(join_front_matter(&front, body))
 }
 
@@ -260,7 +282,11 @@ impl Project {
 
     /// Whether an update is due on `today`, given the last update's time.
     #[must_use]
-    pub fn update_due(&self, last_update: Option<OffsetDateTime>, today: Date) -> bool {
+    pub fn update_due(
+        &self,
+        last_update: Option<OffsetDateTime>,
+        today: Date,
+    ) -> bool {
         if !self.status.is_active() {
             return false;
         }
@@ -345,7 +371,9 @@ fn slug_or_id(title: &str, id: &str) -> String {
 }
 
 /// Computed progress over a set of issues.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 pub struct Progress {
     /// Points in scope (canceled and duplicate issues excluded).
     pub scope: u32,
@@ -368,7 +396,9 @@ impl Progress {
         self.scope = self.scope.saturating_add(points);
         self.issues = self.issues.saturating_add(1);
         match category {
-            Category::Started => self.started = self.started.saturating_add(points),
+            Category::Started => {
+                self.started = self.started.saturating_add(points);
+            }
             Category::Completed => {
                 self.completed = self.completed.saturating_add(points);
                 self.completed_issues = self.completed_issues.saturating_add(1);
@@ -453,10 +483,16 @@ impl fmt::Display for ProjectChange {
             Self::StartDate(old, new) => {
                 write!(f, "Start date moved from {} to {}", day(old), day(new))
             }
-            Self::Status(old, new) => write!(f, "Status changed from {old:?} to {new:?}"),
-            Self::Lead(old, new) => write!(f, "Lead changed from {} to {}", who(old), who(new)),
+            Self::Status(old, new) => {
+                write!(f, "Status changed from {old:?} to {new:?}")
+            }
+            Self::Lead(old, new) => {
+                write!(f, "Lead changed from {} to {}", who(old), who(new))
+            }
             Self::MilestoneAdded(name) => write!(f, "Milestone {name} added"),
-            Self::MilestoneRemoved(name) => write!(f, "Milestone {name} removed"),
+            Self::MilestoneRemoved(name) => {
+                write!(f, "Milestone {name} removed")
+            }
             Self::MilestoneMoved(name, old, new) => {
                 write!(
                     f,
@@ -494,9 +530,13 @@ pub fn changes(before: &Project, after: &Project) -> Vec<ProjectChange> {
     for m in &after.milestones {
         match before.milestone(&m.id) {
             None => out.push(ProjectChange::MilestoneAdded(m.name.clone())),
-            Some(old) if old.target_date != m.target_date => out.push(
-                ProjectChange::MilestoneMoved(m.name.clone(), old.target_date, m.target_date),
-            ),
+            Some(old) if old.target_date != m.target_date => {
+                out.push(ProjectChange::MilestoneMoved(
+                    m.name.clone(),
+                    old.target_date,
+                    m.target_date,
+                ));
+            }
             Some(_) => {}
         }
     }
@@ -563,7 +603,8 @@ mod tests {
     fn pages_round_trip() {
         let p = project();
         assert_eq!(p.default_path(), "projects/traffic-replay/project.md");
-        let back = Project::from_markdown("p", &p.to_markdown().unwrap()).unwrap();
+        let back =
+            Project::from_markdown("p", &p.to_markdown().unwrap()).unwrap();
         assert_eq!(back, p);
         let no_team = p
             .to_markdown()
@@ -586,7 +627,8 @@ mod tests {
             "projects/traffic-replay/updates/2026-10-29-w9x0r1.md"
         );
         assert_eq!(
-            ProjectUpdate::from_markdown("u", &u.to_markdown().unwrap()).unwrap(),
+            ProjectUpdate::from_markdown("u", &u.to_markdown().unwrap())
+                .unwrap(),
             u
         );
 
@@ -662,7 +704,8 @@ mod tests {
             target_date: None,
         });
         b.start_date = None;
-        let text: Vec<String> = changes(&a, &b).iter().map(ToString::to_string).collect();
+        let text: Vec<String> =
+            changes(&a, &b).iter().map(ToString::to_string).collect();
         assert_eq!(text[0], "Target date moved from 2026-12-15 to 2027-01-15");
         assert!(text.contains(&"Milestone Beta added".to_owned()));
         assert!(text.contains(&"Lead changed from @dev to nobody".to_owned()));
@@ -680,7 +723,10 @@ mod tests {
         let mut done = project();
         done.status = ProjectStatus::Completed;
         assert_eq!(
-            rollup([(&a, Some(Health::AtRisk)), (&done, Some(Health::OffTrack))]),
+            rollup([
+                (&a, Some(Health::AtRisk)),
+                (&done, Some(Health::OffTrack))
+            ]),
             Some(Health::AtRisk)
         );
         assert_eq!(rollup([(&a, None)]), None);

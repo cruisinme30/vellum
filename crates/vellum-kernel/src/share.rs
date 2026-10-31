@@ -16,7 +16,8 @@ use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 use zeroize::Zeroizing;
 
-const BASE62: &[u8; 62] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+const BASE62: &[u8; 62] =
+    b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 /// Bytes at or above this value are rejected so `byte % 62` stays uniform.
 const REJECT_FROM: u8 = 248;
 
@@ -59,7 +60,8 @@ impl ShareToken {
                 if token.len() == Self::LEN {
                     break;
                 }
-                let c = BASE62.get(usize::from(byte % 62)).copied().unwrap_or(b'0');
+                let c =
+                    BASE62.get(usize::from(byte % 62)).copied().unwrap_or(b'0');
                 token.push(char::from(c));
             }
         }
@@ -84,7 +86,9 @@ impl FromStr for ShareToken {
 
     /// Accepts a token presented in a link, checking only its shape.
     fn from_str(text: &str) -> Result<Self, Self::Err> {
-        if text.len() == Self::LEN && text.bytes().all(|b| b.is_ascii_alphanumeric()) {
+        if text.len() == Self::LEN
+            && text.bytes().all(|b| b.is_ascii_alphanumeric())
+        {
             Ok(Self(Zeroizing::new(text.to_owned())))
         } else {
             Err(ShareTokenError::Malformed)
@@ -155,22 +159,31 @@ impl FromStr for ShareTokenHash {
             return Err(ShareTokenError::MalformedHash);
         }
         let mut bytes = [0_u8; 32];
-        for (byte, pair) in bytes.iter_mut().zip(text.as_bytes().chunks_exact(2)) {
-            let pair = std::str::from_utf8(pair).map_err(|_| ShareTokenError::MalformedHash)?;
-            *byte = u8::from_str_radix(pair, 16).map_err(|_| ShareTokenError::MalformedHash)?;
+        for (byte, pair) in
+            bytes.iter_mut().zip(text.as_bytes().chunks_exact(2))
+        {
+            let pair = std::str::from_utf8(pair)
+                .map_err(|_| ShareTokenError::MalformedHash)?;
+            *byte = u8::from_str_radix(pair, 16)
+                .map_err(|_| ShareTokenError::MalformedHash)?;
         }
         Ok(Self(bytes))
     }
 }
 
 impl Serialize for ShareTokenHash {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self)
     }
 }
 
 impl<'de> Deserialize<'de> for ShareTokenHash {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         let text = <std::borrow::Cow<'de, str>>::deserialize(deserializer)?;
         text.parse().map_err(serde::de::Error::custom)
     }
@@ -194,7 +207,8 @@ mod tests {
         let token: ShareToken = "0123456789abcdefABCDEF".parse()?;
         // printf %s 0123456789abcdefABCDEF | sha256sum
         let expected: ShareTokenHash =
-            "1f55b9dbb34db31ee615fea98af1b62ec6f169bb38355164364099813349e079".parse()?;
+            "1f55b9dbb34db31ee615fea98af1b62ec6f169bb38355164364099813349e079"
+                .parse()?;
         assert_eq!(token.hash(), expected);
         assert_eq!(
             expected.to_string(),

@@ -165,7 +165,8 @@ pub struct Changes {
 }
 
 impl Changes {
-    pub(crate) fn merge(&mut self, other: Self) {
+    /// Adds what `other` changed, for a command made of several steps.
+    pub fn merge(&mut self, other: Self) {
         self.issues.extend(other.issues);
         self.removed_paths.extend(other.removed_paths);
         self.teams.extend(other.teams);
@@ -220,7 +221,9 @@ impl WorkGraph {
     /// the [`Team::check`] error.
     pub fn insert_team(&mut self, team: Team) -> Result<()> {
         team.check()?;
-        if self.teams.contains_key(&team.key) || self.teams.values().any(|t| t.id == team.id) {
+        if self.teams.contains_key(&team.key)
+            || self.teams.values().any(|t| t.id == team.id)
+        {
             return Err(WorkError::DuplicateTeam(team.key));
         }
         let _ = self.teams.insert(team.key.clone(), team);
@@ -235,12 +238,21 @@ impl WorkGraph {
     /// # Errors
     ///
     /// Returns [`WorkError::UnknownTeam`] or the [`Team::check`] error.
-    pub fn update_team(&mut self, team: Team) -> Result<Changes> {
+    pub fn update_team(&mut self, mut team: Team) -> Result<Changes> {
         team.check()?;
         let old = self
             .teams
             .get(&team.key)
             .ok_or_else(|| WorkError::UnknownTeam(team.key.clone()))?;
+        if team.id != old.id {
+            return Err(WorkError::TeamConfig {
+                team: team.key.clone(),
+                reason: "the team ID cannot change".to_owned(),
+            });
+        }
+        // A settings file read before an issue was filed must not hand its
+        // number out again: numbers only grow.
+        team.last_number = team.last_number.max(old.last_number);
         let mut changes = Changes::default();
         diff_labels(
             Some(&team.key),
@@ -251,6 +263,40 @@ impl WorkGraph {
         let _ = changes.teams.insert(team.key.clone());
         let _ = self.teams.insert(team.key.clone(), team);
         Ok(changes)
+    }
+
+    /// Archives or restores a team (D303). An archived team keeps its
+    /// issues, keys and history but takes no new issues, by creation, a
+    /// triage rule or a move. Setting the state it already has changes
+    /// nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkError::UnknownTeam`].
+    pub fn set_team_archived(
+        &mut self,
+        key: &TeamKey,
+        archived: bool,
+    ) -> Result<Changes> {
+        let team = self
+            .teams
+            .get_mut(key)
+            .ok_or_else(|| WorkError::UnknownTeam(key.clone()))?;
+        let mut changes = Changes::default();
+        if team.archived != archived {
+            team.archived = archived;
+            let _ = changes.teams.insert(key.clone());
+        }
+        Ok(changes)
+    }
+
+    /// The team, refusing an archived one: it takes no new issues.
+    fn open_team(&self, key: &TeamKey) -> Result<&Team> {
+        let team = self.team_ref(key)?;
+        if team.archived {
+            return Err(WorkError::ArchivedTeam(key.clone()));
+        }
+        Ok(team)
     }
 
     /// Replaces the workspace-wide labels.
@@ -467,15 +513,19 @@ impl WorkGraph {
     pub fn project_progress(&self, id: &ProjectId) -> project::ProjectProgress {
         project::progress(
             id,
-            self.issues
-                .values()
-                .filter_map(|i| self.category_of(i).map(|c| (i, c, self.points(i)))),
+            self.issues.values().filter_map(|i| {
+                self.category_of(i).map(|c| (i, c, self.points(i)))
+            }),
         )
     }
 
     /// An evaluation context for filters over this graph.
     #[must_use]
-    pub fn eval_context<'a>(&'a self, ctx: &Ctx, me: Option<&'a UserRef>) -> EvalContext<'a> {
+    pub fn eval_context<'a>(
+        &'a self,
+        ctx: &Ctx,
+        me: Option<&'a UserRef>,
+    ) -> EvalContext<'a> {
         EvalContext {
             today: ctx.today,
             now: ctx.now,
@@ -485,7 +535,10 @@ impl WorkGraph {
     }
 
     fn snapshot(&self, issue: &Issue) -> IssueSnapshot {
-        IssueSnapshot::of(issue, self.category_of(issue).unwrap_or(Category::Backlog))
+        IssueSnapshot::of(
+            issue,
+            self.category_of(issue).unwrap_or(Category::Backlog),
+        )
     }
 
     pub(crate) fn team_ref(&self, key: &TeamKey) -> Result<&Team> {
@@ -555,11 +608,12 @@ impl WorkGraph {
             });
         }
         if let Some(p) = &issue.project {
-            let project = self.projects.get(p).ok_or_else(|| WorkError::Invalid {
-                what: "project",
-                value: p.to_string(),
-                reason: "does not exist",
-            })?;
+            let project =
+                self.projects.get(p).ok_or_else(|| WorkError::Invalid {
+                    what: "project",
+                    value: p.to_string(),
+                    reason: "does not exist",
+                })?;
             if let Some(m) = &issue.milestone
                 && project.milestone(m).is_none()
             {
@@ -628,19 +682,25 @@ impl WorkGraph {
     /// Returns a validation error and changes nothing if any field is
     /// invalid.
     #[instrument(skip_all, fields(team = %draft.team, issue = %draft.id))]
-    pub fn create_issue(&mut self, draft: NewIssue, ctx: &Ctx) -> Result<Changes> {
+    pub fn create_issue(
+        &mut self,
+        draft: NewIssue,
+        ctx: &Ctx,
+    ) -> Result<Changes> {
         if self.issues.contains_key(&draft.id) {
             return Err(WorkError::DuplicateIssue(draft.id));
         }
         let mut issue = self.draft_to_issue(draft, ctx)?;
         // Triage rules route the issue before it gets a number.
         let rule_name = self.route_by_rules(&mut issue, ctx)?;
-        let category = self
-            .category_of(&issue)
-            .ok_or_else(|| WorkError::UnknownStatus {
+        // Checked after routing: a rule may point at an archived team.
+        let _ = self.open_team(&issue.team)?;
+        let category = self.category_of(&issue).ok_or_else(|| {
+            WorkError::UnknownStatus {
                 team: issue.team.clone(),
                 status: issue.state.to_string(),
-            })?;
+            }
+        })?;
         if category == Category::Started || category == Category::Completed {
             let _ = issue.started_at.get_or_insert(ctx.now);
         }
@@ -656,8 +716,12 @@ impl WorkGraph {
 
         let mut changes = Changes::default();
         let policy = self.team_ref(&issue.team)?.sla.clone();
-        let sla_change =
-            sla::evaluate(&mut issue, category, &policy, &self.eval_context(ctx, None));
+        let sla_change = sla::evaluate(
+            &mut issue,
+            category,
+            &policy,
+            &self.eval_context(ctx, None),
+        );
 
         let team = self
             .teams
@@ -680,40 +744,47 @@ impl WorkGraph {
             triage_rule: rule_name,
         });
         push_sla_event(&sla_change, issue, snap, &mut changes);
-        info!(monotonic_counter.work_issues_created = 1_u64, team = %issue.team, "issue created");
+        info!(
+            monotonic_counter.work_issues_created = 1_u64,
+            team = %issue.team,
+            "issue created"
+        );
         Ok(changes)
     }
 
     fn draft_to_issue(&self, mut draft: NewIssue, ctx: &Ctx) -> Result<Issue> {
         let team = self.team_ref(&draft.team)?;
         if let Some(name) = draft.template.clone() {
-            let t = team
-                .templates
-                .iter()
-                .find(|t| t.name == name)
-                .ok_or(WorkError::Invalid {
+            let t = team.templates.iter().find(|t| t.name == name).ok_or(
+                WorkError::Invalid {
                     what: "template",
                     value: name,
                     reason: "is not a template of the team",
-                })?;
+                },
+            )?;
             t.apply(&mut draft);
         }
-        let creator_is_member = ctx.actor.as_ref().is_some_and(|a| team.is_member(a));
-        let to_triage =
-            draft.state.is_none() && team.triage && (draft.intake || !creator_is_member);
+        let creator_is_member =
+            ctx.actor.as_ref().is_some_and(|a| team.is_member(a));
+        let to_triage = draft.state.is_none()
+            && team.triage
+            && (draft.intake || !creator_is_member);
         let state = match &draft.state {
             Some(s) => s.clone(),
-            None if to_triage => team
-                .workflow
-                .first_in(Category::Triage)
-                .map_or_else(|| team.workflow.default.clone(), |s| s.key.clone()),
+            None if to_triage => {
+                team.workflow.first_in(Category::Triage).map_or_else(
+                    || team.workflow.default.clone(),
+                    |s| s.key.clone(),
+                )
+            }
             None => team.workflow.default.clone(),
         };
         let provisional = IssueKey {
             team: draft.team.clone(),
             number: u64::MAX,
         };
-        let mut issue = Issue::new(draft.id, provisional, &draft.title, state, ctx.now);
+        let mut issue =
+            Issue::new(draft.id, provisional, &draft.title, state, ctx.now);
         issue.body = draft.body;
         issue.priority = draft.priority.unwrap_or_default();
         issue.estimate = draft.estimate;
@@ -737,24 +808,33 @@ impl WorkGraph {
 
     /// Runs the team's triage rules on an issue entering triage and
     /// returns the name of the rule that matched.
-    fn route_by_rules(&self, issue: &mut Issue, ctx: &Ctx) -> Result<Option<String>> {
+    fn route_by_rules(
+        &self,
+        issue: &mut Issue,
+        ctx: &Ctx,
+    ) -> Result<Option<String>> {
         if self.category_of(issue) == Some(Category::Triage) {
             let ectx = self.eval_context(ctx, None);
-            if let Some(rule) =
-                triage::first_match(&self.team_ref(&issue.team)?.triage_rules, issue, &ectx)
-            {
+            if let Some(rule) = triage::first_match(
+                &self.team_ref(&issue.team)?.triage_rules,
+                issue,
+                &ectx,
+            ) {
                 let name = rule.name.clone();
                 let actions = rule.then.clone();
                 triage::apply_rule(issue, &actions);
-                if let Some(target) = actions.team.filter(|t| t != &issue.team) {
+                if let Some(target) = actions.team.filter(|t| t != &issue.team)
+                {
                     let other = self.team_ref(&target)?;
-                    let inbox = other.workflow.first_in(Category::Triage).ok_or_else(|| {
-                        WorkError::TeamConfig {
+                    let inbox = other
+                        .workflow
+                        .first_in(Category::Triage)
+                        .ok_or_else(|| WorkError::TeamConfig {
                             team: target.clone(),
-                            reason: "a triage rule routes here but the team has no triage"
+                            reason: "a triage rule routes here but the team \
+                                has no triage"
                                 .to_owned(),
-                        }
-                    })?;
+                        })?;
                     issue.state = inbox.key.clone();
                     issue.team = target;
                     issue.cycle = None;
@@ -765,11 +845,17 @@ impl WorkGraph {
         Ok(None)
     }
 
-    fn auto_add_to_cycle(&self, issue: &mut Issue, category: Category, today: Date) {
+    fn auto_add_to_cycle(
+        &self,
+        issue: &mut Issue,
+        category: Category,
+        today: Date,
+    ) {
         if issue.cycle.is_some() {
             return;
         }
-        let Some(settings) = self.teams.get(&issue.team).and_then(|t| t.cycles) else {
+        let Some(settings) = self.teams.get(&issue.team).and_then(|t| t.cycles)
+        else {
             return;
         };
         let wanted = match category {
@@ -829,35 +915,46 @@ impl WorkGraph {
     /// Returns a validation error and changes nothing if any field is
     /// invalid.
     #[instrument(skip_all, fields(issue = %id))]
-    pub fn update_issue(&mut self, id: &IssueId, patch: IssuePatch, ctx: &Ctx) -> Result<Changes> {
+    pub fn update_issue(
+        &mut self,
+        id: &IssueId,
+        patch: IssuePatch,
+        ctx: &Ctx,
+    ) -> Result<Changes> {
         let before = self.issue_ref(id)?.clone();
         let workflow = self.team_ref(&before.team)?.workflow.clone();
         let mut issue = before.clone();
         let state = apply_patch(&mut issue, patch);
         let state_change = match state.filter(|s| s != &issue.state) {
             Some(s) => {
-                let (from_cat, to_cat) = issue.set_state(s, &workflow, ctx.now)?;
+                let (from_cat, to_cat) =
+                    issue.set_state(s, &workflow, ctx.now)?;
                 Some((before.state.clone(), from_cat, to_cat))
             }
             None => None,
         };
-        let category =
-            workflow
-                .category_of(&issue.state)
-                .ok_or_else(|| WorkError::UnknownStatus {
-                    team: issue.team.clone(),
-                    status: issue.state.to_string(),
-                })?;
+        let category = workflow.category_of(&issue.state).ok_or_else(|| {
+            WorkError::UnknownStatus {
+                team: issue.team.clone(),
+                status: issue.state.to_string(),
+            }
+        })?;
         if state_change.is_some() {
             self.auto_add_to_cycle(&mut issue, category, ctx.today);
         }
         self.check_fields(&issue)?;
         let policy = self.team_ref(&issue.team)?.sla.clone();
-        let sla_change =
-            sla::evaluate(&mut issue, category, &policy, &self.eval_context(ctx, None));
+        let sla_change = sla::evaluate(
+            &mut issue,
+            category,
+            &policy,
+            &self.eval_context(ctx, None),
+        );
 
         let field_changes = diff_fields(&before, &issue);
-        if field_changes.is_empty() && state_change.is_none() && sla_change == SlaChange::Unchanged
+        if field_changes.is_empty()
+            && state_change.is_none()
+            && sla_change == SlaChange::Unchanged
         {
             return Ok(Changes::default());
         }
@@ -908,7 +1005,12 @@ impl WorkGraph {
     /// # Errors
     ///
     /// As [`WorkGraph::update_issue`].
-    pub fn set_state(&mut self, id: &IssueId, state: StatusKey, ctx: &Ctx) -> Result<Changes> {
+    pub fn set_state(
+        &mut self,
+        id: &IssueId,
+        state: StatusKey,
+        ctx: &Ctx,
+    ) -> Result<Changes> {
         let patch = IssuePatch {
             state: Some(state),
             ..IssuePatch::default()
@@ -927,13 +1029,18 @@ impl WorkGraph {
     ///
     /// Returns [`WorkError::UnknownTeam`] or [`WorkError::UnknownIssue`].
     #[instrument(skip_all, fields(issue = %id, to = %to))]
-    pub fn move_issue(&mut self, id: &IssueId, to: &TeamKey, ctx: &Ctx) -> Result<Changes> {
+    pub fn move_issue(
+        &mut self,
+        id: &IssueId,
+        to: &TeamKey,
+        ctx: &Ctx,
+    ) -> Result<Changes> {
         let before = self.issue_ref(id)?.clone();
         if &before.team == to {
             return Ok(Changes::default());
         }
         let category = self.category_of(&before).unwrap_or(Category::Backlog);
-        let target = self.team_ref(to)?;
+        let target = self.open_team(to)?;
         let mut issue = before.clone();
         issue.state = target.workflow.map_from(&before.state, category);
         issue.team = to.clone();
@@ -982,7 +1089,12 @@ impl WorkGraph {
     /// Returns [`WorkError::InvalidState`] if the issue is not in triage,
     /// and [`WorkError::UnknownIssue`] if a duplicate target is unknown.
     #[instrument(skip_all, fields(issue = %id))]
-    pub fn triage(&mut self, id: &IssueId, action: &TriageAction, ctx: &Ctx) -> Result<Changes> {
+    pub fn triage(
+        &mut self,
+        id: &IssueId,
+        action: &TriageAction,
+        ctx: &Ctx,
+    ) -> Result<Changes> {
         if let TriageAction::Duplicate { of } = action {
             let _ = self.issue_ref(of)?;
         }
@@ -990,10 +1102,15 @@ impl WorkGraph {
         let team = self.team_ref(&issue.team)?;
         let workflow = team.workflow.clone();
         let policy = team.sla.clone();
-        let (_, category) = triage::decide(&mut issue, action, &workflow, ctx.now)?;
+        let (_, category) =
+            triage::decide(&mut issue, action, &workflow, ctx.now)?;
         self.auto_add_to_cycle(&mut issue, category, ctx.today);
-        let sla_change =
-            sla::evaluate(&mut issue, category, &policy, &self.eval_context(ctx, None));
+        let sla_change = sla::evaluate(
+            &mut issue,
+            category,
+            &policy,
+            &self.eval_context(ctx, None),
+        );
         let _ = self.issues.insert(*id, issue);
         let mut changes = Changes::default();
         let _ = changes.issues.insert(*id);
@@ -1032,7 +1149,8 @@ impl WorkGraph {
             .values()
             .filter_map(|t| t.cycles.map(|s| (t, s)))
             .map(|(t, s)| {
-                cycle::plan(&t.key, &s, self.cycles(&t.key), today).map(|c| (t.key.clone(), c))
+                cycle::plan(&t.key, &s, self.cycles(&t.key), today)
+                    .map(|c| (t.key.clone(), c))
             })
             .collect::<Result<_>>()?;
         for (team, new) in planned {
@@ -1076,12 +1194,16 @@ impl WorkGraph {
                 let ids: Vec<IssueId> = self
                     .issues
                     .values()
-                    .filter(|i| i.team == team && i.cycle.as_ref() == Some(&from))
+                    .filter(|i| {
+                        i.team == team && i.cycle.as_ref() == Some(&from)
+                    })
                     .map(|i| i.id)
                     .collect();
                 for id in ids {
-                    let category = self.issues.get(&id).and_then(|i| self.category_of(i));
-                    let action = category.map_or(Rollover::Keep, cycle::rollover_action);
+                    let category =
+                        self.issues.get(&id).and_then(|i| self.category_of(i));
+                    let action =
+                        category.map_or(Rollover::Keep, cycle::rollover_action);
                     let Some(issue) = self.issues.get_mut(&id) else {
                         continue;
                     };
@@ -1090,7 +1212,8 @@ impl WorkGraph {
                             issue.cycle = Some(t.clone());
                             moved.push(id);
                         }
-                        (Rollover::MoveToNext, None) | (Rollover::Remove, _) => {
+                        (Rollover::MoveToNext, None)
+                        | (Rollover::Remove, _) => {
                             issue.cycle = None;
                             removed.push(id);
                         }
@@ -1194,10 +1317,113 @@ impl WorkGraph {
     /// # Errors
     ///
     /// As [`WorkGraph::ensure_cycles`].
-    pub fn daily(&mut self, now: OffsetDateTime, today: Date) -> Result<Changes> {
+    pub fn daily(
+        &mut self,
+        now: OffsetDateTime,
+        today: Date,
+    ) -> Result<Changes> {
         let mut changes = self.ensure_cycles(today)?;
         changes.merge(self.rollover(now, today));
         changes.merge(self.record_burn_up(today));
+        Ok(changes)
+    }
+
+    /// Sets or clears how often an issue repeats.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkError::UnknownIssue`] for an unknown issue,
+    /// and [`WorkError::Invalid`] when a repeat is set on an issue with no
+    /// due date (it would never fire).
+    pub fn set_repeat(
+        &mut self,
+        id: &IssueId,
+        repeat: Option<crate::recur::Repeat>,
+        now: OffsetDateTime,
+    ) -> Result<Changes> {
+        let issue = self.issue_ref(id)?;
+        if repeat == issue.repeat {
+            return Ok(Changes::default());
+        }
+        if let Some(r) = repeat.filter(|_| issue.due.is_none()) {
+            return Err(WorkError::Invalid {
+                what: "repeat",
+                value: r.to_string(),
+                reason: "a repeating issue needs a due date",
+            });
+        }
+        let issue = self
+            .issues
+            .get_mut(id)
+            .ok_or_else(|| WorkError::UnknownIssue(id.to_string()))?;
+        issue.repeat = repeat;
+        issue.updated_at = now;
+        let mut changes = Changes::default();
+        let _ = changes.issues.insert(*id);
+        Ok(changes)
+    }
+
+    /// Files the next issue of every repeating issue whose due date is before
+    /// today in its team's time zone, as `today_of` gives it (D224): run every
+    /// few minutes, that is 00:01 team time the day after. The copy keeps the
+    /// team, title, description, priority, estimate, assignee, labels, project
+    /// and milestone, starts in the team's default status and takes over the
+    /// repeat; the old issue keeps its history and stops repeating.
+    ///
+    /// # Errors
+    ///
+    /// As [`WorkGraph::create_issue`]; nothing changes for the issue that
+    /// failed, and earlier ones stay filed.
+    pub fn recur(
+        &mut self,
+        now: OffsetDateTime,
+        today_of: impl Fn(&Team) -> Date,
+        mut new_id: impl FnMut() -> IssueId,
+    ) -> Result<Changes> {
+        let due: Vec<(IssueId, crate::recur::Repeat, Date, Date)> = self
+            .issues
+            .values()
+            .filter_map(|i| {
+                let today = today_of(self.teams.get(&i.team)?);
+                Some((i.id, i.repeat?, i.due?, today))
+            })
+            .filter(|(_, _, due, today)| due < today)
+            .collect();
+        let mut changes = Changes::default();
+        for (id, repeat, due_on, today) in due {
+            let ctx = Ctx {
+                now,
+                today,
+                actor: None,
+            };
+            let ctx = &ctx;
+            let old = self.issue_ref(&id)?.clone();
+            let Some(team) = self.teams.get(&old.team) else {
+                continue;
+            };
+            let mut draft =
+                NewIssue::new(new_id(), old.team.clone(), &old.title);
+            draft.body.clone_from(&old.body);
+            draft.state = Some(team.workflow.default.clone());
+            draft.priority = Some(old.priority);
+            draft.estimate = old.estimate;
+            draft.assignee.clone_from(&old.assignee);
+            draft.labels.clone_from(&old.labels);
+            draft.project = old.project;
+            draft.milestone = old.milestone;
+            draft.due = Some(repeat.next_on_or_after(due_on, ctx.today));
+            let next = draft.id;
+            changes.merge(self.create_issue(draft, ctx)?);
+            if let Some(i) = self.issues.get_mut(&next) {
+                i.repeat = Some(repeat);
+                i.creator.clone_from(&old.creator);
+            }
+            if let Some(i) = self.issues.get_mut(&id) {
+                i.repeat = None;
+                i.updated_at = ctx.now;
+            }
+            let _ = changes.issues.insert(id);
+        }
         Ok(changes)
     }
 }
@@ -1217,7 +1443,8 @@ fn apply_patch(issue: &mut Issue, patch: IssuePatch) -> Option<StatusKey> {
         issue.estimate = e;
     }
     if let Some(a) = patch.assignee {
-        if let Some(who) = a.as_ref().filter(|w| !issue.subscribers.contains(w)) {
+        if let Some(who) = a.as_ref().filter(|w| !issue.subscribers.contains(w))
+        {
             issue.subscribers.push(who.clone());
         }
         issue.assignee = a;
@@ -1269,7 +1496,12 @@ fn apply_patch(issue: &mut Issue, patch: IssuePatch) -> Option<StatusKey> {
     patch.state
 }
 
-fn push_sla_event(change: &SlaChange, issue: &Issue, snap: IssueSnapshot, changes: &mut Changes) {
+fn push_sla_event(
+    change: &SlaChange,
+    issue: &Issue,
+    snap: IssueSnapshot,
+    changes: &mut Changes,
+) {
     match (change, &issue.sla) {
         (SlaChange::Started | SlaChange::Resumed, Some(s)) => {
             changes.events.push(WorkEvent::SlaStarted {
@@ -1288,7 +1520,12 @@ fn push_sla_event(change: &SlaChange, issue: &Issue, snap: IssueSnapshot, change
     }
 }
 
-fn diff_labels(team: Option<&TeamKey>, old: &[Label], new: &[Label], events: &mut Vec<WorkEvent>) {
+fn diff_labels(
+    team: Option<&TeamKey>,
+    old: &[Label],
+    new: &[Label],
+    events: &mut Vec<WorkEvent>,
+) {
     let mut push = |label: &Label, change: &str| {
         events.push(WorkEvent::LabelChanged {
             team: team.cloned(),

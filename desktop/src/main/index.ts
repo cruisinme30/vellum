@@ -3,6 +3,7 @@
 
 // The Electron main process: wires Electron to the tested modules.
 
+import { hostname } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,11 +29,13 @@ import {
   fileDisk,
   freePort,
   readOptionalFile,
+  runBinary,
   safeStorageVault,
   spawnChild,
 } from "./electron-adapters.js";
 import type { Fetch } from "./fetch.js";
 import { bridgeHandlers, dispatch } from "./ipc.js";
+import { PrivateSpaces } from "./private.js";
 import {
   APP_HOST,
   APP_SCHEME,
@@ -49,8 +52,12 @@ import { TokenStore } from "./token-store.js";
 import { startUpdates } from "./updater.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const resources = app.isPackaged ? process.resourcesPath : path.resolve(here, "../../..");
-const webRoot = app.isPackaged ? path.join(resources, "web") : path.join(resources, "web", "dist");
+const resources = app.isPackaged
+  ? process.resourcesPath
+  : path.resolve(here, "../../..");
+const webRoot = app.isPackaged
+  ? path.join(resources, "web")
+  : path.join(resources, "web", "dist");
 const binaryName = process.platform === "win32" ? "vellum.exe" : "vellum";
 const binary = app.isPackaged
   ? path.join(resources, "bin", binaryName)
@@ -60,7 +67,12 @@ const fetchFromMain: Fetch = (input, init) => net.fetch(input, init);
 protocol.registerSchemesAsPrivileged([
   {
     scheme: APP_SCHEME,
-    privileges: { standard: true, secure: true, supportFetchAPI: true, codeCache: true },
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      codeCache: true,
+    },
   },
 ]);
 
@@ -84,7 +96,9 @@ function openLink(link: string): void {
 }
 
 app.on("second-instance", (_event, argv) => {
-  const link = argv.find((argument) => argument.startsWith(`${DEEP_LINK_SCHEME}://`));
+  const link = argv.find((argument) =>
+    argument.startsWith(`${DEEP_LINK_SCHEME}://`),
+  );
   if (link === undefined) window?.focus();
   else openLink(link);
 });
@@ -93,7 +107,8 @@ app.on("open-url", (event, link) => {
   openLink(link);
 });
 
-// Every web contents: no new windows, no navigation away, links go to the system browser.
+// Every web contents: no new windows, no navigation away, links go to the
+// system browser.
 app.on("web-contents-created", (_event, contents) => {
   contents.setWindowOpenHandler(({ url }) => {
     if (isSafeExternal(url)) void shell.openExternal(url);
@@ -113,7 +128,9 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => sidecar?.stop());
 
 async function serverUrl(): Promise<string> {
-  const settingsDisk = fileDisk(path.join(app.getPath("userData"), "settings.json"));
+  const settingsDisk = fileDisk(
+    path.join(app.getPath("userData"), "settings.json"),
+  );
   const fromArgv = settingsFromArgv(process.argv);
   if (fromArgv !== undefined) await saveSettings(settingsDisk, fromArgv);
   const settings = fromArgv ?? (await loadSettings(settingsDisk));
@@ -141,7 +158,10 @@ function createWindow(): BrowserWindow {
     title: "Vellum",
     backgroundColor: "#ffffff",
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "default",
-    webPreferences: webPreferences(path.join(here, "../preload/preload.cjs"), app.getVersion()),
+    webPreferences: webPreferences(
+      path.join(here, "../preload/preload.cjs"),
+      app.getVersion(),
+    ),
   });
   created.once("ready-to-show", () => {
     created.show();
@@ -178,21 +198,42 @@ async function start(): Promise<void> {
       csp: () => contentSecurityPolicy(server),
     }),
   );
-  session.defaultSession.setPermissionRequestHandler((contents, permission, callback) => {
-    callback(allowPermission(permission, contents.getURL()));
-  });
-  session.defaultSession.setPermissionCheckHandler((_contents, permission, origin) =>
-    allowPermission(permission, origin === `${APP_SCHEME}://${APP_HOST}` ? APP_URL : origin),
+  session.defaultSession.setPermissionRequestHandler(
+    (contents, permission, callback) => {
+      callback(allowPermission(permission, contents.getURL()));
+    },
+  );
+  session.defaultSession.setPermissionCheckHandler(
+    (_contents, permission, origin) =>
+      allowPermission(
+        permission,
+        origin === `${APP_SCHEME}://${APP_HOST}` ? APP_URL : origin,
+      ),
   );
 
+  const privateSpaces = new PrivateSpaces(
+    () => server,
+    () => auth.accessToken(),
+    {
+      run: runBinary(binary),
+      hostname,
+      pinDir: path.join(app.getPath("userData"), "private"),
+    },
+  );
   const handlers = bridgeHandlers({
     serverUrl: () => server,
     signIn: () => auth.signIn(),
     signOut: () => auth.signOut(),
     accessToken: () => auth.accessToken(),
     openExternal: (url) => shell.openExternal(url),
+    privateDeviceKey: () => privateSpaces.deviceKey(),
+    privateEnrol: (spaceId, label) => privateSpaces.enrol(spaceId, label),
+    privateReseal: (spaceId, trust) => privateSpaces.reseal(spaceId, trust),
     notify(notice) {
-      const shown = new Notification({ title: notice.title, body: notice.body });
+      const shown = new Notification({
+        title: notice.title,
+        body: notice.body,
+      });
       shown.on("click", () => {
         openLink(`${DEEP_LINK_SCHEME}:/${notice.url}`);
       });
@@ -212,7 +253,8 @@ async function start(): Promise<void> {
   });
 
   if (app.isPackaged) {
-    // electron-updater is CommonJS and defines autoUpdater lazily, so a named ESM import does not see it.
+    // electron-updater is CommonJS and defines autoUpdater lazily, so a named
+    // ESM import does not see it.
     // eslint-disable-next-line import-x/no-named-as-default-member
     startUpdates(electronUpdater.autoUpdater, {
       onReady(version) {

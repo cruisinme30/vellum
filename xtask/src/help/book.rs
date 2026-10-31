@@ -97,7 +97,8 @@ impl Book {
         let mut files = Vec::new();
         walk(dir, dir, &mut files)?;
         files.sort();
-        let listed: Vec<&str> = entries.iter().filter_map(|e| e.path.as_deref()).collect();
+        let listed: Vec<&str> =
+            entries.iter().filter_map(|e| e.path.as_deref()).collect();
         let unlisted = files
             .iter()
             .filter(|f| {
@@ -133,12 +134,14 @@ impl Book {
 
 /// Reads a UTF-8 file.
 pub fn read(path: &Path) -> Result<String, String> {
-    fs::read_to_string(path).map_err(|e| format!("cannot read {}: {e}", path.display()))
+    fs::read_to_string(path)
+        .map_err(|e| format!("cannot read {}: {e}", path.display()))
 }
 
 /// Lists files under `dir`, relative to `root`, with `/` separators.
 fn walk(root: &Path, dir: &Path, out: &mut Vec<String>) -> Result<(), String> {
-    let entries = fs::read_dir(dir).map_err(|e| format!("cannot list {}: {e}", dir.display()))?;
+    let entries = fs::read_dir(dir)
+        .map_err(|e| format!("cannot list {}: {e}", dir.display()))?;
     for entry in entries {
         let path = entry
             .map_err(|e| format!("cannot list {}: {e}", dir.display()))?
@@ -192,7 +195,9 @@ pub fn parse_manifest(text: &str) -> Manifest {
             manifest.header.push(line.to_owned());
             continue;
         }
-        if let Some(key) = line.strip_prefix("  ").filter(|l| !l.starts_with(' ')) {
+        if let Some(key) =
+            line.strip_prefix("  ").filter(|l| !l.starts_with(' '))
+        {
             if let Some(id) = key.trim_end().strip_suffix(':') {
                 manifest.nodes.push(Node {
                     id: markdown::unquote(id).to_owned(),
@@ -204,7 +209,9 @@ pub fn parse_manifest(text: &str) -> Manifest {
             && let Some(node) = manifest.nodes.last_mut()
         {
             match field.strip_prefix("path:") {
-                Some(path) => node.path = Some(markdown::unquote(path.trim()).to_owned()),
+                Some(path) => {
+                    node.path = Some(markdown::unquote(path.trim()).to_owned());
+                }
                 None => node.extra.push(line.to_owned()),
             }
         }
@@ -244,9 +251,12 @@ mod tests {
 
     #[test]
     fn summary_entries_and_drafts() {
-        let summary = "# Summary\n\n[Intro](README.md)\n\n# Part\n\n- [A](a/README.md)\n  - [B](a/b.md)\n  - [Draft]()\n\n---\n\n[Glossary](glossary.md)\n";
+        let summary = "# Summary\n\n[Intro](README.md)\n\n# Part\n\n\
+            - [A](a/README.md)\n  - [B](a/b.md)\n  - [Draft]()\n\n---\n\n\
+            [Glossary](glossary.md)\n";
         let entries = parse_summary(summary);
-        let paths: Vec<Option<&str>> = entries.iter().map(|e| e.path.as_deref()).collect();
+        let paths: Vec<Option<&str>> =
+            entries.iter().map(|e| e.path.as_deref()).collect();
         assert_eq!(
             paths,
             vec![
@@ -261,7 +271,11 @@ mod tests {
 
     #[test]
     fn manifest_round_trips() {
-        let yaml = "vellum: 1\nid: 01M63C8QH9FN872JSH5DQNY6E9\ntitle: User guide\nnodes:\n  01JB3K9Q7Z5N8M2X4V6T0R1Y3W:\n    path: README.md\n    owners: [user:priya]\n  01JB3K9Q7Z5N8M2X4V6T0R1Y3X:\n    path: a.md\n";
+        let yaml = "vellum: 1\nid: 01M63C8QH9FN872JSH5DQNY6E9\n\
+            title: User guide\n\
+            nodes:\n  01JB3K9Q7Z5N8M2X4V6T0R1Y3W:\n    path: README.md\n    \
+            owners: [user:priya]\n  01JB3K9Q7Z5N8M2X4V6T0R1Y3X:\n    path: \
+            a.md\n";
         let manifest = parse_manifest(yaml);
         assert_eq!(manifest.id.as_deref(), Some("01M63C8QH9FN872JSH5DQNY6E9"));
         assert_eq!(manifest.nodes.len(), 2);

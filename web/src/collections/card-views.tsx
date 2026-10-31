@@ -47,8 +47,13 @@ export function ListView({ info, result, onOpen }: ViewProperties) {
   return (
     <div className="vl-list-view">
       {result.groups.map((group) => (
-        <section key={group.label} aria-label={group.label === "" ? result.view : group.label}>
-          {group.label !== "" && <h2 className="vl-list-heading">{group.label}</h2>}
+        <section
+          key={group.label}
+          aria-label={group.label === "" ? result.view : group.label}
+        >
+          {group.label !== "" && (
+            <h2 className="vl-list-heading">{group.label}</h2>
+          )}
           <ul className="vl-list">
             {group.rows.map((row) => (
               <li key={row.id}>

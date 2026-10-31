@@ -1,7 +1,14 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { act, createEvent, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  createEvent,
+  fireEvent,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { NORTHSTAR, PAGE } from "../data/mock/northstar";
@@ -19,7 +26,8 @@ function renderTree(currentId?: string) {
     <Sidebar currentId={currentId} compact={false} onNavigate={onNavigate} />,
   );
   const tree = screen.getByRole("tree", { name: "Engineering pages" });
-  const item = (title: string) => within(tree).getByRole("treeitem", { name: title });
+  const item = (title: string) =>
+    within(tree).getByRole("treeitem", { name: title });
   const titles = () =>
     within(tree)
       .getAllByRole("treeitem")
@@ -29,7 +37,8 @@ function renderTree(currentId?: string) {
       item(title).focus();
     });
   };
-  const titleOf = (id: string) => rendered.store.getSnapshot().pages.find((p) => p.id === id);
+  const titleOf = (id: string) =>
+    rendered.store.getSnapshot().pages.find((p) => p.id === id);
   return { ...rendered, onNavigate, tree, item, titles, focusOn, titleOf };
 }
 
@@ -38,13 +47,23 @@ describe("visibleRows", () => {
 
   it("lists top-level pages only when nothing is expanded", () => {
     const rows = visibleRows(tree, new Set());
-    expect(rows.map((row) => row.node.page.id)).toEqual([PAGE.engHome, PAGE.roadmap]);
-    expect(rows[1]).toMatchObject({ level: 1, index: 1, size: 2, parentId: undefined });
+    expect(rows.map((row) => row.node.page.id)).toEqual([
+      PAGE.engHome,
+      PAGE.roadmap,
+    ]);
+    expect(rows[1]).toMatchObject({
+      level: 1,
+      index: 1,
+      size: 2,
+      parentId: undefined,
+    });
   });
 
   it("walks into expanded pages with their level and parent", () => {
     const rows = visibleRows(tree, new Set([PAGE.engHome, PAGE.gateway]));
-    expect(rows.map((row) => [row.node.page.id, row.level, row.parentId])).toEqual([
+    expect(
+      rows.map((row) => [row.node.page.id, row.level, row.parentId]),
+    ).toEqual([
       [PAGE.engHome, 1, undefined],
       [PAGE.gateway, 2, PAGE.engHome],
       [PAGE.rateLimits, 3, PAGE.gateway],
@@ -56,7 +75,10 @@ describe("visibleRows", () => {
 });
 
 describe("dropTarget", () => {
-  const rows = visibleRows(buildTree(NORTHSTAR.pages, ENGINEERING), new Set([PAGE.engHome]));
+  const rows = visibleRows(
+    buildTree(NORTHSTAR.pages, ENGINEERING),
+    new Set([PAGE.engHome]),
+  );
   const gateway = rows[1];
 
   it("drops before, inside or after a row by pointer height", () => {
@@ -101,7 +123,9 @@ describe("PageTree", () => {
     expect(current.getAttribute("aria-current")).toBe("page");
     expect(current.tabIndex).toBe(0);
     expect(item("Engineering home").tabIndex).toBe(-1);
-    expect(item("Gateway architecture").getAttribute("aria-expanded")).toBe("true");
+    expect(item("Gateway architecture").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
     expect(item("On-call handbook").hasAttribute("aria-expanded")).toBe(false);
   });
 
@@ -126,14 +150,18 @@ describe("PageTree", () => {
     const { user, item, focusOn, titles } = renderTree();
     focusOn("Gateway architecture");
     await user.keyboard("{ArrowRight}");
-    expect(item("Gateway architecture").getAttribute("aria-expanded")).toBe("true");
+    expect(item("Gateway architecture").getAttribute("aria-expanded")).toBe(
+      "true",
+    );
     expect(titles()).toContain("Runbook: deploy the gateway");
     await user.keyboard("{ArrowRight}");
     expect(document.activeElement).toBe(item("Rate limiting design"));
     await user.keyboard("{ArrowLeft}");
     expect(document.activeElement).toBe(item("Gateway architecture"));
     await user.keyboard("{ArrowLeft}");
-    expect(item("Gateway architecture").getAttribute("aria-expanded")).toBe("false");
+    expect(item("Gateway architecture").getAttribute("aria-expanded")).toBe(
+      "false",
+    );
     expect(titles()).not.toContain("Rate limiting design");
     focusOn("Platform roadmap 2027");
     await user.keyboard("{ArrowLeft}{ArrowRight}");
@@ -142,8 +170,12 @@ describe("PageTree", () => {
 
   it("toggles a page with its twisty without opening it", async () => {
     const { user, location } = renderTree();
-    await user.click(screen.getByRole("button", { name: "Expand Gateway architecture" }));
-    expect(screen.getByRole("button", { name: "Collapse Gateway architecture" })).toBeDefined();
+    await user.click(
+      screen.getByRole("button", { name: "Expand Gateway architecture" }),
+    );
+    expect(
+      screen.getByRole("button", { name: "Collapse Gateway architecture" }),
+    ).toBeDefined();
     expect(location()).toBe("/");
   });
 
@@ -157,28 +189,32 @@ describe("PageTree", () => {
     expect(onNavigate).toHaveBeenCalledTimes(2);
   });
 
-  it("renames with F2: Enter saves, Escape cancels, leaving the field saves", async () => {
-    const { user, item, focusOn, titleOf } = renderTree();
-    focusOn("On-call handbook");
-    await user.keyboard("{F2}");
-    const field = screen.getByRole("textbox", { name: "Page title" });
-    expect(document.activeElement).toBe(field);
-    await user.click(field);
-    await user.clear(field);
-    await user.keyboard("  Pager guide  {Enter}");
-    expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide");
-    expect(document.activeElement).toBe(item("Pager guide"));
+  it(
+    "renames with F2: Enter saves, Escape cancels, leaving the field " +
+      "saves",
+    async () => {
+      const { user, item, focusOn, titleOf } = renderTree();
+      focusOn("On-call handbook");
+      await user.keyboard("{F2}");
+      const field = screen.getByRole("textbox", { name: "Page title" });
+      expect(document.activeElement).toBe(field);
+      await user.click(field);
+      await user.clear(field);
+      await user.keyboard("  Pager guide  {Enter}");
+      expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide");
+      expect(document.activeElement).toBe(item("Pager guide"));
 
-    await user.keyboard("{F2}");
-    await user.keyboard("Ignored{Escape}");
-    expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide");
-    expect(screen.queryByRole("textbox")).toBeNull();
+      await user.keyboard("{F2}");
+      await user.keyboard("Ignored{Escape}");
+      expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide");
+      expect(screen.queryByRole("textbox")).toBeNull();
 
-    await user.keyboard("{F2}");
-    await user.keyboard("{End} v2");
-    await user.tab();
-    expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide v2");
-  });
+      await user.keyboard("{F2}");
+      await user.keyboard("{End} v2");
+      await user.tab();
+      expect(titleOf(PAGE.onCall)?.title).toBe("Pager guide v2");
+    },
+  );
 
   it("shows untitled pages by a placeholder name", () => {
     const { store, item } = renderTree();
@@ -218,7 +254,9 @@ describe("PageTree", () => {
     focusOn("On-call handbook");
     await user.keyboard("{Shift>}{F10}{/Shift}");
     const menu = screen.getByRole("menu");
-    expect(document.activeElement).toBe(within(menu).getAllByRole("menuitem")[0]);
+    expect(document.activeElement).toBe(
+      within(menu).getAllByRole("menuitem")[0],
+    );
   });
 });
 
@@ -232,7 +270,9 @@ function dataTransfer() {
 }
 
 function drop(target: HTMLElement, clientY: number, transfer = dataTransfer()) {
-  vi.spyOn(target, "getBoundingClientRect").mockReturnValue(new DOMRect(0, 0, 200, 40));
+  vi.spyOn(target, "getBoundingClientRect").mockReturnValue(
+    new DOMRect(0, 0, 200, 40),
+  );
   fireEvent.dragOver(target, { dataTransfer: transfer });
   // jsdom has no DragEvent, so the pointer position is set by hand.
   const event = createEvent.drop(target, { dataTransfer: transfer });
@@ -244,7 +284,9 @@ describe("PageTree drag and drop", () => {
   it("drops a page inside another row and expands it", () => {
     const { item, titleOf } = renderTree();
     const transfer = dataTransfer();
-    fireEvent.dragStart(item("Platform roadmap 2027"), { dataTransfer: transfer });
+    fireEvent.dragStart(item("Platform roadmap 2027"), {
+      dataTransfer: transfer,
+    });
     expect(transfer.getData("application/x-vellum-page")).toBe(PAGE.roadmap);
     expect(transfer.effectAllowed).toBe("move");
     drop(item("On-call handbook"), 20, transfer);
@@ -254,26 +296,36 @@ describe("PageTree drag and drop", () => {
 
   it("drops a page before or after a row", () => {
     const { item, titles } = renderTree();
-    fireEvent.dragStart(item("Platform roadmap 2027"), { dataTransfer: dataTransfer() });
+    fireEvent.dragStart(item("Platform roadmap 2027"), {
+      dataTransfer: dataTransfer(),
+    });
     drop(item("Engineering home"), 2);
     expect(titles()[0]).toBe("Platform roadmap 2027");
-    fireEvent.dragStart(item("Platform roadmap 2027"), { dataTransfer: dataTransfer() });
+    fireEvent.dragStart(item("Platform roadmap 2027"), {
+      dataTransfer: dataTransfer(),
+    });
     drop(item("Engineering home"), 38);
     expect(titles().at(-1)).toBe("Platform roadmap 2027");
   });
 
-  it("accepts a page dragged from elsewhere and ignores empty or self drops", () => {
-    const { item, titles, titleOf } = renderTree();
-    const before = titles();
-    drop(item("Engineering home"), 20);
-    expect(titles()).toEqual(before);
-    fireEvent.dragStart(item("On-call handbook"), { dataTransfer: dataTransfer() });
-    drop(item("On-call handbook"), 20);
-    expect(titleOf(PAGE.onCall)?.parentId).toBe(PAGE.engHome);
-    const foreign = dataTransfer();
-    foreign.setData("application/x-vellum-page", PAGE.launch);
-    drop(item("Platform roadmap 2027"), 38, foreign);
-    expect(titleOf(PAGE.launch)?.spaceId).toBe(ENGINEERING);
-    expect(titles().at(-1)).toBe("Launch checklist");
-  });
+  it(
+    "accepts a page dragged from elsewhere and ignores empty or self " +
+      "drops",
+    () => {
+      const { item, titles, titleOf } = renderTree();
+      const before = titles();
+      drop(item("Engineering home"), 20);
+      expect(titles()).toEqual(before);
+      fireEvent.dragStart(item("On-call handbook"), {
+        dataTransfer: dataTransfer(),
+      });
+      drop(item("On-call handbook"), 20);
+      expect(titleOf(PAGE.onCall)?.parentId).toBe(PAGE.engHome);
+      const foreign = dataTransfer();
+      foreign.setData("application/x-vellum-page", PAGE.launch);
+      drop(item("Platform roadmap 2027"), 38, foreign);
+      expect(titleOf(PAGE.launch)?.spaceId).toBe(ENGINEERING);
+      expect(titles().at(-1)).toBe("Launch checklist");
+    },
+  );
 });

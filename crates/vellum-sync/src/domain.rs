@@ -16,7 +16,9 @@ const CLIENT_ID_MAX: usize = 64;
 
 /// One device's local store. Clients pick it (a UUID); the server binds
 /// it to the first user who pushes with it.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, JsonSchema,
+)]
 #[serde(transparent)]
 pub struct ClientId(String);
 
@@ -53,9 +55,12 @@ impl fmt::Display for ClientId {
 }
 
 impl<'de> Deserialize<'de> for ClientId {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         let raw = String::deserialize(deserializer)?;
-        Self::parse(&raw).map_err(|err| serde::de::Error::custom(err.message().to_owned()))
+        Self::parse(&raw)
+            .map_err(|err| serde::de::Error::custom(err.message().to_owned()))
     }
 }
 
@@ -172,7 +177,12 @@ pub struct Change {
 impl Change {
     /// A put.
     #[must_use]
-    pub fn put(space: SpaceId, collection: &str, key: &str, value: Value) -> Self {
+    pub fn put(
+        space: SpaceId,
+        collection: &str,
+        key: &str,
+        value: Value,
+    ) -> Self {
         Self {
             space,
             object: None,
@@ -236,7 +246,9 @@ mod tests {
 
     #[test]
     fn client_ids_are_validated() {
-        assert!(ClientId::parse("0b6f8c1e-91a2-4f63-9d1e-2b3c4d5e6f70").is_ok());
+        assert!(
+            ClientId::parse("0b6f8c1e-91a2-4f63-9d1e-2b3c4d5e6f70").is_ok()
+        );
         assert!(ClientId::parse("").is_err());
         assert!(ClientId::parse("has space").is_err());
         assert!(ClientId::parse(&"a".repeat(65)).is_err());
@@ -246,10 +258,16 @@ mod tests {
     }
 
     #[test]
-    fn push_bodies_use_the_client_field_names() -> Result<(), serde_json::Error> {
+    fn push_bodies_use_the_client_field_names() -> Result<(), serde_json::Error>
+    {
         let request: PushRequest = serde_json::from_value(json!({
             "clientId": "c1",
-            "mutations": [{"id": 1, "name": "work.setState", "args": {"key": "ENG-1"}, "createdAt": 5}]
+            "mutations": [{
+                "id": 1,
+                "name": "work.setState",
+                "args": {"key": "ENG-1"},
+                "createdAt": 5
+            }]
         }))?;
         assert_eq!(request.mutations.first().map(|m| m.created_at), Some(5));
         let response = serde_json::to_value(PushResponse {
@@ -263,17 +281,24 @@ mod tests {
     #[test]
     fn patches_are_tagged_by_op() -> Result<(), serde_json::Error> {
         let space = SpaceId::generate();
-        let put = Change::put(space, "issues", "ENG-1", json!({"t": 1})).to_patch();
+        let put =
+            Change::put(space, "issues", "ENG-1", json!({"t": 1})).to_patch();
         let del = Change::delete(space, "issues", "ENG-1").to_patch();
         assert_eq!(
             serde_json::to_value(put)?,
-            json!({"op": "put", "collection": "issues", "key": "ENG-1", "value": {"t": 1}})
+            json!({
+                "op": "put",
+                "collection": "issues",
+                "key": "ENG-1",
+                "value": {"t": 1}
+            })
         );
         assert_eq!(
             serde_json::to_value(del)?,
             json!({"op": "del", "collection": "issues", "key": "ENG-1"})
         );
-        let pull: PullRequest = serde_json::from_value(json!({"clientId": "c"}))?;
+        let pull: PullRequest =
+            serde_json::from_value(json!({"clientId": "c"}))?;
         assert_eq!(pull.cursor, "");
         Ok(())
     }

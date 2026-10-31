@@ -43,7 +43,9 @@ pub struct ProfileArgs {
 }
 
 /// The profile endpoint's response.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct ProfileResponse {
     /// Folded stacks, one `frame;frame;frame microseconds` line each.
     pub folded: String,
@@ -65,8 +67,12 @@ fn fetch(args: &ProfileArgs) -> Result<String> {
     if let Some(route) = &args.route {
         query.push(("route", route));
     }
-    let body: ProfileResponse =
-        crate::http::get_json(&args.server, args.token.as_deref(), PROFILE_PATH, &query)?;
+    let body: ProfileResponse = crate::http::get_json(
+        &args.server,
+        args.token.as_deref(),
+        PROFILE_PATH,
+        &query,
+    )?;
     Ok(body.folded)
 }
 
@@ -79,7 +85,8 @@ fn fetch(args: &ProfileArgs) -> Result<String> {
 pub fn run(args: &ProfileArgs) -> Result<PathBuf> {
     let text = match &args.input {
         Some(path) => std::fs::read_to_string(path).map_err(|e| {
-            Error::new(ErrorKind::InvalidInput, "cannot read the input file").with_source(e)
+            Error::new(ErrorKind::InvalidInput, "cannot read the input file")
+                .with_source(e)
         })?,
         None => fetch(args)?,
     };
@@ -94,7 +101,8 @@ pub fn run(args: &ProfileArgs) -> Result<PathBuf> {
         flame::svg(&folded, &title)
     };
     std::fs::write(&args.out, output).map_err(|e| {
-        Error::new(ErrorKind::Unavailable, "cannot write the output file").with_source(e)
+        Error::new(ErrorKind::Unavailable, "cannot write the output file")
+            .with_source(e)
     })?;
     Ok(args.out.clone())
 }
@@ -120,7 +128,8 @@ mod tests {
     fn renders_a_folded_file() {
         let dir = tempfile::tempdir().unwrap();
         let input = dir.path().join("in.folded");
-        std::fs::write(&input, "http.request;db.query 900\nhttp.request 100\n").unwrap();
+        std::fs::write(&input, "http.request;db.query 900\nhttp.request 100\n")
+            .unwrap();
         let mut a = args(dir.path());
         a.input = Some(input);
         let out = run(&a).unwrap();
@@ -140,7 +149,10 @@ mod tests {
     }
 
     /// A one-shot HTTP server answering `status` with `body`.
-    fn serve(status: u16, body: &'static str) -> (String, std::thread::JoinHandle<String>) {
+    fn serve(
+        status: u16,
+        body: &'static str,
+    ) -> (String, std::thread::JoinHandle<String>) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = listener.local_addr().unwrap();
         let handle = std::thread::spawn(move || {
@@ -149,7 +161,8 @@ mod tests {
             let n = stream.read(&mut buf).unwrap();
             let request = String::from_utf8_lossy(&buf[..n]).into_owned();
             let response = format!(
-                "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                "HTTP/1.1 {status} X\r\ncontent-type: application/json\r\n\
+                    content-length: {}\r\nconnection: close\r\n\r\n{body}",
                 body.len()
             );
             stream.write_all(response.as_bytes()).unwrap();
@@ -166,7 +179,9 @@ mod tests {
         a.server = format!("{url}/");
         let _ = run(&a).unwrap();
         let request = handle.join().unwrap();
-        assert!(request.starts_with("GET /api/v1/admin/profile?seconds=30&route=%2Fapi%2Fv1%2Fx "));
+        assert!(request.starts_with(
+            "GET /api/v1/admin/profile?seconds=30&route=%2Fapi%2Fv1%2Fx "
+        ));
         assert!(
             request
                 .to_ascii_lowercase()

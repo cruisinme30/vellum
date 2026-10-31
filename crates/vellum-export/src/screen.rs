@@ -67,15 +67,29 @@ impl Gotenberg {
     ///
     /// [`ExportError::Remote`] when Gotenberg fails, times out or returns
     /// something that is not a PDF.
-    #[tracing::instrument(name = "export.pdf_screen", skip_all, fields(files = page.files.len()))]
-    pub async fn print(&self, page: &ScreenPage) -> Result<Vec<u8>, ExportError> {
+    #[tracing::instrument(
+        name = "export.pdf_screen",
+        skip_all,
+        fields(files = page.files.len())
+    )]
+    pub async fn print(
+        &self,
+        page: &ScreenPage,
+    ) -> Result<Vec<u8>, ExportError> {
         let started = Instant::now();
         let result = self.print_inner(page).await;
-        metrics::export_done("pdf_screen", started, result.as_ref().map(Vec::len));
+        metrics::export_done(
+            "pdf_screen",
+            started,
+            result.as_ref().map(Vec::len),
+        );
         result
     }
 
-    async fn print_inner(&self, page: &ScreenPage) -> Result<Vec<u8>, ExportError> {
+    async fn print_inner(
+        &self,
+        page: &ScreenPage,
+    ) -> Result<Vec<u8>, ExportError> {
         let (width, height) = match page.paper {
             Paper::A4 => ("8.27", "11.7"),
             Paper::Letter => ("8.5", "11"),
@@ -97,12 +111,16 @@ impl Gotenberg {
             .text("printBackground", "true")
             .text("landscape", if page.landscape { "true" } else { "false" });
         for (name, bytes) in &page.files {
-            if name == "index.html" || name.contains('/') || name.contains("..") {
+            if name == "index.html" || name.contains('/') || name.contains("..")
+            {
                 return Err(ExportError::Invalid(format!(
                     "bad screen asset name {name}"
                 )));
             }
-            form = form.part("files", Part::bytes(bytes.clone()).file_name(name.clone()));
+            form = form.part(
+                "files",
+                Part::bytes(bytes.clone()).file_name(name.clone()),
+            );
         }
         let response = self
             .client

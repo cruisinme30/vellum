@@ -18,7 +18,9 @@ use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp, ToSpan as _};
 use vellum_kernel::{ShareToken, ShareTokenHash};
 
-use crate::ical::{Component, Property, calendar, format_date, format_utc, rrule_value, uid};
+use crate::ical::{
+    Component, Property, calendar, format_date, format_utc, rrule_value, uid,
+};
 use crate::model::{Due, RecurFrom, Task};
 use crate::telemetry;
 
@@ -49,7 +51,8 @@ pub struct FeedOptions {
 /// # Errors
 ///
 /// Fails only when the operating system's random source does.
-pub fn issue_token() -> Result<(ShareToken, ShareTokenHash), vellum_kernel::ShareTokenError> {
+pub fn issue_token()
+-> Result<(ShareToken, ShareTokenHash), vellum_kernel::ShareTokenError> {
     let token = ShareToken::generate()?;
     let hash = token.hash();
     Ok((token, hash))
@@ -81,16 +84,22 @@ fn event(task: &Task, options: &FeedOptions) -> Option<Component> {
             if date < cutoff && !recurring {
                 return None;
             }
-            event.push(Property::new("DTSTART", format_date(date)).param("VALUE", "DATE"));
+            event.push(
+                Property::new("DTSTART", format_date(date))
+                    .param("VALUE", "DATE"),
+            );
             let end = date.tomorrow().ok()?;
-            event.push(Property::new("DTEND", format_date(end)).param("VALUE", "DATE"));
+            event.push(
+                Property::new("DTEND", format_date(end)).param("VALUE", "DATE"),
+            );
             false
         }
         Due::DateTime(moment) => {
             if moment.date() < cutoff && task.fields.recurrence.is_none() {
                 return None;
             }
-            let start = moment.to_zoned(options.time_zone.clone()).ok()?.timestamp();
+            let start =
+                moment.to_zoned(options.time_zone.clone()).ok()?.timestamp();
             event.push(Property::new("DTSTART", format_utc(start)));
             event.push(Property::new(
                 "DTEND",
@@ -105,7 +114,8 @@ fn event(task: &Task, options: &FeedOptions) -> Option<Component> {
         .as_ref()
         .filter(|r| r.from == RecurFrom::Schedule)
     {
-        event.push(Property::new("RRULE", rrule_value(&recurrence.rule, timed)));
+        event
+            .push(Property::new("RRULE", rrule_value(&recurrence.rule, timed)));
     }
     if !task.fields.labels.is_empty() {
         let labels: Vec<String> = task
@@ -131,7 +141,8 @@ fn event(task: &Task, options: &FeedOptions) -> Option<Component> {
 /// Renders the feed for the owner's open tasks.
 #[must_use]
 pub fn render(tasks: &[Task], options: &FeedOptions) -> String {
-    let _span = tracing::debug_span!("tasks.ics_feed", tasks = tasks.len()).entered();
+    let _span =
+        tracing::debug_span!("tasks.ics_feed", tasks = tasks.len()).entered();
     let events = tasks
         .iter()
         .filter(|t| !t.done)
@@ -139,7 +150,9 @@ pub fn render(tasks: &[Task], options: &FeedOptions) -> String {
         .collect();
     let mut cal = calendar(Some(&options.name), events);
     cal.properties.insert(3, Property::new("METHOD", "PUBLISH"));
-    cal.push(Property::new("REFRESH-INTERVAL", "PT15M").param("VALUE", "DURATION"));
+    cal.push(
+        Property::new("REFRESH-INTERVAL", "PT15M").param("VALUE", "DURATION"),
+    );
     cal.push(Property::new("X-PUBLISHED-TTL", "PT15M"));
     let text = cal.to_ical();
     telemetry::record_calendar("ics_feed", text.len());
@@ -166,7 +179,8 @@ mod tests {
             },
             title: title.into(),
             done,
-            fields: TaskFields::from_attrs(&Attrs::parse(attrs).unwrap()).unwrap(),
+            fields: TaskFields::from_attrs(&Attrs::parse(attrs).unwrap())
+                .unwrap(),
             assignees: vec![],
             parent: None,
             list: None,
@@ -203,12 +217,18 @@ mod tests {
         assert!(text.contains("METHOD:PUBLISH\r\n"));
         assert!(text.contains("X-WR-CALNAME:My Work (Gourav)\r\n"));
         assert_eq!(text.matches("BEGIN:VEVENT").count(), 4);
-        assert!(text.contains("DTSTART;VALUE=DATE:20261103\r\nDTEND;VALUE=DATE:20261104\r\n"));
+        assert!(text.contains(
+            "DTSTART;VALUE=DATE:20261103\r\nDTEND;VALUE=DATE:20261104\r\n"
+        ));
         // 15:00 London summer time is 14:00 UTC.
-        assert!(text.contains("DTSTART:20260703T140000Z\r\nDTEND:20260703T143000Z\r\n"));
+        assert!(text.contains(
+            "DTSTART:20260703T140000Z\r\nDTEND:20260703T143000Z\r\n"
+        ));
         assert!(text.contains("RRULE:FREQ=WEEKLY\r\n"));
         assert_eq!(text.matches("RRULE").count(), 1);
-        assert!(text.contains("URL:https://vellum.northstar.dev/my-work?task="));
+        assert!(
+            text.contains("URL:https://vellum.northstar.dev/my-work?task=")
+        );
         assert!(text.contains("TRANSP:TRANSPARENT"));
         assert!(!text.contains("Long ago") && !text.contains("SUMMARY:Done"));
     }

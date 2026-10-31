@@ -63,13 +63,17 @@ impl Collection {
         let mut collection = Self::new(schema);
         let mut diags = Vec::new();
         for (path, text) in rows {
-            let (mut row, mut d) = Row::parse(text.as_ref(), &collection.schema, path.as_ref());
+            let (mut row, mut d) =
+                Row::parse(text.as_ref(), &collection.schema, path.as_ref());
             diags.append(&mut d);
             if collection.rows.contains_key(&row.id) {
                 let fresh = DocId::generate();
                 diags.push(Diagnostic::warning(
                     path.as_ref(),
-                    format!("row id {} is used twice; assigned {fresh}", row.id),
+                    format!(
+                        "row id {} is used twice; assigned {fresh}",
+                        row.id
+                    ),
                 ));
                 row.id = fresh;
             }
@@ -163,7 +167,16 @@ impl Collection {
 
 /// A row in a specific collection.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, schemars::JsonSchema,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    schemars::JsonSchema,
 )]
 #[serde(rename_all = "camelCase")]
 pub struct RowRef {
@@ -218,7 +231,9 @@ pub enum Edit {
 }
 
 /// What an edit touched.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Default, PartialEq, Eq, Serialize, schemars::JsonSchema,
+)]
 #[serde(rename_all = "camelCase")]
 pub struct Changeset {
     /// Rows whose files must be written (created or changed).
@@ -255,7 +270,10 @@ impl Workspace {
     ///
     /// Returns a [`SchemaError`] and leaves the workspace unchanged when a
     /// relation does not pair up or a rollup reads a missing property.
-    pub fn insert(&mut self, collection: Collection) -> Result<(), SchemaError> {
+    pub fn insert(
+        &mut self,
+        collection: Collection,
+    ) -> Result<(), SchemaError> {
         let id = collection.id();
         let previous = self.collections.insert(id, collection);
         if let Err(e) = self.check_links() {
@@ -286,6 +304,43 @@ impl Workspace {
     /// All collections.
     pub fn collections(&self) -> impl Iterator<Item = &Collection> {
         self.collections.values()
+    }
+
+    /// Replaces several schemas at once, keeping their rows, so a change
+    /// that spans collections (both sides of a relation) is checked as a
+    /// whole. Nothing changes when the result does not check.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EditError::UnknownCollection`] or the first link error.
+    pub fn set_schemas(
+        &mut self,
+        schemas: Vec<Schema>,
+    ) -> Result<(), EditError> {
+        let mut previous = Vec::with_capacity(schemas.len());
+        for schema in &schemas {
+            if !self.collections.contains_key(&schema.id) {
+                return Err(EditError::UnknownCollection(schema.id));
+            }
+        }
+        for schema in schemas {
+            let id = schema.id;
+            let Some(existing) = self.collections.get(&id) else {
+                continue;
+            };
+            let mut next = Collection::new(schema);
+            next.rows.clone_from(&existing.rows);
+            if let Some(old) = self.collections.insert(id, next) {
+                previous.push(old);
+            }
+        }
+        if let Err(e) = self.check_links() {
+            for old in previous {
+                let _ = self.collections.insert(old.id(), old);
+            }
+            return Err(e.into());
+        }
+        Ok(())
     }
 
     /// Replaces a collection's schema, keeping its rows.
@@ -319,7 +374,10 @@ impl Workspace {
                         let paired = matches!(
                             target.schema.property(back),
                             Some(Property {
-                                kind: PropertyType::Relation { to: t, back: Some(b) },
+                                kind: PropertyType::Relation {
+                                    to: t,
+                                    back: Some(b)
+                                },
                                 ..
                             }) if *t == c.id() && *b == p.key
                         );
@@ -414,7 +472,10 @@ impl Workspace {
             .ok_or(EditError::UnknownCollection(id))
     }
 
-    fn get_mut(&mut self, id: CollectionId) -> Result<&mut Collection, EditError> {
+    fn get_mut(
+        &mut self,
+        id: CollectionId,
+    ) -> Result<&mut Collection, EditError> {
         self.collections
             .get_mut(&id)
             .ok_or(EditError::UnknownCollection(id))
@@ -440,11 +501,12 @@ impl Workspace {
     }
 
     fn coerce(&self, p: &Property, value: Value) -> Result<Value, EditError> {
-        let wrong = |expected: &'static str, got: &Value| EditError::WrongType {
-            key: p.key.clone(),
-            expected,
-            got: got.type_name(),
-        };
+        let wrong =
+            |expected: &'static str, got: &Value| EditError::WrongType {
+                key: p.key.clone(),
+                expected,
+                got: got.type_name(),
+            };
         if value.is_empty() {
             return if p.kind.is_stored() {
                 Ok(Value::Empty)
@@ -452,7 +514,8 @@ impl Workspace {
                 Err(EditError::Computed(p.key.clone()))
             };
         }
-        let all_text = |items: &[Value]| items.iter().all(|i| matches!(i, Value::Text(_)));
+        let all_text =
+            |items: &[Value]| items.iter().all(|i| matches!(i, Value::Text(_)));
         match (&p.kind, value) {
             (
                 PropertyType::Title
@@ -465,10 +528,13 @@ impl Workspace {
             | (PropertyType::Number { .. }, v @ Value::Number(_))
             | (PropertyType::Checkbox, v @ Value::Bool(_))
             | (PropertyType::Date, v @ Value::Date(_)) => Ok(v),
-            (PropertyType::Multi { .. }, Value::Text(t)) => Ok(Value::List(vec![Value::Text(t)])),
-            (PropertyType::Multi { .. } | PropertyType::Person, Value::List(items))
-                if all_text(&items) =>
-            {
+            (PropertyType::Multi { .. }, Value::Text(t)) => {
+                Ok(Value::List(vec![Value::Text(t)]))
+            }
+            (
+                PropertyType::Multi { .. } | PropertyType::Person,
+                Value::List(items),
+            ) if all_text(&items) => {
                 let mut seen = BTreeSet::new();
                 Ok(Value::List(
                     items
@@ -477,7 +543,10 @@ impl Workspace {
                         .collect(),
                 ))
             }
-            (PropertyType::Relation { to, .. }, v @ (Value::Text(_) | Value::List(_))) => {
+            (
+                PropertyType::Relation { to, .. },
+                v @ (Value::Text(_) | Value::List(_)),
+            ) => {
                 let mut ids = Vec::new();
                 for item in v.items() {
                     let id: DocId = item
@@ -496,7 +565,9 @@ impl Workspace {
                 Ok(relation_value(&ids))
             }
             (
-                PropertyType::Rollup { .. } | PropertyType::Formula { .. } | PropertyType::Created,
+                PropertyType::Rollup { .. }
+                | PropertyType::Formula { .. }
+                | PropertyType::Created,
                 _,
             ) => Err(EditError::Computed(p.key.clone())),
             (kind, other) => Err(wrong(expected_shape(kind), &other)),
@@ -516,7 +587,8 @@ impl Workspace {
                     .links(&p.key)
                     .into_iter()
                     .filter(|id| {
-                        target.rows.contains_key(id) || (*to == collection && *id == row.id)
+                        target.rows.contains_key(id)
+                            || (*to == collection && *id == row.id)
                     })
                     .collect();
                 row.set_raw(&p.key, relation_value(&kept));
@@ -526,7 +598,11 @@ impl Workspace {
     }
 
     /// Stores `next` and mirrors relation differences to the other side.
-    fn replace(&mut self, collection: CollectionId, next: Row) -> Result<Changeset, EditError> {
+    fn replace(
+        &mut self,
+        collection: CollectionId,
+        next: Row,
+    ) -> Result<Changeset, EditError> {
         let c = self.get(collection)?;
         let previous = c.rows.get(&next.id);
         let id = next.id;
@@ -594,7 +670,11 @@ impl Workspace {
         changes
     }
 
-    fn delete(&mut self, collection: CollectionId, id: DocId) -> Result<Changeset, EditError> {
+    fn delete(
+        &mut self,
+        collection: CollectionId,
+        id: DocId,
+    ) -> Result<Changeset, EditError> {
         let _ = self.get_mut(collection)?.row_mut(id)?;
         let mut changes = Changeset::default();
         let _ = self.get_mut(collection)?.rows.remove(&id);
@@ -608,9 +688,12 @@ impl Workspace {
                 .schema
                 .properties
                 .iter()
-                .filter(
-                    |p| matches!(&p.kind, PropertyType::Relation { to, .. } if *to == collection),
-                )
+                .filter(|p| {
+                    matches!(
+                        &p.kind,
+                        PropertyType::Relation { to, .. } if *to == collection
+                    )
+                })
                 .map(|p| p.key.clone())
                 .collect();
             let cid = c.id();
@@ -618,7 +701,8 @@ impl Workspace {
                 for key in &keys {
                     let links = row.links(key);
                     if links.contains(&id) {
-                        let kept: Vec<DocId> = links.into_iter().filter(|l| *l != id).collect();
+                        let kept: Vec<DocId> =
+                            links.into_iter().filter(|l| *l != id).collect();
                         row.set_raw(key, relation_value(&kept));
                         let _ = changes.written.insert(RowRef {
                             collection: cid,

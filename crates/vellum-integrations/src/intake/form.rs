@@ -103,24 +103,33 @@ fn check(field: &Field, value: &str) -> Result<(), String> {
         return Err("is too long".to_owned());
     }
     match &field.kind {
-        FieldKind::ShortText if value.contains('\n') => Err("must be one line".to_owned()),
-        FieldKind::Select { options } if !options.iter().any(|o| o == value) => {
+        FieldKind::ShortText if value.contains('\n') => {
+            Err("must be one line".to_owned())
+        }
+        FieldKind::Select { options }
+            if !options.iter().any(|o| o == value) =>
+        {
             Err("is not one of the options".to_owned())
         }
         FieldKind::Email
             if !value.split_once('@').is_some_and(|(l, d)| {
-                !l.is_empty() && d.contains('.') && !value.contains(char::is_whitespace)
+                !l.is_empty()
+                    && d.contains('.')
+                    && !value.contains(char::is_whitespace)
             }) =>
         {
             Err("is not an email address".to_owned())
         }
         FieldKind::Url
-            if !url::Url::parse(value)
-                .is_ok_and(|u| u.scheme() == "https" || u.scheme() == "http") =>
+            if !url::Url::parse(value).is_ok_and(|u| {
+                u.scheme() == "https" || u.scheme() == "http"
+            }) =>
         {
             Err("is not a web address".to_owned())
         }
-        FieldKind::Number if value.parse::<f64>().map_or(true, |n| !n.is_finite()) => {
+        FieldKind::Number
+            if value.parse::<f64>().map_or(true, |n| !n.is_finite()) =>
+        {
             Err("is not a number".to_owned())
         }
         _ => Ok(()),
@@ -182,7 +191,9 @@ impl Form {
                         message: "is not a priority".to_owned(),
                     }),
                 },
-                Target::Fact => facts.push(Fact::new(field.label.clone(), value)),
+                Target::Fact => {
+                    facts.push(Fact::new(field.label.clone(), value));
+                }
             }
         }
         if draft.title.is_empty() && errors.is_empty() {
@@ -211,7 +222,12 @@ impl Form {
 mod tests {
     use super::*;
 
-    fn field(id: &str, kind: FieldKind, required: bool, target: Target) -> Field {
+    fn field(
+        id: &str,
+        kind: FieldKind,
+        required: bool,
+        target: Target,
+    ) -> Field {
         Field {
             id: id.to_owned(),
             label: id.to_owned(),
@@ -227,7 +243,12 @@ mod tests {
             team: "ENG".to_owned(),
             fields: vec![
                 field("summary", FieldKind::ShortText, true, Target::Title),
-                field("details", FieldKind::LongText, true, Target::Description),
+                field(
+                    "details",
+                    FieldKind::LongText,
+                    true,
+                    Target::Description,
+                ),
                 field(
                     "area",
                     FieldKind::Select {
@@ -306,7 +327,8 @@ mod tests {
             )
             .err()
             .unwrap_or_default();
-        let fields: Vec<&str> = errors.iter().map(|e| e.field.as_str()).collect();
+        let fields: Vec<&str> =
+            errors.iter().map(|e| e.field.as_str()).collect();
         assert_eq!(fields, ["summary", "details", "area", "contact"]);
     }
 }

@@ -9,25 +9,26 @@
 //!   It looks a page up in the drive's own tables (`drive_nodes`), reads
 //!   the file from the store and turns it into blocks with
 //!   [`crate::markdown::blocks`].
-//! - [`DriveFeed`] notices which pages changed and queues them. It sweeps
-//!   `drive_nodes` on an interval and compares each page's fingerprint
-//!   (place, path, title, size, modified time, trash state) with the last
-//!   sweep. That catches every way a page changes: saves in the app, edits
-//!   made outside it that the file watcher picks up, startup rescans,
-//!   moves, renames, trash and purges, including pages removed with their
-//!   folder. A page that is gone is queued too, and the indexer removes it.
+//! - [`DriveFeed`] notices which pages changed and queues them. It reads
+//!   the drive's page change log from a cursor (ADR 0038 D164). Triggers
+//!   on `drive_nodes` fill the log, so it catches every way a page
+//!   changes: saves in the app, edits made outside it that the file
+//!   watcher picks up, startup rescans, moves, renames, trash and purges,
+//!   including pages removed with their folder. A page that is gone is
+//!   queued too, and the indexer removes it.
 //!
-//! The drive emits no events of its own, and its rescans record no
-//! activity, so a sweep is the one signal that covers them all.
+//! With one shared search index, [`DriveFeed::spawn_shared`] runs the
+//! feed on one replica at a time under a lease, and keeps its cursor in
+//! the database for the next holder.
 
-use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
+use vellum_db::changes::{DriveChanges, Position};
+use vellum_db::cluster::{Cursors, Leases, singleton};
 use vellum_db::{Index, IndexPool, sqlx, traced};
 use vellum_kernel::{DocId, ObjectId, SpaceId, Timestamp, UserId};
 use vellum_store::{BlobPath, BlobStore, StoreError};
@@ -41,18 +42,15 @@ const MAX_DEPTH: i32 = 64;
 
 const LIST: &str = "SELECT node_id FROM drive_nodes WHERE kind = 'page'";
 
-const NODE: &str = "SELECT space_id, kind, path, title, modified_at, created_by, trash \
-                    FROM drive_nodes WHERE node_id = $1";
+const NODE: &str = "SELECT space_id, kind, path, title, modified_at, \
+                    created_by, trash FROM drive_nodes WHERE node_id = $1";
 
 const ANCESTORS: &str = "WITH RECURSIVE up (node_id, parent, kind, depth) AS ( \
-         SELECT node_id, tree_parent_id, kind, 0 FROM drive_nodes WHERE node_id = $1 \
-         UNION ALL \
-         SELECT n.node_id, n.tree_parent_id, n.kind, up.depth + 1 \
-         FROM drive_nodes n JOIN up ON n.node_id = up.parent WHERE up.depth < $2 \
-     ) SELECT node_id, kind FROM up WHERE depth > 0 ORDER BY depth DESC";
-
-const SWEEP: &str = "SELECT node_id, space_id, tree_parent_id, path, title, byte_size, \
-                     modified_at, trash FROM drive_nodes WHERE kind = 'page'";
+         SELECT node_id, tree_parent_id, kind, 0 FROM drive_nodes WHERE \
+         node_id = $1 UNION ALL SELECT n.node_id, n.tree_parent_id, n.kind, \
+         up.depth + 1 FROM drive_nodes n JOIN up ON n.node_id = up.parent \
+         WHERE up.depth < $2 ) SELECT node_id, kind FROM up WHERE depth > 0 \
+         ORDER BY depth DESC";
 
 fn failed(op: &str, error: &sqlx::Error) -> SearchError {
     SearchError::Source(format!("{op}: {error}"))
@@ -66,8 +64,12 @@ fn unsupported() -> SearchError {
 macro_rules! fetch {
     ($index:expr, $op:literal, $method:ident, $query:expr) => {
         match $index.pool() {
-            IndexPool::Sqlite(pool) => traced("sqlite", $op, $query.$method(pool)).await,
-            IndexPool::Postgres(pool) => traced("postgresql", $op, $query.$method(pool)).await,
+            IndexPool::Sqlite(pool) => {
+                traced("sqlite", $op, $query.$method(pool)).await
+            }
+            IndexPool::Postgres(pool) => {
+                traced("postgresql", $op, $query.$method(pool)).await
+            }
             _ => return Err(unsupported()),
         }
         .map_err(|e| failed($op, &e))?
@@ -122,7 +124,8 @@ impl DriveSource {
     }
 
     async fn text(&self, path: &str) -> Result<String> {
-        let path = BlobPath::new(path).map_err(|e| SearchError::Source(e.to_string()))?;
+        let path = BlobPath::new(path)
+            .map_err(|e| SearchError::Source(e.to_string()))?;
         match self.store.get(&path).await {
             Ok(blob) => Ok(String::from_utf8_lossy(&blob.bytes).into_owned()),
             // The row is ahead of the file (a move in flight); index the
@@ -145,7 +148,8 @@ impl DocumentSource for DriveSource {
             fetch_optional,
             sqlx::query_as(NODE).bind(node)
         );
-        let Some((space, kind, path, title, modified, created_by, trash)) = row else {
+        let Some((space, kind, path, title, modified, created_by, trash)) = row
+        else {
             return Ok(None);
         };
         if kind != "page" {
@@ -195,22 +199,22 @@ impl DocumentSource for DriveSource {
     }
 }
 
-/// What the first sweep does.
+/// Where a feed without a saved position starts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Start {
     /// Queue every page, catching up on edits made while the server was
     /// down. The default.
     CatchUp,
-    /// Only remember the pages as they are; use right after a rebuild.
+    /// Only follow changes from now on; use right after a rebuild.
     Current,
 }
 
 /// Feed settings.
 #[derive(Debug, Clone, Copy)]
 pub struct FeedConfig {
-    /// Time between sweeps.
+    /// Time between reads of the change log.
     pub interval: Duration,
-    /// What the first sweep does.
+    /// Where to start without a saved position.
     pub start: Start,
 }
 
@@ -223,89 +227,189 @@ impl Default for FeedConfig {
     }
 }
 
-type SweepRow = (
-    Uuid,
-    Uuid,
-    Option<Uuid>,
-    String,
-    String,
-    i64,
-    i64,
-    Option<String>,
-);
+/// The lease and saved cursor of the shared feed.
+pub const SHARED_FEED: &str = "search.drive_feed";
 
-/// Each page's fingerprint as of the last sweep.
-#[derive(Debug, Default)]
-pub struct Fingerprints(HashMap<DocId, u64>);
+/// How long the shared feed's lease lasts without renewal.
+const SHARED_TTL: Duration = Duration::from_secs(30);
 
-impl Fingerprints {
-    /// Reads every page's fingerprint from the drive's tables.
-    ///
-    /// # Errors
-    /// When the index cannot be read.
-    pub async fn read(index: &Index) -> Result<HashMap<DocId, u64>> {
-        let rows: Vec<SweepRow> =
-            fetch!(index, "search.feed.sweep", fetch_all, sqlx::query_as(SWEEP));
-        Ok(rows
-            .into_iter()
-            .map(|row| {
-                let mut hasher = DefaultHasher::new();
-                row.hash(&mut hasher);
-                (DocId::from_u128(row.0.as_u128()), hasher.finish())
-            })
-            .collect())
-    }
+/// Most changes read per pass; a longer backlog is read over several.
+const PAGE: usize = 1024;
 
-    /// Takes the new fingerprints and returns the pages that changed,
-    /// appeared or disappeared since the last call.
-    pub fn update(&mut self, now: HashMap<DocId, u64>) -> Vec<DocId> {
-        let mut changed: Vec<DocId> = now
-            .iter()
-            .filter(|(doc, print)| self.0.get(doc) != Some(print))
-            .map(|(doc, _)| *doc)
-            .collect();
-        changed.extend(self.0.keys().filter(|doc| !now.contains_key(doc)));
-        changed.sort_unstable();
-        self.0 = now;
-        changed
-    }
-}
-
-/// Watches the drive's pages and feeds changes to an [`Indexer`].
+/// Follows the drive's page change log (`vellum_db::changes`) and feeds
+/// changed pages to an [`Indexer`]. Each pass costs one indexed query
+/// past the cursor, however many pages the workspace holds (D164).
 #[derive(Debug)]
 pub struct DriveFeed;
 
 impl DriveFeed {
-    /// Starts sweeping on the current runtime. The task ends when the
-    /// indexer stops; abort the handle to stop it sooner.
+    /// Follows the log on this replica alone, from a position kept in
+    /// memory. Use it when each replica has its own search index (the
+    /// embedded engine). The task ends when the indexer stops; abort the
+    /// handle to stop it sooner.
     #[must_use]
-    pub fn spawn(index: Arc<Index>, indexer: Indexer, config: FeedConfig) -> JoinHandle<()> {
+    pub fn spawn(
+        index: Arc<Index>,
+        indexer: Indexer,
+        config: FeedConfig,
+    ) -> JoinHandle<()> {
         tokio::spawn(async move {
-            let mut known = Fingerprints::default();
-            let mut first = true;
-            let mut tick = tokio::time::interval(config.interval);
-            tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-            loop {
-                let _ = tick.tick().await;
-                let now = match Fingerprints::read(&index).await {
-                    Ok(now) => now,
+            let log = DriveChanges::new((*index).clone());
+            let mut at = None;
+            follow(&index, &log, &indexer, config, &mut at, |_| async { true })
+                .await;
+        })
+    }
+
+    /// Follows the log once for the whole cluster: whichever replica
+    /// holds the [`SHARED_FEED`] lease runs it, saving its position in the
+    /// database after each indexed batch so the next holder carries on
+    /// there. Use it when the replicas share one search index (Postgres
+    /// or Meilisearch), so each change is indexed once. `holder` names
+    /// this replica uniquely.
+    #[must_use]
+    pub fn spawn_shared(
+        index: Arc<Index>,
+        indexer: Indexer,
+        config: FeedConfig,
+        holder: &str,
+    ) -> JoinHandle<()> {
+        let leases = Leases::new((*index).clone());
+        let me = holder.to_owned();
+        singleton(leases, SHARED_FEED, holder, SHARED_TTL, move || {
+            let (index, indexer, me) =
+                (Arc::clone(&index), indexer.clone(), me.clone());
+            async move {
+                let cursors = Cursors::new((*index).clone());
+                let log = DriveChanges::new((*index).clone());
+                let mut at = match cursors.get(SHARED_FEED).await {
+                    Ok(saved) => saved.map(Position::from_pair),
                     Err(error) => {
-                        tracing::warn!(%error, "search feed could not read the drive");
-                        continue;
-                    }
-                };
-                let changed = known.update(now);
-                if std::mem::take(&mut first) && config.start == Start::Current {
-                    continue;
-                }
-                for doc in changed {
-                    if indexer.touch(doc).await.is_err() {
+                        tracing::warn!(%error, "search feed could not read its \
+                            position");
                         return;
                     }
-                }
+                };
+                let save = |pos: Position| {
+                    let (cursors, me) = (cursors.clone(), me.clone());
+                    async move {
+                        match cursors
+                            .set(SHARED_FEED, pos.pair(), SHARED_FEED, &me)
+                            .await
+                        {
+                            Ok(saved) => saved,
+                            Err(error) => {
+                                tracing::warn!(%error, "search feed could not \
+                                    save its position");
+                                true
+                            }
+                        }
+                    }
+                };
+                follow(&index, &log, &indexer, config, &mut at, save).await;
             }
         })
     }
+}
+
+/// Reads the log from `at` every interval and touches what changed. After
+/// each batch is indexed, `save` records the new position; when it says
+/// the position can no longer be saved (the lease went), the loop ends.
+async fn follow<S, F>(
+    index: &Index,
+    log: &DriveChanges,
+    indexer: &Indexer,
+    config: FeedConfig,
+    at: &mut Option<Position>,
+    save: S,
+) where
+    S: Fn(Position) -> F,
+    F: std::future::Future<Output = bool>,
+{
+    let mut tick = tokio::time::interval(config.interval);
+    tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+    loop {
+        let _ = tick.tick().await;
+        // Drain the backlog, then wait for the next tick.
+        loop {
+            let (touched, next, more) =
+                match pass(index, log, config, *at).await {
+                    Ok(step) => step,
+                    Err(error) => {
+                        tracing::warn!(%error, "search feed could not read the \
+                        drive");
+                        break;
+                    }
+                };
+            for doc in &touched {
+                if indexer.touch(*doc).await.is_err() {
+                    return;
+                }
+            }
+            if Some(next) != *at {
+                if !touched.is_empty() && indexer.flush().await.is_err() {
+                    // Not indexed: read the batch again next time.
+                    break;
+                }
+                if !save(next).await {
+                    return;
+                }
+                *at = Some(next);
+            }
+            if !more {
+                break;
+            }
+        }
+    }
+}
+
+/// One read: the pages to touch, the position after them, and whether
+/// more changes may be waiting.
+async fn pass(
+    index: &Index,
+    log: &DriveChanges,
+    config: FeedConfig,
+    at: Option<Position>,
+) -> Result<(Vec<DocId>, Position, bool)> {
+    let Some(at) = at else {
+        // No position yet: take the head first, so nothing written while
+        // the pages are listed is missed.
+        let head = log.head().await.map_err(|e| source_error(&e))?;
+        let all = match config.start {
+            Start::CatchUp => all_pages(index).await?,
+            Start::Current => Vec::new(),
+        };
+        return Ok((all, head, false));
+    };
+    let batch = log.read(at, PAGE).await.map_err(|e| source_error(&e))?;
+    if batch.reset {
+        tracing::warn!(
+            "search feed fell behind the pruned change log; queueing every page"
+        );
+        return Ok((all_pages(index).await?, batch.next, false));
+    }
+    let more = batch.pages.len() >= PAGE;
+    let mut pages: Vec<DocId> = batch
+        .pages
+        .into_iter()
+        .map(|id| DocId::from_u128(id.as_u128()))
+        .collect();
+    pages.sort_unstable();
+    pages.dedup();
+    Ok((pages, batch.next, more))
+}
+
+async fn all_pages(index: &Index) -> Result<Vec<DocId>> {
+    let rows: Vec<(Uuid,)> =
+        fetch!(index, "search.feed.list", fetch_all, sqlx::query_as(LIST));
+    Ok(rows
+        .into_iter()
+        .map(|(id,)| DocId::from_u128(id.as_u128()))
+        .collect())
+}
+
+fn source_error(error: &vellum_db::Error) -> SearchError {
+    SearchError::Source(format!("drive change log: {error}"))
 }
 
 #[cfg(test)]
@@ -333,11 +437,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().join("files");
         let index = Arc::new(
-            Index::open(&IndexConfig::sqlite(dir.path().join("index.db"), None))
-                .await
-                .unwrap(),
+            Index::open(&IndexConfig::sqlite(
+                dir.path().join("index.db"),
+                None,
+            ))
+            .await
+            .unwrap(),
         );
-        let store: Arc<dyn BlobStore> = Arc::new(LocalStore::open(&root).await.unwrap());
+        let store: Arc<dyn BlobStore> =
+            Arc::new(LocalStore::open(&root).await.unwrap());
         let source = DriveSource::new(Arc::clone(&index), store);
         Fixture {
             _dir: dir,
@@ -354,11 +462,17 @@ mod tests {
         pool
     }
 
-    async fn node(index: &Index, id: u128, kind: &str, parent: Option<u128>, path: &str) {
+    async fn node(
+        index: &Index,
+        id: u128,
+        kind: &str,
+        parent: Option<u128>,
+        path: &str,
+    ) {
         let _ = sqlx::query(
-            "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, tree_parent_id, \
-             path, title, byte_size, modified_at, created_by, trash) \
-             VALUES ($1, $2, $3, $4, $4, $5, $6, 0, 1000, $7, NULL)",
+            "INSERT INTO drive_nodes (space_id, node_id, kind, parent_id, \
+             tree_parent_id, path, title, byte_size, modified_at, created_by, \
+             trash) VALUES ($1, $2, $3, $4, $4, $5, $6, 0, 1000, $7, NULL)",
         )
         .bind(uuid(SPACE))
         .bind(uuid(id))
@@ -413,10 +527,14 @@ mod tests {
             ]
         );
         assert!(!doc.trashed);
-        let texts: Vec<_> = doc.blocks.iter().map(|b| b.text.as_str()).collect();
+        let texts: Vec<_> =
+            doc.blocks.iter().map(|b| b.text.as_str()).collect();
         assert_eq!(texts, vec!["Launch", "Ship on Friday."]);
 
-        assert_eq!(f.source.list().await.unwrap(), vec![DocId::from_u128(PAGE)]);
+        assert_eq!(
+            f.source.list().await.unwrap(),
+            vec![DocId::from_u128(PAGE)]
+        );
     }
 
     #[tokio::test]
@@ -426,7 +544,10 @@ mod tests {
         node(&f.index, BOOK, "book", Some(FOLDER), "eng/guide").await;
         node(&f.index, CHAPTER, "page", Some(BOOK), "eng/guide/one.md").await;
 
-        assert_eq!(f.source.load(DocId::from_u128(FOLDER)).await.unwrap(), None);
+        assert_eq!(
+            f.source.load(DocId::from_u128(FOLDER)).await.unwrap(),
+            None
+        );
         assert_eq!(f.source.load(DocId::from_u128(0x99)).await.unwrap(), None);
 
         // No file yet: the title is still searchable.
@@ -450,40 +571,46 @@ mod tests {
         assert!(trashed.trashed);
     }
 
+    async fn changed(log: &DriveChanges, at: &mut Position) -> Vec<DocId> {
+        let batch = log.read(*at, 100).await.unwrap();
+        assert!(!batch.reset);
+        *at = batch.next;
+        let mut pages: Vec<DocId> = batch
+            .pages
+            .into_iter()
+            .map(|id| DocId::from_u128(id.as_u128()))
+            .collect();
+        pages.sort_unstable();
+        pages.dedup();
+        pages
+    }
+
     #[tokio::test]
-    async fn sweeps_report_new_changed_and_removed_pages() {
+    async fn the_change_log_reports_new_changed_and_removed_pages() {
         let f = fixture().await;
-        let mut known = Fingerprints::default();
-        assert!(
-            known
-                .update(Fingerprints::read(&f.index).await.unwrap())
-                .is_empty()
-        );
+        let log = DriveChanges::new((*f.index).clone());
+        let mut at = log.head().await.unwrap();
+        assert!(changed(&log, &mut at).await.is_empty());
 
         node(&f.index, FOLDER, "folder", None, "eng").await;
         node(&f.index, PAGE, "page", Some(FOLDER), "eng/a.md").await;
         node(&f.index, CHAPTER, "page", Some(FOLDER), "eng/b.md").await;
         let page = DocId::from_u128(PAGE);
         let chapter = DocId::from_u128(CHAPTER);
-        assert_eq!(
-            known.update(Fingerprints::read(&f.index).await.unwrap()),
-            vec![page, chapter]
-        );
-        assert!(
-            known
-                .update(Fingerprints::read(&f.index).await.unwrap())
-                .is_empty()
-        );
+        // Folders are not logged; pages are.
+        assert_eq!(changed(&log, &mut at).await, vec![page, chapter]);
+        assert!(changed(&log, &mut at).await.is_empty());
 
         sql(
             &f.index,
             "UPDATE drive_nodes SET modified_at = 2000 WHERE path = 'eng/a.md'",
         )
         .await;
-        assert_eq!(
-            known.update(Fingerprints::read(&f.index).await.unwrap()),
-            vec![page]
-        );
+        assert_eq!(changed(&log, &mut at).await, vec![page]);
+
+        // A rescan that rewrites the same values logs nothing.
+        sql(&f.index, "UPDATE drive_nodes SET title = title").await;
+        assert!(changed(&log, &mut at).await.is_empty());
 
         // Renaming the folder moves both pages.
         sql(
@@ -491,16 +618,18 @@ mod tests {
             "UPDATE drive_nodes SET path = replace(path, 'eng', 'team')",
         )
         .await;
-        assert_eq!(
-            known.update(Fingerprints::read(&f.index).await.unwrap()),
-            vec![page, chapter]
-        );
+        assert_eq!(changed(&log, &mut at).await, vec![page, chapter]);
 
         // Purging the folder removes both pages.
         sql(&f.index, "DELETE FROM drive_nodes").await;
-        assert_eq!(
-            known.update(Fingerprints::read(&f.index).await.unwrap()),
-            vec![page, chapter]
-        );
+        assert_eq!(changed(&log, &mut at).await, vec![page, chapter]);
+
+        // Pruning past a reader's position tells it to start over.
+        tokio::time::sleep(Duration::from_millis(5)).await;
+        assert!(log.prune(Duration::ZERO).await.unwrap() > 0);
+        let stale = log.read(Position::default(), 100).await.unwrap();
+        assert!(stale.reset);
+        assert_eq!(stale.next, at);
+        assert!(!log.read(at, 100).await.unwrap().reset);
     }
 }

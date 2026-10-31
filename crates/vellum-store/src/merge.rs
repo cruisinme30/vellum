@@ -31,9 +31,13 @@ impl MergeKind {
     /// text.
     #[must_use]
     pub fn for_path(path: &BlobPath) -> Self {
-        let ext = |name: &str| name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase());
-        let yaml = matches!(ext(path.file_name()).as_deref(), Some("yaml" | "yml"));
-        let in_book = path.parent().and_then(|p| ext(p.file_name())).as_deref() == Some("book");
+        let ext = |name: &str| {
+            name.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase())
+        };
+        let yaml =
+            matches!(ext(path.file_name()).as_deref(), Some("yaml" | "yml"));
+        let in_book = path.parent().and_then(|p| ext(p.file_name())).as_deref()
+            == Some("book");
         let book_toc = in_book && path.file_name() == "SUMMARY.md";
         if yaml || book_toc {
             Self::Manifest
@@ -54,7 +58,11 @@ pub enum Merged {
 
 /// Merges `ours` and `theirs`, both descended from `base`.
 #[must_use]
-#[tracing::instrument(skip_all, fields(kind = ?kind, base = base.len(), conflict), level = "debug")]
+#[tracing::instrument(
+    skip_all,
+    fields(kind = ?kind, base = base.len(), conflict),
+    level = "debug"
+)]
 pub fn merge3(kind: MergeKind, base: &str, ours: &str, theirs: &str) -> Merged {
     let merged = if ours == theirs || base == theirs {
         Merged::Clean(ours.to_owned())
@@ -62,13 +70,13 @@ pub fn merge3(kind: MergeKind, base: &str, ours: &str, theirs: &str) -> Merged {
         Merged::Clean(theirs.to_owned())
     } else {
         match kind {
-            MergeKind::Manifest => {
-                diffy::merge(base, ours, theirs).map_or(Merged::Conflict, Merged::Clean)
-            }
+            MergeKind::Manifest => diffy::merge(base, ours, theirs)
+                .map_or(Merged::Conflict, Merged::Clean),
             MergeKind::Text => merge_text(base, ours, theirs),
         }
     };
-    let _ = tracing::Span::current().record("conflict", merged == Merged::Conflict);
+    let _ =
+        tracing::Span::current().record("conflict", merged == Merged::Conflict);
     merged
 }
 
@@ -168,13 +176,16 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
-    const BASE: &str = "# Plan\n\nShip the editor in May.\nHire two engineers.\n";
+    const BASE: &str =
+        "# Plan\n\nShip the editor in May.\nHire two engineers.\n";
 
     #[test]
     fn disjoint_text_edits_both_survive() {
         let ours = "# Plan\n\nShip the editor in June.\nHire two engineers.\n";
-        let theirs = "# Plan\n\nShip the editor in May.\nHire three engineers.\n";
-        let want = "# Plan\n\nShip the editor in June.\nHire three engineers.\n";
+        let theirs =
+            "# Plan\n\nShip the editor in May.\nHire three engineers.\n";
+        let want =
+            "# Plan\n\nShip the editor in June.\nHire three engineers.\n";
         assert_eq!(
             merge3(MergeKind::Text, BASE, ours, theirs),
             Merged::Clean(want.into())
@@ -218,11 +229,14 @@ mod tests {
 
     #[test]
     fn manifests_merge_by_line() {
-        let base = "- [Intro](intro.md)\n- [Setup](setup.md)\n- [Usage](usage.md)\n";
-        let ours = "- [Introduction](intro.md)\n- [Setup](setup.md)\n- [Usage](usage.md)\n";
-        let theirs =
-            "- [Intro](intro.md)\n- [Setup](setup.md)\n- [Usage](usage.md)\n- [FAQ](faq.md)\n";
-        let want = "- [Introduction](intro.md)\n- [Setup](setup.md)\n- [Usage](usage.md)\n- [FAQ](faq.md)\n";
+        let base =
+            "- [Intro](intro.md)\n- [Setup](setup.md)\n- [Usage](usage.md)\n";
+        let ours = "- [Introduction](intro.md)\n- [Setup](setup.md)\n\
+            - [Usage](usage.md)\n";
+        let theirs = "- [Intro](intro.md)\n- [Setup](setup.md)\n\
+            - [Usage](usage.md)\n- [FAQ](faq.md)\n";
+        let want = "- [Introduction](intro.md)\n- [Setup](setup.md)\n\
+            - [Usage](usage.md)\n- [FAQ](faq.md)\n";
         assert_eq!(
             merge3(MergeKind::Manifest, base, ours, theirs),
             Merged::Clean(want.into())
@@ -253,9 +267,18 @@ mod tests {
 
     proptest! {
         #[test]
-        fn one_sided_edits_always_apply(base in "[a-c \\n]{0,40}", side in "[a-c \\n]{0,40}") {
-            prop_assert_eq!(merge3(MergeKind::Text, &base, &side, &base), Merged::Clean(side.clone()));
-            prop_assert_eq!(merge3(MergeKind::Text, &base, &base, &side), Merged::Clean(side));
+        fn one_sided_edits_always_apply(
+            base in "[a-c \\n]{0,40}",
+            side in "[a-c \\n]{0,40}"
+        ) {
+            prop_assert_eq!(
+                merge3(MergeKind::Text, &base, &side, &base),
+                Merged::Clean(side.clone())
+            );
+            prop_assert_eq!(
+                merge3(MergeKind::Text, &base, &base, &side),
+                Merged::Clean(side)
+            );
         }
 
         #[test]

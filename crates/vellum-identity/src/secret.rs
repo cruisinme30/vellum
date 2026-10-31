@@ -31,10 +31,14 @@ pub enum Kind {
     BreakGlass,
     /// A pending `OAuth` consent.
     Consent,
+    /// A second-factor ticket or passkey ceremony (ADR 0069, D290).
+    MfaTicket,
+    /// The SCIM provisioning token (ADR 0069, D294).
+    ScimToken,
 }
 
 impl Kind {
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 9] = [
         Self::Session,
         Self::ApiToken,
         Self::AuthCode,
@@ -42,6 +46,8 @@ impl Kind {
         Self::RefreshToken,
         Self::BreakGlass,
         Self::Consent,
+        Self::MfaTicket,
+        Self::ScimToken,
     ];
 
     /// The prefix, including its underscore.
@@ -55,6 +61,8 @@ impl Kind {
             Self::RefreshToken => "vrt_",
             Self::BreakGlass => "vbg_",
             Self::Consent => "vcn_",
+            Self::MfaTicket => "vmt_",
+            Self::ScimToken => "vsc_",
         }
     }
 
@@ -77,8 +85,9 @@ pub type SecretHash = [u8; 32];
 /// [`ErrorKind::Internal`] if the system random source fails.
 pub fn generate(kind: Kind) -> Result<String, Error> {
     let mut bytes = [0_u8; 32];
-    getrandom::fill(&mut bytes)
-        .map_err(|e| Error::new(ErrorKind::Internal, format!("random source failed: {e}")))?;
+    getrandom::fill(&mut bytes).map_err(|e| {
+        Error::new(ErrorKind::Internal, format!("random source failed: {e}"))
+    })?;
     Ok(format!(
         "{}{}",
         kind.prefix(),

@@ -7,6 +7,7 @@
 - [Your first ten minutes](start/README.md)
   - [The editor](start/editor.md)
   - [Keyboard shortcuts](start/shortcuts.md)
+  - [Desktop, phone and offline](start/desktop.md)
 
 # Writing
 

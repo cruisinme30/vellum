@@ -7,7 +7,8 @@ import type { Http } from "../api/http";
  * Notification preferences: which channels each kind of notification uses,
  * how long email waits, what is muted and whether everything is snoozed.
  *
- * The wire body is the server's `PreferencesView` (`/api/v1/notifications/preferences`):
+ * The wire body is the server's `PreferencesView`
+ * (`/api/v1/notifications/preferences`):
  *
  * ```json
  * { "channels": { "mentioned": ["in_app", "push"] },
@@ -46,7 +47,9 @@ export type NotificationKind = (typeof KINDS)[number];
 /** One person's settings, in app form. */
 export interface NotificationPreferences {
   /** Channels per kind; a missing kind uses {@link defaultChannels}. */
-  readonly channels: Readonly<Partial<Record<NotificationKind, readonly Channel[]>>>;
+  readonly channels: Readonly<
+    Partial<Record<NotificationKind, readonly Channel[]>>
+  >;
   /** Minutes email waits for the inbox entry to be read. */
   readonly emailDelayMinutes: number;
   /** Subjects (issue keys, document IDs) that stay quiet. */
@@ -88,7 +91,10 @@ export function channelsFor(
   return preferences.channels[kind] ?? defaultChannels(kind);
 }
 
-/** Turns one channel of one kind on or off. Kinds left at their defaults stay out of the map. */
+/**
+ * Turns one channel of one kind on or off. Kinds left at their defaults stay
+ * out of the map.
+ */
 export function withChannel(
   preferences: NotificationPreferences,
   kind: NotificationKind,
@@ -101,7 +107,8 @@ export function withChannel(
   const next = CHANNELS.filter((each) => current.has(each));
   const defaults = defaultChannels(kind);
   const isDefault =
-    next.length === defaults.length && next.every((each) => defaults.includes(each));
+    next.length === defaults.length &&
+    next.every((each) => defaults.includes(each));
   const channels: Partial<Record<NotificationKind, readonly Channel[]>> = {};
   for (const each of KINDS) {
     if (each !== kind) {
@@ -158,7 +165,10 @@ export function fromWire(wire: PreferencesWire): NotificationPreferences {
     : DEFAULT_PREFERENCES.emailDelayMinutes;
   return {
     channels,
-    emailDelayMinutes: Math.min(MAX_EMAIL_DELAY, Math.max(0, Math.floor(delay))),
+    emailDelayMinutes: Math.min(
+      MAX_EMAIL_DELAY,
+      Math.max(0, Math.floor(delay)),
+    ),
     muted: [...new Set(wire.muted)],
     snoozedUntil: wire.snoozed_until ?? undefined,
   };
@@ -169,7 +179,8 @@ export function toWire(preferences: NotificationPreferences): PreferencesWire {
   const channels: Record<string, readonly string[]> = {};
   for (const kind of KINDS) {
     const list = preferences.channels[kind];
-    if (list !== undefined) channels[kind] = list.filter((channel) => isChannel(channel));
+    if (list !== undefined)
+      channels[kind] = list.filter((channel) => isChannel(channel));
   }
   const wire = {
     channels,
@@ -196,11 +207,20 @@ export interface NotificationPreferencesStore {
 export const PREFERENCES_PATH = "/api/v1/notifications/preferences";
 
 /** Reads and writes the signed-in person's preferences on a Vellum server. */
-export function createHttpNotificationPreferencesStore(http: Http): NotificationPreferencesStore {
+export function createHttpNotificationPreferencesStore(
+  http: Http,
+): NotificationPreferencesStore {
   return {
-    load: async () => fromWire(await http.get<PreferencesWire>(PREFERENCES_PATH)),
+    load: async () =>
+      fromWire(await http.get<PreferencesWire>(PREFERENCES_PATH)),
     save: async (preferences) =>
-      fromWire(await http.send<PreferencesWire>("PUT", PREFERENCES_PATH, toWire(preferences))),
+      fromWire(
+        await http.send<PreferencesWire>(
+          "PUT",
+          PREFERENCES_PATH,
+          toWire(preferences),
+        ),
+      ),
   };
 }
 
@@ -210,7 +230,9 @@ const NORTHSTAR_PREFERENCES: NotificationPreferences = {
   muted: ["ENG-118", "ENG-142"],
 };
 
-/** Northstar demo: Priya muted two noisy issues and gets comments by push too. */
+/**
+ * Northstar demo: Priya muted two noisy issues and gets comments by push too.
+ */
 export function createMockNotificationPreferencesStore(
   initial?: NotificationPreferences,
 ): NotificationPreferencesStore {

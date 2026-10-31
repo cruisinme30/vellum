@@ -67,7 +67,12 @@ impl<S: BlobStore> Metered<S> {
         &self.inner
     }
 
-    fn record<T>(&self, op: &'static str, started: Instant, result: &StoreResult<T>) {
+    fn record<T>(
+        &self,
+        op: &'static str,
+        started: Instant,
+        result: &StoreResult<T>,
+    ) {
         let backend = KeyValue::new("backend", self.inner.backend());
         let op = KeyValue::new("op", op);
         let outcome = result.as_ref().map_or_else(StoreError::kind, |_| "ok");
@@ -130,27 +135,39 @@ impl<S: BlobStore> BlobStore for Metered<S> {
         result
     }
 
-    async fn delete(&self, path: &BlobPath, condition: Precondition) -> StoreResult<()> {
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        condition: Precondition,
+    ) -> StoreResult<()> {
         let started = Instant::now();
         let result = self.inner.delete(path, condition).await;
         self.record("delete", started, &result);
         result
     }
 
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         let started = Instant::now();
         let result = self.inner.rename(from, to).await;
         self.record("rename", started, &result);
         result
     }
 
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>> {
         let ops = self.ops.clone();
         let backend = KeyValue::new("backend", self.inner.backend());
         self.inner
             .list(dir)
             .inspect(move |item| {
-                let outcome = item.as_ref().map_or_else(StoreError::kind, |_| "ok");
+                let outcome =
+                    item.as_ref().map_or_else(StoreError::kind, |_| "ok");
                 let attrs = [
                     backend.clone(),
                     KeyValue::new("op", "list_entry"),

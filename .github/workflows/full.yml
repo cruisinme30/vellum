@@ -5,15 +5,18 @@
 # release pull requests into main (and by hand); the fuzzers moved to the
 # nightly workflow, which skips nights when develop has not changed.
 # Branch protection on main requires the "Full suite" check.
+# It also fails while the latest nightly load, ZAP, fuzz or chaos run on
+# develop failed (scripts/ci/reliability-gate.sh, ADR 0022 D254).
 #
 # Each test runs once per event: the Rust tests run only in the coverage
-# job and the UI tests only in the end-to-end matrix, not again inside the
+# shards and the UI tests only in the end-to-end matrix, not again inside the
 # fast suite. Pushes to main are not checked again: main requires an
 # up-to-date branch, so the merge commit has the tree this suite passed.
 #
 # Wall time (ADR 0035, D165-D167): the help pages that share one template
 # get the default display mode only, the browser matrix is three browsers
-# times two shards, and the two reproducible builds run side by side.
+# times six shards of four workers, and the two reproducible builds run
+# side by side.
 name: "Checks: full suite (release PRs)"
 
 on:
@@ -23,7 +26,9 @@ on:
   workflow_dispatch:
     inputs:
       ui-scope:
-        description: "UI suite scope: full, or exhaustive (every help page in every display mode)"
+        description: >-
+          UI suite scope: full, or exhaustive (every help page in every display
+          mode)
         type: choice
         options: [full, exhaustive]
         default: full
@@ -59,17 +64,21 @@ jobs:
           # suite on every merge into develop, and none of those runs
           # finishes. Release from a frozen snapshot instead.
           if [[ "${EVENT}" == "pull_request" && "${HEAD}" == "develop" ]]; then
-            echo "::error::Open release pull requests from a chore/release-YYYY-MM-DD branch cut" \
-              "from develop, not from develop itself (see CONTRIBUTING.md, Branches)."
+            echo "::error::Open release pull requests from a" \
+              "chore/release-YYYY-MM-DD branch cut" \
+              "from develop, not from develop itself" \
+              "(see CONTRIBUTING.md, Branches)."
             exit 1
           fi
           passed=0
           if [[ "${EVENT}" == "pull_request" && "${ACTION}" == "edited" ]]; then
-            passed="$(gh api "repos/${GH_REPO}/actions/workflows/full.yml/runs?head_sha=${SHA}&status=success" \
+            runs="repos/${GH_REPO}/actions/workflows/full.yml/runs"
+            passed="$(gh api "${runs}?head_sha=${SHA}&status=success" \
               --jq '.total_count' || echo 0)"
           fi
           if ((passed > 0)); then
-            echo "This commit already passed the Full suite; checking the description only."
+            echo "This commit already passed the Full suite; checking the" \
+              "description only."
             echo "run=false" >> "${GITHUB_OUTPUT}"
           else
             echo "run=true" >> "${GITHUB_OUTPUT}"
@@ -89,33 +98,69 @@ jobs:
       actions: read
       issues: read # the issue and decision record check reads the linked issue
 
-  coverage:
-    name: Rust coverage
+  # Four shards of the Rust tests (ADR 0076, D324): one runner ran out of
+  # disk linking every test program, and the tests take long enough that
+  # four runners finish sooner. Each shard builds the whole instrumented
+  # workspace, runs a quarter of the tests and reports its line coverage.
+  coverage-shard:
+    name: Rust tests ${{ matrix.shard }}/4
     needs: gate
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - run: rustup toolchain install
+      # The shards build the same thing, so they share one cache, which
+      # the first shard saves.
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          save-if: ${{ github.event_name != 'pull_request' }}
+          save-if: >-
+            ${{ github.event_name != 'pull_request' && matrix.shard == 1 }}
       - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
         with:
           tool: cargo-nextest,cargo-llvm-cov,mdbook
       # The only run of the workspace tests in this suite: the fast suite
-      # leaves them to this job when the full suite calls it.
-      - name: Tests, with line coverage of at least 85 %
+      # leaves them to these shards when the full suite calls it.
+      - name: A quarter of the tests, with line coverage
         env:
           NEXTEST_PROFILE: ci
-        run: >-
-          cargo llvm-cov nextest --workspace --exclude xtask --locked
-          --fail-under-lines 85 --lcov --output-path lcov.info
+          SHARD: ${{ matrix.shard }}
+        run: |
+          cargo llvm-cov nextest --workspace --exclude xtask --locked \
+            --no-report --partition "hash:${SHARD}/4"
+          cargo llvm-cov report --lcov --output-path "lcov-${SHARD}.info"
       - name: Tests of the build tooling (not counted in coverage)
+        if: matrix.shard == 1
         run: cargo nextest run --package xtask --locked --profile ci
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: rust-coverage-${{ matrix.shard }}
+          path: lcov-${{ matrix.shard }}.info
+
+  # Keeps the job the Full suite waits for: merges the shards' coverage
+  # and holds the total to at least 85 % of lines.
+  coverage:
+    name: Rust coverage
+    needs: coverage-shard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: rust-coverage-*
+          merge-multiple: true
+      - name: Line coverage of at least 85 %
+        run: scripts/ci/merge-coverage.sh 85 lcov.info lcov-*.info
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: rust-coverage
@@ -140,7 +185,8 @@ jobs:
       - name: Build the binary from scratch
         run: |
           docker buildx build --no-cache --target binary \
-            --output "type=local,dest=${RUNNER_TEMP}/build" -f deploy/docker/Dockerfile .
+            --output "type=local,dest=${RUNNER_TEMP}/build" \
+            -f deploy/docker/Dockerfile .
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-binary-${{ matrix.build }}
@@ -158,14 +204,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: release-binary-*
           path: ${{ runner.temp }}
       - name: The two builds are byte-identical
         run: |
           sha256sum "${RUNNER_TEMP}"/release-binary-*/vellum
-          cmp "${RUNNER_TEMP}/release-binary-1/vellum" "${RUNNER_TEMP}/release-binary-2/vellum"
+          cmp "${RUNNER_TEMP}/release-binary-1/vellum" \
+            "${RUNNER_TEMP}/release-binary-2/vellum"
           chmod +x "${RUNNER_TEMP}/release-binary-1/vellum"
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
@@ -173,26 +220,30 @@ jobs:
       - name: Build the image from that binary
         run: |
           mkdir -p "${RUNNER_TEMP}/dist"
-          cp "${RUNNER_TEMP}/release-binary-1/vellum" "${RUNNER_TEMP}/dist/vellum-linux-amd64"
+          cp "${RUNNER_TEMP}/release-binary-1/vellum" \
+            "${RUNNER_TEMP}/dist/vellum-linux-amd64"
           docker buildx build --load --target runtime \
-            --build-arg DIST=release --build-context "release=${RUNNER_TEMP}/dist" \
+            --build-arg DIST=release --build-context \
+            "release=${RUNNER_TEMP}/dist" \
             -t vellum:ci -f deploy/docker/Dockerfile .
       - name: Size, cold start, idle memory and drain within budget
         run: |
           image_bytes="$(docker save vellum:ci | gzip -9 | wc -c)"
           cargo run --locked --package xtask -- budgets \
-            --binary "${RUNNER_TEMP}/release-binary-1/vellum" --image-bytes "${image_bytes}"
+            --binary "${RUNNER_TEMP}/release-binary-1/vellum" \
+            --image-bytes "${image_bytes}"
 
   website:
     name: Website build for the UI suite
     needs: gate
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 25
     env:
       # Keep in step with site.yml.
       MDBOOK_VERSION: 0.5.4
-      MDBOOK_SHA256: 3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
+      MDBOOK_SHA256: >-
+        3f28de05dafca9d0f2eab99c662116b0e37b89b1d96a08f8f430b9eeae958cd7
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -205,6 +256,12 @@ jobs:
           echo "${MDBOOK_SHA256}  ${RUNNER_TEMP}/${tarball}" | sha256sum --check
           tar -xzf "${RUNNER_TEMP}/${tarball}" -C "${RUNNER_TEMP}" mdbook
           echo "MDBOOK=${RUNNER_TEMP}/mdbook" >> "${GITHUB_ENV}"
+      # build-site.sh builds vellum-render's site_blocks example (ADR 0071).
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          shared-key: site
+          save-if: false
       - run: scripts/ci/build-site.sh _site
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -212,7 +269,9 @@ jobs:
           path: _site
 
   e2e:
-    name: End-to-end, UI and accessibility (${{ matrix.browser }} ${{ matrix.shard }}/2)
+    name: >-
+      End-to-end, UI and accessibility (${{ matrix.browser }} ${{ matrix.shard
+      }}/6)
     needs: [gate, website]
     if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-24.04
@@ -227,9 +286,11 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
-        # Two shards: about 10 minutes each, and six jobs instead of twelve
-        # leave room under the account's 20 concurrent jobs (D167).
-        shard: [1, 2]
+        # Six shards of four workers each (Gourav: the fastest pipeline):
+        # two shards with the default two workers took about 25 minutes
+        # each. Eighteen jobs nearly fill the account's 20 concurrent jobs
+        # (D167), so the other jobs may queue briefly.
+        shard: [1, 2, 3, 4, 5, 6]
     defaults:
       run:
         working-directory: web
@@ -244,7 +305,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: website
           path: _site
@@ -252,7 +313,7 @@ jobs:
         with:
           package_json_file: web/package.json
       - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright test --shard=${{ matrix.shard }}/2
+      - run: pnpm exec playwright test --shard=${{ matrix.shard }}/6 --workers=4
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -274,7 +335,8 @@ jobs:
       - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         with:
           args: >-
-            --no-progress --exclude-path LICENSES --exclude-path web/node_modules --exclude-path corpus
+            --no-progress --exclude-path LICENSES
+            --exclude-path web/node_modules --exclude-path corpus
             '**/*.md'
           fail: true
 
@@ -296,21 +358,46 @@ jobs:
       - name: Stream a 30 MB file and the EICAR test file through clamd
         working-directory: deploy/compose
         run: |
-          ip="$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
-            "$(docker compose ps -q clamav)")"
+          ips='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'
+          ip="$(docker inspect -f "${ips}" "$(docker compose ps -q clamav)")"
           ../clamav/smoke.sh "${ip}" 3310
       - name: ClamAV logs
         if: failure()
         working-directory: deploy/compose
         run: docker compose logs clamav
 
+  reliability:
+    name: Nightly, fuzz and chaos results on develop
+    # The slow reliability checks run on schedule, never here (CI cost
+    # rules); this reads their latest results (ADR 0022, D254).
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read # reads the nightly workflow's runs and jobs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: The latest load, ZAP, fuzz and chaos runs passed
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ci/reliability-gate.sh
+
   full-suite:
     name: Full suite
     if: always()
-    needs: [gate, fast, coverage, binary, image, clamav, e2e, links]
+    needs:
+      [gate, fast, coverage-shard, coverage, binary, image, clamav, e2e,
+       links, reliability]
     runs-on: ubuntu-24.04
     steps:
       - name: Every check passed
-        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        if: >-
+          contains(needs.*.result, 'failure') || contains(needs.*.result,
+          'cancelled')
         run: exit 1
       - run: echo "Full suite passed."

@@ -1,7 +1,14 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { createContext, use, useCallback, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  use,
+  useCallback,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { Navigate, useLocation } from "react-router";
 
 import type { AuthApi, AuthStatus } from "./auth";
@@ -31,7 +38,10 @@ export function SessionProvider({
     const next = await auth.status();
     if (next !== undefined) setStatus(next);
   }, [auth]);
-  const value = useMemo(() => ({ auth, status, refresh }), [auth, status, refresh]);
+  const value = useMemo(
+    () => ({ auth, status, refresh }),
+    [auth, status, refresh],
+  );
   return <SessionContext value={value}>{children}</SessionContext>;
 }
 
@@ -42,7 +52,12 @@ export function useSession(): Session | undefined {
 
 /** Where to go after signing in: a path inside the app, never another site. */
 export function safeNext(next: string | null): string {
-  if (next === null || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) {
+  if (
+    next === null ||
+    !next.startsWith("/") ||
+    next.startsWith("//") ||
+    next.startsWith("/\\")
+  ) {
     return "/";
   }
   return next;
@@ -60,7 +75,8 @@ export function RequireSession({ children }: { readonly children: ReactNode }) {
   if (session.status.needsSetup) return <Navigate to="/setup" replace />;
   if (session.status.user === undefined || session.status.user === null) {
     const next = `${location.pathname}${location.search}${location.hash}`;
-    const query = next === "/" ? "" : `?${new URLSearchParams({ next }).toString()}`;
+    const query =
+      next === "/" ? "" : `?${new URLSearchParams({ next }).toString()}`;
     return <Navigate to={`/sign-in${query}`} replace />;
   }
   return <>{children}</>;

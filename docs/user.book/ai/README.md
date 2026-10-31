@@ -11,6 +11,28 @@ Cursor or any MCP client, and the model can search, read and draft in
 Vellum under your own permissions: it sees exactly what you can see and
 nothing more.
 
+```image
+src: assets/ai.jpg
+alt: Claude drafting a change to a Northstar page, shown as a draft for review beside the page
+caption: Claude's edits arrive as a draft you review, never as a silent change.
+```
+
+```mermaid
+sequenceDiagram
+  participant You
+  participant Client as Claude or another MCP client
+  participant MCP as Vellum MCP server
+  participant V as Vellum
+  You->>Client: "Summarise the launch risks"
+  Client->>MCP: search and read (your token)
+  MCP->>V: same permission checks as you
+  V-->>Client: only pages you can open
+  Client->>MCP: propose an edit
+  MCP->>V: save it as a draft
+  V-->>You: a draft to review
+  You->>V: accept, edit or discard
+```
+
 ## Connect in one minute {#connect}
 
 1. Open **Settings → AI** and pick your client.
@@ -36,12 +58,17 @@ OAuth:
 | --- | --- |
 | `search` | Finds pages, rows and issues, with block-level citations |
 | `get_doc`, `get_blocks`, `get_outline` | Reads a page, some blocks or its outline |
+| `get_template` | Lists page templates, or reads one to follow |
 | `create_draft`, `propose_edit` | Writes a new page or a change as a draft for you to review |
 | `create_issue`, `update_issue`, `add_comment` | Works with issues and comments |
 | `create_task` | Adds a task to My Work |
 | `query_collection`, `upsert_rows` | Reads and updates collection rows |
 | `export` | Exports a page or book |
 | `list_changes` | Lists what changed since a time |
+
+Page templates are ordinary pages in a folder named **Templates** in any
+space you can open. The assistant finds them by name, such as `prd` for a
+page titled "PRD", and follows the one you ask for when it drafts.
 
 Built-in prompts include summarise a space, write a PRD, weekly status,
 verify a page and triage an issue.
@@ -70,14 +97,25 @@ so the server cannot search it or pass it to a model. Your own computer
 can: `vellum mcp --private` opens the pages sealed to this device, in
 memory only, and serves them to your AI client read-only.
 
-1. Run `vellum private key` and send the public key it prints to the
-   space's owner, who adds this device to the space.
-2. Add Vellum to your client with the space's folder:
+1. In the desktop app, open **Settings → Private spaces** and choose
+   **Enrol this device** on the space. (From a terminal:
+   `vellum private enrol --server <url> --space <id> --label "My laptop"`
+   with an API token in `VELLUM_TOKEN`.)
+2. On a device that can already open the space, choose **Seal pages
+   for every device**, so existing pages open on the new one too. If
+   the app lists new devices to check, ask each owner to read out the
+   fingerprint from their screen, and trust it only if it matches.
+3. Add Vellum to your client with the space's ID and your server:
 
 ```json
 { "mcpServers": { "vellum-private": { "command": "vellum",
-  "args": ["mcp", "--private", "--space", "board=drives/shared/board"] } } }
+  "args": ["mcp", "--private", "--server", "https://vellum.northstar.dev",
+           "--space", "board=01JDB0ARD00000000000000000"],
+  "env": { "VELLUM_TOKEN": "<an API token>" } } } }
 ```
+
+Without `--server`, give the space's folder in the data folder instead,
+such as `board=drives/shared/board`.
 
 The model can search, read pages and blocks, and cite them. It cannot
 write, comment or export, and nothing it reads leaves your computer

@@ -21,7 +21,9 @@ workspace = true
 async-trait = "0.1.89"
 axum = { version = "0.8.9", default-features = false, features = ["ws"] }
 bytes = "1.12.1"
-futures-util = { version = "0.3.31", default-features = false, features = ["sink", "std"] }
+futures-util.version = "0.3.31"
+futures-util.default-features = false
+futures-util.features = ["sink", "std"]
 hex = "0.4.3"
 hmac = "0.13.0"
 opentelemetry = "0.33.1"
@@ -38,13 +40,18 @@ vellum-crypto = { path = "../vellum-crypto" }
 vellum-db = { path = "../vellum-db" }
 vellum-format = { path = "../vellum-format" }
 vellum-kernel.workspace = true
-yrs = { version = "0.28.0", features = ["sync"] }
+# Exact: protocol::UpdateGuard relies on the order in which yrs reads a v1
+# update; re-check its table of counts before moving this.
+yrs = { version = "=0.28.0", features = ["sync"] }
 
 [dev-dependencies]
 tempfile = "3"
 testcontainers-modules = { version = "0.15", features = ["postgres"] }
-axum = { version = "0.8.9", default-features = false, features = ["ws", "tokio", "http1"] }
+axum.version = "0.8.9"
+axum.default-features = false
+axum.features = ["ws", "tokio", "http1"]
 # proptest 1.12 moves to rand 0.10 while OpenTelemetry is on rand 0.9.
-proptest = ">=1.11.0, <1.12"
-tokio = { version = "1.54.1", features = ["rt-multi-thread", "net", "test-util"] }
+proptest = ">=1.11.0, <1.13"
+tokio.version = "1.54.1"
+tokio.features = ["rt-multi-thread", "net", "test-util"]
 tokio-tungstenite = "0.29"

@@ -20,10 +20,11 @@ mod extras;
 pub mod front_matter;
 mod prepass;
 mod serialize;
+mod settle;
 
 pub use ast::{
-    Alignment, Attributes, Block, Container, ContainerKind, Document, Fence, FenceKind, Inline,
-    List, ListItem, Table,
+    Alignment, Attributes, Block, Container, ContainerKind, Document, Fence,
+    FenceKind, Inline, List, ListItem, Table,
 };
 pub use convert::plain_text;
 pub use diagnostic::{Diagnostic, DiagnosticCode};
@@ -55,6 +56,13 @@ pub struct Parsed {
 #[must_use]
 #[tracing::instrument(level = "debug", skip_all, fields(bytes = src.len()))]
 pub fn parse(src: &str) -> Parsed {
+    let mut parsed = parse_unsettled(src);
+    settle::blocks(&mut parsed.document.blocks, &mut parsed.diagnostics);
+    parsed
+}
+
+/// Parses without settling emphasis-like markup (see [`settle`]).
+fn parse_unsettled(src: &str) -> Parsed {
     let src = src.strip_prefix('\u{feff}').unwrap_or(src);
     let src = if src.contains('\r') {
         std::borrow::Cow::Owned(src.replace("\r\n", "\n").replace('\r', "\n"))

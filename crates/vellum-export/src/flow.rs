@@ -120,8 +120,9 @@ impl Media {
             let head = bytes.get(..bytes.len().min(512)).unwrap_or_default();
             let head = String::from_utf8_lossy(head);
             let head = head.trim_start_matches('\u{feff}').trim_start();
-            (head.starts_with("<svg") || head.starts_with("<?xml") && head.contains("<svg"))
-                .then_some(Self::Svg)
+            (head.starts_with("<svg")
+                || head.starts_with("<?xml") && head.contains("<svg"))
+            .then_some(Self::Svg)
         }
     }
 }
@@ -477,7 +478,9 @@ pub fn plain_text(spans: &[Span]) -> String {
     let mut out = String::new();
     for span in spans {
         match span {
-            Span::Text { text, .. } | Span::Xref { text, .. } => out.push_str(text),
+            Span::Text { text, .. } | Span::Xref { text, .. } => {
+                out.push_str(text);
+            }
             Span::Link { spans, .. } => out.push_str(&plain_text(spans)),
             Span::Image { alt, .. } => out.push_str(alt),
             Span::Break => out.push(' '),
@@ -557,7 +560,9 @@ impl Node {
     pub fn walk(&self, f: &mut impl FnMut(&Self)) {
         f(self);
         match self {
-            Self::Quote { blocks } | Self::Callout { blocks, .. } | Self::Titled { blocks, .. } => {
+            Self::Quote { blocks }
+            | Self::Callout { blocks, .. }
+            | Self::Titled { blocks, .. } => {
                 for b in blocks {
                     b.walk(f);
                 }
@@ -565,7 +570,9 @@ impl Node {
             Self::List { items, .. } => {
                 items.iter().flat_map(|i| &i.blocks).for_each(|b| b.walk(f));
             }
-            Self::Columns { columns } => columns.iter().flatten().for_each(|b| b.walk(f)),
+            Self::Columns { columns } => {
+                columns.iter().flatten().for_each(|b| b.walk(f));
+            }
             _ => {}
         }
     }
@@ -582,7 +589,9 @@ impl Node {
             f(spans);
         }
         match self {
-            Self::Heading { spans, .. } | Self::Paragraph { spans, .. } => runs(spans, f),
+            Self::Heading { spans, .. } | Self::Paragraph { spans, .. } => {
+                runs(spans, f);
+            }
             Self::Titled { title, blocks } => {
                 runs(title, f);
                 for b in blocks {
@@ -598,13 +607,19 @@ impl Node {
                 .iter_mut()
                 .flat_map(|i| &mut i.blocks)
                 .for_each(|b| b.spans_mut(f)),
-            Self::Columns { columns } => columns.iter_mut().flatten().for_each(|b| b.spans_mut(f)),
+            Self::Columns { columns } => {
+                columns.iter_mut().flatten().for_each(|b| b.spans_mut(f));
+            }
             Self::Table(table) => table
                 .header
                 .iter_mut()
                 .chain(table.rows.iter_mut().flatten())
                 .for_each(|cell| runs(&mut cell.spans, f)),
-            Self::Cards { cards } => cards.iter_mut().for_each(|card| runs(&mut card.spans, f)),
+            Self::Cards { cards } => {
+                for card in cards.iter_mut() {
+                    runs(&mut card.spans, f);
+                }
+            }
             _ => {}
         }
     }
@@ -628,7 +643,8 @@ mod tests {
     }
 
     #[test]
-    fn spans_serialise_flat_for_the_template() -> Result<(), serde_json::Error> {
+    fn spans_serialise_flat_for_the_template() -> Result<(), serde_json::Error>
+    {
         let span = Span::Text {
             text: "x".into(),
             style: Style {

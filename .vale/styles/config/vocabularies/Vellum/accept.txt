@@ -178,3 +178,15 @@ zizmor
 [Rr]ecents
 ClamAV
 EICAR
+[Rr]escan(s|ned|ning)?
+lettre
+rustls
+unlinks
+Hyperlegible
+nfpm
+winget
+rustc
+renderer's
+revalidates
+Canonicalization
+lxml

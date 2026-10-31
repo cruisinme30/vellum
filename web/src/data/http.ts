@@ -4,9 +4,15 @@
 import type { SearchPage } from "../api/api.gen";
 import { ApiError, type Http } from "../api/http";
 
-import type { SignedInUser, StoreProblem, WorkspaceSnapshot, WorkspaceStore } from "./store";
+import { filterHits, modifiedFrom } from "./search";
+import type {
+  SignedInUser,
+  StoreProblem,
+  WorkspaceSnapshot,
+  WorkspaceStore,
+} from "./store";
 import { descendants, movePage } from "./tree";
-import type { PageMeta, SearchHit, Space } from "./types";
+import type { PageMeta, SearchFilters, SearchHit, Space } from "./types";
 
 /** `SpaceView` from `vellum-drive`. */
 interface SpaceView {
@@ -47,8 +53,12 @@ const item = (id: string) => `${DRIVE}/items/${segment(id)}`;
 /** The most items one tree request asks for; the server's own cap. */
 const TREE_LIMIT = 10_000;
 
-/** Folders and pages make the tree; books, collections and shortcuts open elsewhere. */
-const inTree = (node: NodeView) => node.kind === "page" || node.kind === "folder";
+/**
+ * Folders and pages make the tree; books, collections and shortcuts open
+ * elsewhere.
+ */
+const inTree = (node: NodeView) =>
+  node.kind === "page" || node.kind === "folder";
 
 function problemOf(error: unknown): StoreProblem {
   if (error instanceof ApiError) {
@@ -88,6 +98,7 @@ function spaceOf(space: SpaceView): Space {
     slug: space.slug,
     name: space.name,
     icon: space.kind === "user_drive" ? "🏠" : "👥",
+    root: `drives/${space.kind === "user_drive" ? "users" : "shared"}/${space.slug}`,
   };
 }
 
@@ -100,10 +111,10 @@ export interface HttpWorkspaceOptions {
 }
 
 /**
- * The workspace port over the drive's REST operations (`/api/v1/drive`,
- * issue #392). The snapshot holds the signed-in person's My Drive, which
- * the server makes with the account, and the shared drives they can open,
- * each with its whole folder and page tree. Changes show at once and settle with the server;
+ * The workspace port over the drive's REST operations (`/api/v1/drive`, issue
+ * #392). The snapshot holds the signed-in person's My Drive, which the server
+ * makes with the account, and the shared drives they can open, each with its
+ * whole folder and page tree. Changes show at once and settle with the server;
  * one the server refuses is undone and shows as the snapshot's `problem`.
  *
  * Page bodies travel over the live-editing socket, never through here
@@ -122,7 +133,9 @@ export function createHttpWorkspaceStore(
 
   function emptyFor(who?: SignedInUser): WorkspaceSnapshot {
     const me =
-      who === undefined ? { handle: "", name: "" } : { handle: who.handle, name: who.name };
+      who === undefined
+        ? { handle: "", name: "" }
+        : { handle: who.handle, name: who.name };
     return {
       name,
       me,
@@ -137,14 +150,20 @@ export function createHttpWorkspaceStore(
     snapshot = next;
     for (const listener of listeners) listener();
   };
-  const setPages = (change: (pages: readonly PageMeta[]) => readonly PageMeta[]) => {
+  const setPages = (
+    change: (pages: readonly PageMeta[]) => readonly PageMeta[],
+  ) => {
     set({ ...snapshot, pages: change(snapshot.pages) });
   };
   const report = (error: unknown) => {
     set({ ...snapshot, problem: problemOf(error) });
   };
 
-  const metaOf = (node: NodeView, position: number, starred: boolean): PageMeta => {
+  const metaOf = (
+    node: NodeView,
+    position: number,
+    starred: boolean,
+  ): PageMeta => {
     const folder = node.kind === "folder";
     return {
       id: node.id,
@@ -155,7 +174,8 @@ export function createHttpWorkspaceStore(
       icon: folder ? "📁" : "📄",
       // The drive keeps no status; front matter is not in its views.
       status: "draft",
-      owner: user !== undefined && node.created_by === user.id ? user.handle : "",
+      owner:
+        user !== undefined && node.created_by === user.id ? user.handle : "",
       updatedAt: node.modified,
       starred,
       ...(folder ? { folder } : {}),
@@ -163,7 +183,9 @@ export function createHttpWorkspaceStore(
   };
 
   const myDrive = async (): Promise<SpaceView> => {
-    const mine = await http.get<{ space?: SpaceView | null }>(`${DRIVE}/my-drive`);
+    const mine = await http.get<{ space?: SpaceView | null }>(
+      `${DRIVE}/my-drive`,
+    );
     if (mine.space === undefined || mine.space === null) {
       // The server makes a My Drive with every account, so this is a fault.
       throw new Error("The server returned no My Drive.");
@@ -171,15 +193,22 @@ export function createHttpWorkspaceStore(
     return mine.space;
   };
 
-  /** Turns depth-first items into pages, numbering each list of siblings from 1. */
-  const pagesOf = (items: readonly NodeView[], starred: ReadonlySet<string>): PageMeta[] => {
+  /**
+   * Turns depth-first items into pages, numbering each list of siblings from 1.
+   */
+  const pagesOf = (
+    items: readonly NodeView[],
+    starred: ReadonlySet<string>,
+  ): PageMeta[] => {
     const kept = new Set<string>();
     const counts = new Map<string | undefined, number>();
     const out: PageMeta[] = [];
     for (const node of items) {
       const parent = node.parent_id ?? undefined;
-      // Only folders and pages make the tree, and nothing under what it leaves out.
-      if (!inTree(node) || (parent !== undefined && !kept.has(parent))) continue;
+      // Only folders and pages make the tree, and nothing under what it leaves
+      // out.
+      if (!inTree(node) || (parent !== undefined && !kept.has(parent)))
+        continue;
       kept.add(node.id);
       const position = (counts.get(parent) ?? 0) + 1;
       counts.set(parent, position);
@@ -195,21 +224,34 @@ export function createHttpWorkspaceStore(
     while (level.length > 0) {
       const lists = await Promise.all(
         level.map((parent) =>
-          http.get<NodeList>(`${DRIVE}/spaces/${segment(spaceId)}/items`, { parent_id: parent }),
+          http.get<NodeList>(`${DRIVE}/spaces/${segment(spaceId)}/items`, {
+            parent_id: parent,
+          }),
         ),
       );
-      const found = lists.flatMap((list) => list.items.filter((n) => inTree(n)));
+      const found = lists.flatMap((list) =>
+        list.items.filter((n) => inTree(n)),
+      );
       out.push(...found);
       level = found.map((node) => node.id);
     }
     return out;
   };
 
-  /** A space's folders and pages in one request, or level by level when it is too big. */
-  const tree = async (spaceId: string, starred: ReadonlySet<string>): Promise<PageMeta[]> => {
-    const whole = await http.get<TreeList>(`${DRIVE}/spaces/${segment(spaceId)}/tree`, {
-      limit: TREE_LIMIT,
-    });
+  /**
+   * A space's folders and pages in one request, or level by level when it is
+   * too big.
+   */
+  const tree = async (
+    spaceId: string,
+    starred: ReadonlySet<string>,
+  ): Promise<PageMeta[]> => {
+    const whole = await http.get<TreeList>(
+      `${DRIVE}/spaces/${segment(spaceId)}/tree`,
+      {
+        limit: TREE_LIMIT,
+      },
+    );
     const items = whole.truncated ? await treeByLevel(spaceId) : whole.items;
     return pagesOf(items, starred);
   };
@@ -253,7 +295,8 @@ export function createHttpWorkspaceStore(
     setPages(apply);
     const touched = new Map<string, PageMeta | undefined>();
     for (const page of snapshot.pages) {
-      if (before.get(page.id) !== page) touched.set(page.id, before.get(page.id));
+      if (before.get(page.id) !== page)
+        touched.set(page.id, before.get(page.id));
     }
     const kept = new Set(snapshot.pages.map((p) => p.id));
     const removed = [...before.values()].filter((p) => !kept.has(p.id));
@@ -278,19 +321,49 @@ export function createHttpWorkspaceStore(
         listeners.delete(listener);
       };
     },
-    async createPage({ spaceId, parentId, title = "" }) {
+    async createPage({ spaceId, parentId, title = "", body }) {
       try {
         const node = await http.send<NodeView>(
           "POST",
           `${DRIVE}/spaces/${segment(spaceId)}/pages`,
-          { parent_id: parentId, title },
+          { parent_id: parentId, title, body },
         );
-        const row = snapshot.pages.filter((p) => p.spaceId === spaceId && p.parentId === parentId);
-        const page = metaOf(node, Math.max(0, ...row.map((p) => p.position)) + 1, false);
+        const row = snapshot.pages.filter(
+          (p) => p.spaceId === spaceId && p.parentId === parentId,
+        );
+        const page = metaOf(
+          node,
+          Math.max(0, ...row.map((p) => p.position)) + 1,
+          false,
+        );
         setPages((pages) => [...pages, page]);
         return page;
       } catch (error) {
         report(error);
+        return;
+      }
+    },
+    async loadPage(id) {
+      const known = snapshot.pages.find((p) => p.id === id);
+      if (known !== undefined) return known;
+      const asked = generation;
+      try {
+        const node = await http.get<NodeView>(item(id));
+        if (asked !== generation || !inTree(node)) return;
+        const starred = await http.get<NodeList>(`${DRIVE}/starred`);
+        if (asked !== generation) return;
+        const page = metaOf(
+          node,
+          1,
+          starred.items.some((n) => n.id === id),
+        );
+        // Another load may have brought it in meanwhile.
+        const present = snapshot.pages.find((p) => p.id === id);
+        if (present !== undefined) return present;
+        setPages((pages) => [...pages, page]);
+        return page;
+      } catch {
+        // Not found, or not the person's to open: the page says so.
         return;
       }
     },
@@ -305,7 +378,9 @@ export function createHttpWorkspaceStore(
       const page = snapshot.pages.find((p) => p.id === id);
       if (page === undefined) return;
       const starred = !page.starred;
-      change(patch(id, { starred }), () => http.send("PUT", `${item(id)}/star`, { starred }));
+      change(patch(id, { starred }), () =>
+        http.send("PUT", `${item(id)}/star`, { starred }),
+      );
     },
     movePage(id, target) {
       if (!snapshot.pages.some((p) => p.id === id)) return;
@@ -329,13 +404,19 @@ export function createHttpWorkspaceStore(
     seedFor() {
       return;
     },
-    async search(raw) {
+    async search(raw, filters) {
       const q = raw.trim();
       if (q === "") return [];
-      // Only what the tree holds opens here: shared-with-me items have no space in it yet.
+      // Only what the tree holds opens here: shared-with-me items have no space
+      // in it yet.
       const known = new Map(snapshot.pages.map((p) => [p.id, p]));
+      const me = snapshot.me.handle;
       try {
-        return await searchText(http, q, known);
+        return filterHits(
+          await searchText(http, q, known, filters),
+          filters,
+          me,
+        );
       } catch (error) {
         if (!searchMissing(error)) {
           report(error);
@@ -343,7 +424,7 @@ export function createHttpWorkspaceStore(
         }
       }
       try {
-        return await searchTitles(http, q, known);
+        return filterHits(await searchTitles(http, q, known), filters, me);
       } catch (error) {
         report(error);
         return [];
@@ -365,6 +446,9 @@ export function createHttpWorkspaceStore(
       }
       void load(next);
     },
+    refresh() {
+      if (user !== undefined) void load(user);
+    },
   };
   store.setUser?.(options.user);
   return store;
@@ -378,17 +462,31 @@ async function searchText(
   http: Http,
   q: string,
   known: ReadonlyMap<string, PageMeta>,
+  filters: SearchFilters | undefined,
 ): Promise<SearchHit[]> {
-  const found = await http.get<SearchPage>(SEARCH, { q, kinds: "page", limit: SEARCH_LIMIT });
+  // The server narrows what it can before its limit; the caller checks every
+  // filter again.
+  const found = await http.get<SearchPage>(SEARCH, {
+    q,
+    kinds: "page",
+    limit: SEARCH_LIMIT,
+    starred: filters?.starred === true ? true : undefined,
+    spaces: filters?.spaceId,
+    modified_from: modifiedFrom(filters),
+  });
   const hits = new Map<string, SearchHit>();
   for (const hit of found.hits) {
     const page = known.get(hit.doc);
     if (page === undefined || hits.has(page.id)) continue;
-    const snippet = hit.snippet
+    const fragments = hit.snippet.map(({ text, hit: matched }) => ({
+      text,
+      hit: matched,
+    }));
+    const snippet = fragments
       .map((fragment) => fragment.text)
       .join("")
       .trim();
-    hits.set(page.id, { page, snippet });
+    hits.set(page.id, { page, snippet, fragments });
   }
   return [...hits.values()];
 }
@@ -399,7 +497,10 @@ async function searchTitles(
   title: string,
   known: ReadonlyMap<string, PageMeta>,
 ): Promise<SearchHit[]> {
-  const found = await http.get<NodeList>(`${DRIVE}/search`, { title, limit: SEARCH_LIMIT });
+  const found = await http.get<NodeList>(`${DRIVE}/search`, {
+    title,
+    limit: SEARCH_LIMIT,
+  });
   return found.items.flatMap((node): SearchHit[] => {
     const page = known.get(node.id);
     return page === undefined ? [] : [{ page, snippet: "" }];

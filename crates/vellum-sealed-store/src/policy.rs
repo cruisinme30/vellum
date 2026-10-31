@@ -68,7 +68,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn encrypted_unless_under_a_plaintext_dir() -> Result<(), vellum_store::StoreError> {
+    fn encrypted_unless_under_a_plaintext_dir()
+    -> Result<(), vellum_store::StoreError> {
         let mut policy = PrefixPolicy::encrypt_all();
         let docs = BlobPath::new("docs")?;
         policy.set(docs.clone(), true);

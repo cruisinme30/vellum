@@ -5,7 +5,9 @@ import { createContext, use, useEffect, useState, type ReactNode } from "react";
 
 import type { CollectionsStore } from "./store";
 
-const CollectionsContext = createContext<CollectionsStore | undefined>(undefined);
+const CollectionsContext = createContext<CollectionsStore | undefined>(
+  undefined,
+);
 
 /** Provides the collections store to the app. */
 export function CollectionsProvider({
@@ -16,6 +18,14 @@ export function CollectionsProvider({
   readonly children: ReactNode;
 }) {
   return <CollectionsContext value={store}>{children}</CollectionsContext>;
+}
+
+/**
+ * The collections store, or undefined outside a provider (editor previews,
+ * tests).
+ */
+export function useOptionalCollections(): CollectionsStore | undefined {
+  return use(CollectionsContext);
 }
 
 /** The collections store; throws outside a provider. */
@@ -38,7 +48,10 @@ export interface Loaded<T> {
  * names what is loaded: a new key starts over. The previous data stays on
  * screen while a reload is in flight, so views do not flicker.
  */
-export function useLoad<T>(key: string, load: (store: CollectionsStore) => Promise<T>): Loaded<T> {
+export function useLoad<T>(
+  key: string,
+  load: (store: CollectionsStore) => Promise<T>,
+): Loaded<T> {
   const store = useCollections();
   const [state, setState] = useState<{ key: string } & Loaded<T>>({
     key,

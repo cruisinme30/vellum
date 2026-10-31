@@ -18,7 +18,9 @@ use vellum_kernel::{BlockId, DocId, ObjectId, SpaceId, Timestamp, UserId};
 use crate::access::{Principal, ReadAccess, Stars};
 use crate::backend::{Scope, SearchBackend};
 use crate::error::{Result, SearchError};
-use crate::model::{BlockKind, DocKind, Filters, IndexBlock, IndexDocument, SearchQuery};
+use crate::model::{
+    BlockKind, DocKind, Filters, IndexBlock, IndexDocument, SearchQuery,
+};
 use crate::service::{SearchService, Update};
 use crate::text;
 use crate::vector::{self, Embedder};
@@ -113,7 +115,10 @@ fn block(
 impl Corpus {
     /// The documents of the corpus.
     #[must_use]
-    #[expect(clippy::too_many_lines, reason = "fixture data, one document per call")]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "fixture data, one document per call"
+    )]
     pub fn documents(&self) -> Vec<IndexDocument> {
         let doc = |space,
                    doc,
@@ -156,21 +161,35 @@ impl Corpus {
                         &[],
                         "On-call guide for the Northstar API gateway.",
                     ),
-                    block(2, BlockKind::Heading, Some(2), &["Deploying"], "Deploying"),
+                    block(
+                        2,
+                        BlockKind::Heading,
+                        Some(2),
+                        &["Deploying"],
+                        "Deploying",
+                    ),
                     block(
                         3,
                         BlockKind::Paragraph,
                         Some(2),
                         &["Deploying"],
-                        "Run the canary deploy at 10% of traffic, then 50%, then everyone.",
+                        "Run the canary deploy at 10% of traffic, then 50%, \
+                            then everyone.",
                     ),
-                    block(4, BlockKind::Heading, Some(4), &["Rollback"], "Rollback"),
+                    block(
+                        4,
+                        BlockKind::Heading,
+                        Some(4),
+                        &["Rollback"],
+                        "Rollback",
+                    ),
                     block(
                         5,
                         BlockKind::Paragraph,
                         Some(4),
                         &["Rollback"],
-                        "Roll back with the release tool when the error budget burns too fast.",
+                        "Roll back with the release tool when the error budget \
+                            burns too fast.",
                     ),
                     block(
                         6,
@@ -191,7 +210,13 @@ impl Corpus {
                 vec![eng_root],
                 false,
                 vec![
-                    block(1, BlockKind::Property, None, &[], "Status: In progress"),
+                    block(
+                        1,
+                        BlockKind::Property,
+                        None,
+                        &[],
+                        "Status: In progress",
+                    ),
                     block(
                         2,
                         BlockKind::Paragraph,
@@ -295,7 +320,12 @@ pub struct StaticAccess {
 
 impl StaticAccess {
     /// Lets `principal` read `docs` in `spaces`.
-    pub fn grant(&mut self, principal: Principal, spaces: &[SpaceId], docs: &[DocId]) {
+    pub fn grant(
+        &mut self,
+        principal: Principal,
+        spaces: &[SpaceId],
+        docs: &[DocId],
+    ) {
         self.spaces
             .entry(principal)
             .or_default()
@@ -316,7 +346,10 @@ impl StaticAccess {
 
 #[async_trait]
 impl ReadAccess for StaticAccess {
-    async fn readable_spaces(&self, principal: &Principal) -> Result<Vec<SpaceId>> {
+    async fn readable_spaces(
+        &self,
+        principal: &Principal,
+    ) -> Result<Vec<SpaceId>> {
         Ok(self.spaces.get(principal).cloned().unwrap_or_default())
     }
 
@@ -361,10 +394,12 @@ impl HashEmbedder {
         let len = v.len();
         for token in text::tokens(input) {
             // FNV-1a: stable across runs and platforms.
-            let hash = token.term.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
-                (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
-            });
-            let slot = usize::try_from(hash % u64::try_from(len).unwrap_or(1)).unwrap_or(0);
+            let hash =
+                token.term.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+                    (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+                });
+            let slot = usize::try_from(hash % u64::try_from(len).unwrap_or(1))
+                .unwrap_or(0);
             if let Some(x) = v.get_mut(slot) {
                 *x += 1.0;
             }
@@ -453,6 +488,21 @@ async fn ranking(service: &SearchService, c: &Corpus) -> Result<(), Failure> {
         top.citation
     );
     check!(page.hybrid, "hybrid ranking was off with an embedder");
+    // Turned off by the admin (D300): the same query is keyword-only.
+    service.set_hybrid(false);
+    let off = service
+        .search(&ada, &SearchQuery::new("canary deploy", 10))
+        .await;
+    service.set_hybrid(true);
+    let off = off?;
+    check!(
+        !off.hybrid,
+        "hybrid ranking stayed on after it was turned off"
+    );
+    check!(
+        off.hits.first().map(|h| h.doc) == Some(c.runbook),
+        "keyword-only search lost the best hit: {off:?}"
+    );
     check!(
         !docs_of(&page).contains(&c.trashed),
         "trash leaked into live search"
@@ -471,7 +521,10 @@ async fn ranking(service: &SearchService, c: &Corpus) -> Result<(), Failure> {
     Ok(())
 }
 
-async fn permissions(service: &SearchService, c: &Corpus) -> Result<(), Failure> {
+async fn permissions(
+    service: &SearchService,
+    c: &Corpus,
+) -> Result<(), Failure> {
     let grace = Principal::User(c.grace);
     let page = service
         .search(&grace, &SearchQuery::new("gateway", 50))
@@ -640,16 +693,23 @@ async fn titles(service: &SearchService, c: &Corpus) -> Result<(), Failure> {
 
 async fn sections(service: &SearchService, c: &Corpus) -> Result<(), Failure> {
     let ada = Principal::User(c.ada);
-    let context = service
-        .context(&ada, c.runbook, bid(5))
-        .await?
-        .ok_or_else(|| Failure::Check("no context for a readable block".into()))?;
-    let blocks: Vec<BlockId> = context.section.iter().map(|b| b.block).collect();
+    let context =
+        service
+            .context(&ada, c.runbook, bid(5))
+            .await?
+            .ok_or_else(|| {
+                Failure::Check("no context for a readable block".into())
+            })?;
+    let blocks: Vec<BlockId> =
+        context.section.iter().map(|b| b.block).collect();
     check!(blocks == [bid(4), bid(5), bid(6)], "section was {blocks:?}");
-    let lead = service
-        .context(&ada, c.runbook, bid(1))
-        .await?
-        .ok_or_else(|| Failure::Check("no context for the lead block".into()))?;
+    let lead =
+        service
+            .context(&ada, c.runbook, bid(1))
+            .await?
+            .ok_or_else(|| {
+                Failure::Check("no context for the lead block".into())
+            })?;
     let blocks: Vec<BlockId> = lead.section.iter().map(|b| b.block).collect();
     check!(blocks == [bid(1)], "lead section was {blocks:?}");
     check!(
@@ -659,7 +719,10 @@ async fn sections(service: &SearchService, c: &Corpus) -> Result<(), Failure> {
     Ok(())
 }
 
-async fn semantic(backend: &dyn SearchBackend, c: &Corpus) -> Result<(), Failure> {
+async fn semantic(
+    backend: &dyn SearchBackend,
+    c: &Corpus,
+) -> Result<(), Failure> {
     let embedder = HashEmbedder { dimensions: 64 };
     let spaces = [c.eng, c.finance];
     let filters = Filters::default();
@@ -668,8 +731,8 @@ async fn semantic(backend: &dyn SearchBackend, c: &Corpus) -> Result<(), Failure
         docs: None,
         filters: &filters,
     };
-    let probe =
-        "Runbook › Rollback\nRoll back with the release tool when the error budget burns too fast.";
+    let probe = "Runbook › Rollback\n\
+        Roll back with the release tool when the error budget burns too fast.";
     let nearest = backend
         .semantic(&embedder.embed(probe), 0.35, scope, 3)
         .await?;
@@ -713,8 +776,9 @@ async fn paging(service: &SearchService, c: &Corpus) -> Result<(), Failure> {
     first.offset = 2;
     let page2 = service.search(&ada, &first).await?;
     check!(page1.has_more, "first page did not report more");
-    let keys =
-        |p: &crate::model::SearchPage| p.hits.iter().map(|h| (h.doc, h.block)).collect::<Vec<_>>();
+    let keys = |p: &crate::model::SearchPage| {
+        p.hits.iter().map(|h| (h.doc, h.block)).collect::<Vec<_>>()
+    };
     let expected: Vec<_> = keys(&all).into_iter().take(4).collect();
     let mut got = keys(&page1);
     got.extend(keys(&page2));

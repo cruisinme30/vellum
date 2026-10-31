@@ -70,7 +70,8 @@ pub const SIMPLE_UPLOAD_MAX: usize = 4 * 1024 * 1024;
 pub const UPLOAD_CHUNK: usize = 32 * 320 * 1024;
 
 /// Fields a listing needs; the rest of a driveItem is left out.
-const LIST_SELECT: &str = "$select=id,name,size,lastModifiedDateTime,file,folder";
+const LIST_SELECT: &str =
+    "$select=id,name,size,lastModifiedDateTime,file,folder";
 
 /// Which drive holds the blobs.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -104,7 +105,11 @@ pub struct OneDriveConfig {
 impl OneDriveConfig {
     /// Settings for `root` in `drive` against the public Graph endpoint.
     #[must_use]
-    pub fn new(drive: Drive, root: impl Into<String>, tokens: Arc<dyn TokenSource>) -> Self {
+    pub fn new(
+        drive: Drive,
+        root: impl Into<String>,
+        tokens: Arc<dyn TokenSource>,
+    ) -> Self {
         Self {
             base_url: DEFAULT_BASE_URL.to_owned(),
             drive,
@@ -199,7 +204,11 @@ impl BlobStore for OneDriveStore {
         self.0.meta(path).await
     }
 
-    #[instrument(skip(self, bytes), fields(backend = "onedrive", path = %path, size = bytes.len()), err)]
+    #[instrument(
+        skip(self, bytes),
+        fields(backend = "onedrive", path = %path, size = bytes.len()),
+        err
+    )]
     async fn put(
         &self,
         path: &BlobPath,
@@ -218,7 +227,11 @@ impl BlobStore for OneDriveStore {
     }
 
     #[instrument(skip(self), fields(backend = "onedrive", path = %path), err)]
-    async fn delete(&self, path: &BlobPath, cond: Precondition) -> StoreResult<()> {
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        cond: Precondition,
+    ) -> StoreResult<()> {
         match &cond {
             Precondition::IfAbsent => match self.0.meta(path).await {
                 Ok(_) => Err(StoreError::AlreadyExists(path.clone())),
@@ -231,20 +244,37 @@ impl BlobStore for OneDriveStore {
                 let _ = self.0.meta(path).await?;
                 self.0.remove(path, &cond).await
             }
-            Precondition::IfMatch(_) => match self.0.remove(path, &cond).await {
-                Ok(()) => Ok(()),
-                Err(e) => Err(self.0.refine(path, &cond, e).await),
-            },
+            Precondition::IfMatch(_) => {
+                match self.0.remove(path, &cond).await {
+                    Ok(()) => Ok(()),
+                    Err(e) => Err(self.0.refine(path, &cond, e).await),
+                }
+            }
         }
     }
 
-    #[instrument(skip(self), fields(backend = "onedrive", from = %from, to = %to), err)]
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    #[instrument(
+        skip(self),
+        fields(backend = "onedrive", from = %from, to = %to),
+        err
+    )]
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         self.0.rename(from, to).await
     }
 
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
-        let span = tracing::info_span!("list", backend = BACKEND, dir = ?dir.map(BlobPath::as_str));
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>> {
+        let span = tracing::info_span!(
+            "list",
+            backend = BACKEND,
+            dir = ?dir.map(BlobPath::as_str)
+        );
         let walk = Walk {
             inner: Arc::clone(&self.0),
             dir: dir.cloned(),
@@ -330,9 +360,11 @@ impl Inner {
         // write fails and merges instead of losing an update.
         let item = self.item(path).await?;
         let mut meta = file_meta(path, &item)?;
-        let url = item
-            .download_url
-            .ok_or_else(|| StoreError::Backend(format!("{BACKEND}: {path} has no download URL")))?;
+        let url = item.download_url.ok_or_else(|| {
+            StoreError::Backend(format!(
+                "{BACKEND}: {path} has no download URL"
+            ))
+        })?;
         // No bearer token: the URL is pre-authenticated.
         let response = self.http.send(|| self.http.client().get(&url)).await?;
         if !response.status().is_success() {
@@ -383,16 +415,21 @@ impl Inner {
         cond: &Precondition,
     ) -> StoreResult<Item> {
         let url = format!("{}/createUploadSession", self.item_url(Some(path)));
-        let body =
-            json!({ "item": { "@microsoft.graph.conflictBehavior": conflict_behavior(cond) } });
+        let body = json!({
+            "item": {
+                "@microsoft.graph.conflictBehavior": conflict_behavior(cond)
+            }
+        });
         let response = self
             .send(|| if_match(self.http.client().post(&url).json(&body), cond))
             .await?;
         if !response.status().is_success() {
             return Err(graph_error(path, response).await);
         }
-        let session: UploadSession = response.json().await.map_err(|e| decode_error(path, e))?;
-        let outcome = self.upload_chunks(path, &session.upload_url, &bytes).await;
+        let session: UploadSession =
+            response.json().await.map_err(|e| decode_error(path, e))?;
+        let outcome =
+            self.upload_chunks(path, &session.upload_url, &bytes).await;
         if outcome.is_err() {
             // Best effort: an abandoned session expires on its own anyway.
             let _ = self.http.client().delete(&session.upload_url).send().await;
@@ -427,7 +464,10 @@ impl Inner {
             let status = response.status();
             if end < total && status == StatusCode::ACCEPTED {
                 start = end;
-            } else if end == total && status.is_success() && status != StatusCode::ACCEPTED {
+            } else if end == total
+                && status.is_success()
+                && status != StatusCode::ACCEPTED
+            {
                 return item_response(path, response).await;
             } else {
                 return Err(graph_error(path, response).await);
@@ -438,7 +478,11 @@ impl Inner {
         )))
     }
 
-    async fn remove(&self, path: &BlobPath, cond: &Precondition) -> StoreResult<()> {
+    async fn remove(
+        &self,
+        path: &BlobPath,
+        cond: &Precondition,
+    ) -> StoreResult<()> {
         let url = self.item_url(Some(path));
         let response = self
             .send(|| if_match(self.http.client().delete(&url), cond))
@@ -450,7 +494,11 @@ impl Inner {
         }
     }
 
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         // Only files move: patching a folder path would move a whole tree.
         let _ = self.meta(from).await?;
         let to_parent = to.parent();
@@ -466,23 +514,33 @@ impl Inner {
             self.item_url(Some(from))
         );
         // `parentReference.path` is read-only in Graph; moves go by id.
-        let body = json!({ "parentReference": { "id": parent_id }, "name": to.file_name() });
+        let body = json!({
+            "parentReference": { "id": parent_id },
+            "name": to.file_name()
+        });
         let response = self
             .send(|| self.http.client().patch(&url).json(&body))
             .await?;
         if !response.status().is_success() {
             return Err(match graph_error(from, response).await {
-                StoreError::AlreadyExists(_) => StoreError::AlreadyExists(to.clone()),
+                StoreError::AlreadyExists(_) => {
+                    StoreError::AlreadyExists(to.clone())
+                }
                 e => e,
             });
         }
-        let item: Item = response.json().await.map_err(|e| decode_error(to, e))?;
+        let item: Item =
+            response.json().await.map_err(|e| decode_error(to, e))?;
         file_meta(to, &item)
     }
 
     /// The id of the folder at `segments`, creating it and any missing
     /// ancestors. `ctx` names the blob the folder is for, in errors.
-    async fn ensure_folder(&self, ctx: &BlobPath, segments: &[&str]) -> StoreResult<String> {
+    async fn ensure_folder(
+        &self,
+        ctx: &BlobPath,
+        segments: &[&str],
+    ) -> StoreResult<String> {
         let mut existing = segments.len();
         let mut id = loop {
             match self
@@ -508,7 +566,11 @@ impl Inner {
         Ok(id)
     }
 
-    async fn folder_id(&self, ctx: &BlobPath, segments: &[&str]) -> StoreResult<String> {
+    async fn folder_id(
+        &self,
+        ctx: &BlobPath,
+        segments: &[&str],
+    ) -> StoreResult<String> {
         let url = self.url_for(segments);
         let response = self.send(|| self.http.client().get(&url)).await?;
         let item = item_response(ctx, response).await?;
@@ -521,7 +583,12 @@ impl Inner {
         }
     }
 
-    async fn create_folder(&self, ctx: &BlobPath, parent: &str, name: &str) -> StoreResult<String> {
+    async fn create_folder(
+        &self,
+        ctx: &BlobPath,
+        parent: &str,
+        name: &str,
+    ) -> StoreResult<String> {
         let url = format!("{}/items/{}/children", self.drive, encode(parent));
         let body = json!({
             "name": name,
@@ -537,7 +604,12 @@ impl Inner {
     /// Turns a failed conditional write or delete into the error the
     /// [`BlobStore`] contract promises, fetching the current etag for
     /// [`StoreError::PreconditionFailed`].
-    async fn refine(&self, path: &BlobPath, cond: &Precondition, err: StoreError) -> StoreError {
+    async fn refine(
+        &self,
+        path: &BlobPath,
+        cond: &Precondition,
+        err: StoreError,
+    ) -> StoreError {
         match (cond, err) {
             (Precondition::IfAbsent, StoreError::PreconditionFailed { .. }) => {
                 StoreError::AlreadyExists(path.clone())
@@ -550,10 +622,12 @@ impl Inner {
                     path: path.clone(),
                     current: Some(m.etag),
                 },
-                Err(StoreError::NotFound(_)) => StoreError::PreconditionFailed {
-                    path: path.clone(),
-                    current: None,
-                },
+                Err(StoreError::NotFound(_)) => {
+                    StoreError::PreconditionFailed {
+                        path: path.clone(),
+                        current: None,
+                    }
+                }
                 Err(e) => e,
             },
             (_, e) => e,
@@ -637,7 +711,13 @@ impl Walk {
             } else if child.file.is_some() {
                 match BlobPath::new(rel) {
                     Ok(path) => self.ready.push_back(entry(path, &child)?),
-                    Err(e) => tracing::warn!(backend = BACKEND, error = %e, "skipping item"),
+                    Err(e) => {
+                        tracing::warn!(
+                            backend = BACKEND,
+                            error = %e,
+                            "skipping item"
+                        );
+                    }
                 }
             }
         }
@@ -709,7 +789,10 @@ fn if_match(request: RequestBuilder, cond: &Precondition) -> RequestBuilder {
     }
 }
 
-async fn item_response(path: &BlobPath, response: Response) -> StoreResult<Item> {
+async fn item_response(
+    path: &BlobPath,
+    response: Response,
+) -> StoreResult<Item> {
     if response.status().is_success() {
         response.json().await.map_err(|e| decode_error(path, e))
     } else {
@@ -728,24 +811,35 @@ async fn graph_error(path: &BlobPath, response: Response) -> StoreError {
         (StatusCode::NOT_FOUND, _) | (_, Some("itemNotFound")) => {
             StoreError::NotFound(path.clone())
         }
-        (_, Some("nameAlreadyExists")) => StoreError::AlreadyExists(path.clone()),
-        (StatusCode::PRECONDITION_FAILED, _) => StoreError::PreconditionFailed {
-            path: path.clone(),
-            current: None,
-        },
+        (_, Some("nameAlreadyExists")) => {
+            StoreError::AlreadyExists(path.clone())
+        }
+        (StatusCode::PRECONDITION_FAILED, _) => {
+            StoreError::PreconditionFailed {
+                path: path.clone(),
+                current: None,
+            }
+        }
         _ => backend_error(BACKEND, path, status, &body),
     }
 }
 
-async fn listing_json<T: for<'de> Deserialize<'de>>(response: Response) -> StoreResult<T> {
+async fn listing_json<T: for<'de> Deserialize<'de>>(
+    response: Response,
+) -> StoreResult<T> {
     let status = response.status();
     if status.is_success() {
         return response.json().await.map_err(|e| {
-            StoreError::Backend(format!("{BACKEND}: bad listing: {}", e.without_url()))
+            StoreError::Backend(format!(
+                "{BACKEND}: bad listing: {}",
+                e.without_url()
+            ))
         });
     }
     let body = response.bytes().await.unwrap_or_default();
-    let excerpt = String::from_utf8_lossy(body.get(..body.len().min(300)).unwrap_or_default());
+    let excerpt = String::from_utf8_lossy(
+        body.get(..body.len().min(300)).unwrap_or_default(),
+    );
     Err(StoreError::Backend(format!(
         "{BACKEND}: {status} while listing: {}",
         excerpt.trim()
@@ -763,10 +857,9 @@ fn file_meta(path: &BlobPath, item: &Item) -> StoreResult<BlobMeta> {
     if item.file.is_none() {
         return Err(StoreError::NotFound(path.clone()));
     }
-    let etag = item
-        .e_tag
-        .clone()
-        .ok_or_else(|| StoreError::Backend(format!("{BACKEND}: {path} has no eTag")))?;
+    let etag = item.e_tag.clone().ok_or_else(|| {
+        StoreError::Backend(format!("{BACKEND}: {path} has no eTag"))
+    })?;
     Ok(BlobMeta {
         path: path.clone(),
         size: item.size.unwrap_or_default(),
@@ -786,7 +879,11 @@ fn entry(path: BlobPath, item: &Item) -> StoreResult<BlobEntry> {
 
 /// Parses `lastModifiedDateTime` (RFC 3339) to millisecond precision.
 fn modified(path: &str, item: &Item) -> StoreResult<SystemTime> {
-    let bad = || StoreError::Backend(format!("{BACKEND}: bad lastModifiedDateTime on {path}"));
+    let bad = || {
+        StoreError::Backend(format!(
+            "{BACKEND}: bad lastModifiedDateTime on {path}"
+        ))
+    };
     let stamp: Timestamp = item
         .last_modified_date_time
         .as_deref()
@@ -823,7 +920,8 @@ mod tests {
     use crate::remote::StaticToken;
 
     fn store(drive: Drive, root: &str) -> StoreResult<OneDriveStore> {
-        let mut config = OneDriveConfig::new(drive, root, Arc::new(StaticToken::new("t")));
+        let mut config =
+            OneDriveConfig::new(drive, root, Arc::new(StaticToken::new("t")));
         config.base_url = "https://graph.example/v1.0/".to_owned();
         OneDriveStore::new(config)
     }

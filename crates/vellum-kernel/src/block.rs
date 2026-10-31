@@ -57,7 +57,10 @@ impl BlockId {
 impl fmt::Display for BlockId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(BLOCK_PREFIX)?;
-        f.write_str(&base32::encode(u128::from(self.0), BLOCK_DIGITS).to_ascii_lowercase())
+        f.write_str(
+            &base32::encode(u128::from(self.0), BLOCK_DIGITS)
+                .to_ascii_lowercase(),
+        )
     }
 }
 
@@ -73,12 +76,12 @@ impl FromStr for BlockId {
     /// Parses `blk-xxxxxxxx`; the body is case-insensitive.
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         const KIND: &str = "BlockId";
-        let body = text
-            .strip_prefix(BLOCK_PREFIX)
-            .ok_or(IdParseError::Prefix {
-                kind: KIND,
-                prefix: BLOCK_PREFIX,
-            })?;
+        let body =
+            text.strip_prefix(BLOCK_PREFIX)
+                .ok_or(IdParseError::Prefix {
+                    kind: KIND,
+                    prefix: BLOCK_PREFIX,
+                })?;
         let actual = body.chars().count();
         if actual != BLOCK_DIGITS as usize {
             return Err(IdParseError::Length {
@@ -88,10 +91,12 @@ impl FromStr for BlockId {
             });
         }
         let value = base32::decode(body).map_err(
-            |base32::DecodeError::Character { found, position }| IdParseError::Character {
-                kind: KIND,
-                found,
-                position: position + BLOCK_PREFIX.len(),
+            |base32::DecodeError::Character { found, position }| {
+                IdParseError::Character {
+                    kind: KIND,
+                    found,
+                    position: position + BLOCK_PREFIX.len(),
+                }
             },
         )?;
         // Eight digits hold exactly 40 bits, so the value always fits.
@@ -117,13 +122,18 @@ impl schemars::JsonSchema for BlockId {
 }
 
 impl Serialize for BlockId {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: Serializer>(
+        &self,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.collect_str(self)
     }
 }
 
 impl<'de> Deserialize<'de> for BlockId {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Self, D::Error> {
         let text = <std::borrow::Cow<'de, str>>::deserialize(deserializer)?;
         text.parse().map_err(serde::de::Error::custom)
     }

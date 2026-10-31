@@ -18,9 +18,13 @@ test.use({
   isMobile: false,
   serviceWorkers: "block",
 });
-// eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
+// Playwright needs the fixtures object.
+// eslint-disable-next-line no-empty-pattern
 test.beforeEach(({}, testInfo) => {
-  test.skip(!testInfo.project.name.endsWith("-laptop"), "runs at laptop size only");
+  test.skip(
+    !testInfo.project.name.endsWith("-laptop"),
+    "runs at laptop size only",
+  );
 });
 
 const GATEWAY = "/p/01JB3KA1C2D3E4F5G6H7J8K9MN";
@@ -33,7 +37,8 @@ async function expectNoViolations(page: Page) {
   expect(results.violations).toEqual([]);
 }
 
-const editorOf = (page: Page) => page.getByRole("textbox", { name: "Page body" });
+const editorOf = (page: Page) =>
+  page.getByRole("textbox", { name: "Page body" });
 
 /** Every Yjs update in the page cache, decoded loosely as text. */
 async function storedText(): Promise<string> {
@@ -47,7 +52,10 @@ async function storedText(): Promise<string> {
     });
   });
   const rows = await new Promise<{ update: Uint8Array }[]>((resolve) => {
-    const request = database.transaction("documentUpdates").objectStore("documentUpdates").getAll();
+    const request = database
+      .transaction("documentUpdates")
+      .objectStore("documentUpdates")
+      .getAll();
     request.addEventListener("success", () => {
       resolve(request.result as { update: Uint8Array }[]);
     });
@@ -100,7 +108,9 @@ test("the slash menu inserts a block", async ({ page }) => {
   await page.keyboard.press("Enter");
   await expect(page.getByRole("listbox", { name: "Blocks" })).toBeHidden();
   await page.keyboard.type("Inserted from the slash menu");
-  await expect(editor.getByRole("note").last()).toContainText("Inserted from the slash menu");
+  await expect(editor.getByRole("note").last()).toContainText(
+    "Inserted from the slash menu",
+  );
 });
 
 test("two tabs edit the same page together", async ({ page, context }) => {
@@ -148,13 +158,17 @@ test.describe("on a phone", () => {
     await expectNoViolations(page);
   });
 
-  test("long unbroken text never scrolls the page sideways", async ({ page }) => {
+  test("long unbroken text never scrolls the page sideways", async ({
+    page,
+  }) => {
     await page.goto(GATEWAY);
     const title = page.getByRole("textbox", { name: "Page title" });
     await title.fill(`https://example.com/${"a".repeat(300)} 長い見出し😀`);
     await title.press("Enter");
     const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
   });

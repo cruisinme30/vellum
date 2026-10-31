@@ -1,15 +1,17 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// Thin adapters from Node and Electron to the interfaces the tested modules use.
+// Thin adapters from Node and Electron to the interfaces the tested modules
+// use.
 
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer, type AddressInfo } from "node:net";
 import path from "node:path";
 
 import type { SafeStorage } from "electron";
 
+import type { RunResult } from "./private.js";
 import type { Disk } from "./settings.js";
 import type { Child } from "./sidecar.js";
 import type { Vault } from "./token-store.js";
@@ -29,7 +31,9 @@ export function fileDisk(file: string): Disk {
   };
 }
 
-export async function readOptionalFile(file: string): Promise<Uint8Array | undefined> {
+export async function readOptionalFile(
+  file: string,
+): Promise<Uint8Array | undefined> {
   try {
     return await readFile(file);
   } catch {
@@ -40,7 +44,8 @@ export async function readOptionalFile(file: string): Promise<Uint8Array | undef
 export function safeStorageVault(storage: SafeStorage): Vault {
   return {
     available: () => storage.isEncryptionAvailable(),
-    backend: () => (process.platform === "linux" ? storage.getSelectedStorageBackend() : "os"),
+    backend: () =>
+      process.platform === "linux" ? storage.getSelectedStorageBackend() : "os",
     encrypt: (plain) => storage.encryptString(plain),
     decrypt: (sealed) => storage.decryptString(Buffer.from(sealed)),
   };
@@ -79,4 +84,38 @@ export async function freePort(): Promise<number> {
     }),
   );
   return port;
+}
+
+/**
+ * How long one `vellum private` command may run; a reseal of a large space
+ * takes longest.
+ */
+const PRIVATE_TIMEOUT_MS = 10 * 60_000;
+
+/** Runs `binary` to completion, capturing its output. */
+export function runBinary(
+  binary: string,
+): (
+  commandArguments: readonly string[],
+  environment: Readonly<Record<string, string>>,
+) => Promise<RunResult> {
+  return (commandArguments, environment) =>
+    new Promise((resolve) => {
+      execFile(
+        binary,
+        [...commandArguments],
+        {
+          env: { ...process.env, ...environment },
+          timeout: PRIVATE_TIMEOUT_MS,
+          maxBuffer: 1024 * 1024,
+          windowsHide: true,
+        },
+        (error, stdout, stderr) => {
+          let code = 0;
+          if (error !== null)
+            code = typeof error.code === "number" ? error.code : 1;
+          resolve({ code, stdout, stderr });
+        },
+      );
+    });
 }

@@ -80,7 +80,10 @@ pub async fn run_all(store: &dyn BlobStore) -> Outcome {
 ///
 /// # Errors
 /// Returns the first [`Failure`].
-pub async fn run_with(store: &dyn BlobStore, guarantees: Guarantees) -> Outcome {
+pub async fn run_with(
+    store: &dyn BlobStore,
+    guarantees: Guarantees,
+) -> Outcome {
     put_get_roundtrip(store).await?;
     missing_blobs(store).await?;
     rename_never_clobbers(store).await?;

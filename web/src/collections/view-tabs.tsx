@@ -18,7 +18,8 @@ const KIND_ICONS: Readonly<Record<ViewKind, string>> = {
 };
 
 /** The id of a view's tab, so the panel can name it. */
-export const tabId = (base: string, index: number) => `${base}-tab-${String(index)}`;
+export const tabId = (base: string, index: number) =>
+  `${base}-tab-${String(index)}`;
 
 interface ViewTabsProperties {
   readonly views: readonly ViewInfo[];
@@ -29,13 +30,26 @@ interface ViewTabsProperties {
   readonly onSelect: (name: string) => void;
 }
 
-/** Saved views as tabs; arrows, Home and End move between them and open them. */
-export function ViewTabs({ views, active, idBase, panelId, onSelect }: ViewTabsProperties) {
+/**
+ * Saved views as tabs; arrows, Home and End move between them and open them.
+ */
+export function ViewTabs({
+  views,
+  active,
+  idBase,
+  panelId,
+  onSelect,
+}: ViewTabsProperties) {
   const t = useT();
   const list = useRef<HTMLDivElement>(null);
   const onKeyDown = (event: KeyboardEvent) => {
     const last = views.length - 1;
-    const target = { ArrowLeft: active - 1, ArrowRight: active + 1, Home: 0, End: last }[event.key];
+    const target = {
+      ArrowLeft: active - 1,
+      ArrowRight: active + 1,
+      Home: 0,
+      End: last,
+    }[event.key];
     if (target === undefined) {
       return;
     }
@@ -44,11 +58,18 @@ export function ViewTabs({ views, active, idBase, panelId, onSelect }: ViewTabsP
     const view = views[index];
     if (view) {
       onSelect(view.name);
-      list.current?.querySelector<HTMLElement>(`#${CSS.escape(tabId(idBase, index))}`)?.focus();
+      list.current
+        ?.querySelector<HTMLElement>(`#${CSS.escape(tabId(idBase, index))}`)
+        ?.focus();
     }
   };
   return (
-    <div ref={list} className="vl-view-tabs" role="tablist" aria-label={t("collection-views")}>
+    <div
+      ref={list}
+      className="vl-view-tabs"
+      role="tablist"
+      aria-label={t("collection-views")}
+    >
       {views.map((view, index) => (
         <button
           key={view.name}

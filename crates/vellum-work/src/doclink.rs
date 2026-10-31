@@ -24,7 +24,9 @@ use crate::graph::{Changes, Ctx, IssuePatch, NewIssue, WorkGraph};
 use crate::id::{IssueId, UserRef, ViewId};
 use crate::issue::{Issue, IssueKey, IssueLink};
 use crate::mention;
-use crate::view::{self, GroupBy, Layout, OrderBy, ShowClosed, View, Visibility};
+use crate::view::{
+    self, GroupBy, Layout, OrderBy, ShowClosed, View, Visibility,
+};
 
 /// The link kind for the block an issue was created from.
 pub const SOURCE: &str = "source";
@@ -72,7 +74,11 @@ pub fn source_of(issue: &Issue) -> Option<BlockRef> {
 /// # Errors
 ///
 /// Returns [`WorkError::Invalid`] if no block has this ID.
-pub fn insert_chip(markdown: &str, block: &str, key: &IssueKey) -> Result<String> {
+pub fn insert_chip(
+    markdown: &str,
+    block: &str,
+    key: &IssueKey,
+) -> Result<String> {
     let found = mention::blocks(markdown)
         .into_iter()
         .find(|b| b.id == Some(block))
@@ -180,11 +186,12 @@ impl IssueEmbed {
     /// Returns [`WorkError::Invalid`] for unknown keys, a bad filter, or
     /// neither a view nor a filter.
     pub fn from_yaml(text: &str) -> Result<Self> {
-        let embed: Self = serde_saphyr::from_str(text).map_err(|e| WorkError::Invalid {
-            what: "issue embed",
-            value: e.to_string(),
-            reason: "is not a valid issues block",
-        })?;
+        let embed: Self =
+            serde_saphyr::from_str(text).map_err(|e| WorkError::Invalid {
+                what: "issue embed",
+                value: e.to_string(),
+                reason: "is not a valid issues block",
+            })?;
         if embed.view.is_none() && embed.filter.is_none() {
             return Err(WorkError::Invalid {
                 what: "issue embed",
@@ -209,7 +216,11 @@ impl IssueEmbed {
     ///
     /// Returns [`WorkError::Invalid`] if the block names a view but
     /// `saved` is not that view.
-    pub fn to_view(&self, saved: Option<&View>, viewer: &UserRef) -> Result<View> {
+    pub fn to_view(
+        &self,
+        saved: Option<&View>,
+        viewer: &UserRef,
+    ) -> Result<View> {
         let mut v = match (self.view, saved) {
             (Some(id), Some(s)) if s.id == id => s.clone(),
             (Some(id), _) => {

@@ -13,12 +13,16 @@ export interface Space {
   readonly slug: string;
   readonly name: string;
   readonly icon: string;
+  /** Its folder on the server, such as `drives/users/priya`; absent in the demo. */
+  readonly root?: string;
 }
 
 /** Page status from front matter. */
 type PageStatus = "draft" | "in-review" | "verified" | "outdated";
 
-/** A page as the tree and lists see it; the body lives in its collab document. */
+/**
+ * A page as the tree and lists see it; the body lives in its collab document.
+ */
 export interface PageMeta {
   /** The page ULID, its only identity. */
   readonly id: string;
@@ -46,9 +50,32 @@ export interface MoveTarget {
   readonly index: number;
 }
 
+/** A run of text, marked when it matched the query. */
+export interface Fragment {
+  readonly text: string;
+  readonly hit: boolean;
+}
+
 /** A search result. */
 export interface SearchHit {
   readonly page: PageMeta;
   /** Text around the match, when the body matched. */
   readonly snippet: string;
+  /**
+   * The snippet split into matched and unmatched runs, when the server marked
+   * them.
+   */
+  readonly fragments?: readonly Fragment[];
+}
+
+/** Narrows a search (R-DR-9). Every field is optional; absent means "any". */
+export interface SearchFilters {
+  /** `me`: only pages I own. */
+  readonly owner?: "me";
+  /** Only pages changed in the last this many days. */
+  readonly modifiedDays?: number;
+  /** Only starred pages. */
+  readonly starred?: boolean;
+  /** Only pages in this space. */
+  readonly spaceId?: string;
 }

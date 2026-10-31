@@ -16,7 +16,8 @@ folder adapter is the reference.
 
 - Keys are paths relative to the drive root, with `/` separators
 - Reads return the bytes and a version tag (an `ETag`, a generation or a commit)
-- Conditional writes succeed only if the version still matches, and fail with a conflict error otherwise
+- Conditional writes succeed only if the version still matches, and fail with a
+  conflict error otherwise
 - Listing is paginated and may be eventually consistent; the merge layer copes
 - Every call creates a tracing span and records latency and bytes
 

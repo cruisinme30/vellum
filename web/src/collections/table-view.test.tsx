@@ -11,7 +11,11 @@ import { COLLECTION } from "./mock-data";
 
 async function renderTable() {
   const collections = createMockCollectionsStore();
-  const rendered = renderApp(`/data/${COLLECTION.issues}`, undefined, collections);
+  const rendered = renderApp(
+    `/data/${COLLECTION.issues}`,
+    undefined,
+    collections,
+  );
   const grid = await screen.findByRole("grid", { name: "All issues" });
   const rows = () => within(grid).getAllByRole("row");
   const cell = (row: number, column: number) => {
@@ -30,7 +34,8 @@ async function renderTable() {
   return { ...rendered, grid, rows, cell, focus, query };
 }
 
-// Columns: Issue, Status, Labels, Owner, Start, Due, Estimate, Blocked, Link, Release, Points left.
+// Columns: Issue, Status, Labels, Owner, Start, Due, Estimate, Blocked, Link,
+// Release, Points left.
 const [STATUS, LABELS, OWNER, START, ESTIMATE, BLOCKED, LINK, RELEASE, LEFT] = [
   1, 2, 3, 4, 6, 7, 8, 9, 10,
 ];
@@ -65,7 +70,9 @@ describe("TableView", () => {
     expect(cell(1, OWNER).textContent).toBe("Dev Rao");
     expect(cell(1, BLOCKED).textContent).toBe("No");
     expect(cell(1, LEFT).getAttribute("aria-readonly")).toBe("true");
-    expect(cell(3, LINK).textContent).toBe("https://status.northstar.example/incidents/42");
+    expect(cell(3, LINK).textContent).toBe(
+      "https://status.northstar.example/incidents/42",
+    );
     expect(screen.getByText(/Arrow keys move between cells/)).toBeDefined();
   });
 
@@ -95,27 +102,32 @@ describe("TableView", () => {
     expect(document.activeElement).toBe(cell(1, 0));
   });
 
-  it("edits text with Enter, keeps it with Enter and drops it with Escape", async () => {
-    const { user, cell, focus, query } = await renderTable();
-    focus(1, 0);
-    await user.keyboard("{Enter}");
-    const input = within(cell(1, 0)).getByRole("textbox", {
-      name: "Issue of Trace sampling knobs",
-    });
-    expect(document.activeElement).toBe(input);
-    await user.clear(input);
-    await user.type(input, "Trace sampling controls{Enter}");
-    expect(await within(cell(1, 0)).findByText("Trace sampling controls")).toBeDefined();
-    expect(document.activeElement).toBe(cell(1, 0));
-    const result = await query();
-    expect(result.groups[0]?.rows[0]?.title).toBe("Trace sampling controls");
+  it(
+    "edits text with Enter, keeps it with Enter and drops it with " + "Escape",
+    async () => {
+      const { user, cell, focus, query } = await renderTable();
+      focus(1, 0);
+      await user.keyboard("{Enter}");
+      const input = within(cell(1, 0)).getByRole("textbox", {
+        name: "Issue of Trace sampling knobs",
+      });
+      expect(document.activeElement).toBe(input);
+      await user.clear(input);
+      await user.type(input, "Trace sampling controls{Enter}");
+      expect(
+        await within(cell(1, 0)).findByText("Trace sampling controls"),
+      ).toBeDefined();
+      expect(document.activeElement).toBe(cell(1, 0));
+      const result = await query();
+      expect(result.groups[0]?.rows[0]?.title).toBe("Trace sampling controls");
 
-    await user.keyboard("{F2}");
-    await user.keyboard("{Control>}a{/Control}Nope{Escape}");
-    expect(within(cell(1, 0)).queryByRole("textbox")).toBeNull();
-    expect(cell(1, 0).textContent).toContain("Trace sampling controls");
-    expect(document.activeElement).toBe(cell(1, 0));
-  });
+      await user.keyboard("{F2}");
+      await user.keyboard("{Control>}a{/Control}Nope{Escape}");
+      expect(within(cell(1, 0)).queryByRole("textbox")).toBeNull();
+      expect(cell(1, 0).textContent).toContain("Trace sampling controls");
+      expect(document.activeElement).toBe(cell(1, 0));
+    },
+  );
 
   it("explains a number it cannot read and keeps the editor open", async () => {
     const { user, cell, focus } = await renderTable();
@@ -134,27 +146,32 @@ describe("TableView", () => {
     expect(await within(cell(1, ESTIMATE)).findByText("8")).toBeDefined();
   });
 
-  it("keeps an edit when focus leaves, and drops one that does not parse", async () => {
-    const { user, cell, focus } = await renderTable();
-    focus(1, ESTIMATE);
-    await user.keyboard("{Enter}");
-    await user.clear(within(cell(1, ESTIMATE)).getByRole("textbox"));
-    await user.type(within(cell(1, ESTIMATE)).getByRole("textbox"), "13");
-    await user.click(cell(2, 0));
-    expect(await within(cell(1, ESTIMATE)).findByText("13")).toBeDefined();
+  it(
+    "keeps an edit when focus leaves, and drops one that does not " + "parse",
+    async () => {
+      const { user, cell, focus } = await renderTable();
+      focus(1, ESTIMATE);
+      await user.keyboard("{Enter}");
+      await user.clear(within(cell(1, ESTIMATE)).getByRole("textbox"));
+      await user.type(within(cell(1, ESTIMATE)).getByRole("textbox"), "13");
+      await user.click(cell(2, 0));
+      expect(await within(cell(1, ESTIMATE)).findByText("13")).toBeDefined();
 
-    await user.dblClick(cell(2, ESTIMATE));
-    await user.type(within(cell(2, ESTIMATE)).getByRole("textbox"), "x");
-    await user.click(cell(3, 0));
-    expect(within(cell(2, ESTIMATE)).queryByRole("textbox")).toBeNull();
-    expect(cell(2, ESTIMATE).textContent).toBe("5");
-  });
+      await user.dblClick(cell(2, ESTIMATE));
+      await user.type(within(cell(2, ESTIMATE)).getByRole("textbox"), "x");
+      await user.click(cell(3, 0));
+      expect(within(cell(2, ESTIMATE)).queryByRole("textbox")).toBeNull();
+      expect(cell(2, ESTIMATE).textContent).toBe("5");
+    },
+  );
 
   it("edits a date", async () => {
     const { user, cell, focus } = await renderTable();
     focus(1, START);
     await user.keyboard("{Enter}");
-    const input = within(cell(1, START)).getByLabelText("Start of Trace sampling knobs");
+    const input = within(cell(1, START)).getByLabelText(
+      "Start of Trace sampling knobs",
+    );
     expect(input.getAttribute("type")).toBe("date");
     expect(input).toHaveProperty("value", "2026-10-26");
     await user.clear(input);
@@ -193,9 +210,11 @@ describe("TableView", () => {
     expect(listbox.getAttribute("aria-multiselectable")).toBe("true");
     await user.keyboard("{Home} ");
     await user.click(within(listbox).getByRole("option", { name: "docs" }));
-    expect(within(listbox).getByRole("option", { name: "bug" }).getAttribute("aria-selected")).toBe(
-      "true",
-    );
+    expect(
+      within(listbox)
+        .getByRole("option", { name: "bug" })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
     await user.keyboard("{Enter}");
     expect(await within(cell(1, LABELS)).findByText("bug")).toBeDefined();
     expect(cell(1, LABELS).textContent).toBe("bug docs performance");
@@ -210,45 +229,60 @@ describe("TableView", () => {
     focus(1, RELEASE);
     await user.keyboard("{Enter}");
     const listbox = await within(cell(1, RELEASE)).findByRole("listbox");
-    expect(await within(listbox).findByRole("option", { name: "Gateway beta" })).toBeDefined();
-    await user.click(within(listbox).getByRole("option", { name: "Gateway beta" }));
+    expect(
+      await within(listbox).findByRole("option", { name: "Gateway beta" }),
+    ).toBeDefined();
+    await user.click(
+      within(listbox).getByRole("option", { name: "Gateway beta" }),
+    );
     await user.keyboard("{Escape}");
     expect(cell(1, RELEASE).textContent).toBe("Gateway beta");
     await user.keyboard("{Enter}");
-    await user.click(await screen.findByRole("option", { name: "Gateway beta" }));
+    await user.click(
+      await screen.findByRole("option", { name: "Gateway beta" }),
+    );
     await user.click(cell(2, 0));
     expect(await within(cell(1, LEFT)).findByText("0")).toBeDefined();
     expect(cell(1, RELEASE).textContent).toBe("");
   });
 
-  it("toggles a checkbox with Space and Enter, and leaves computed cells alone", async () => {
-    const { user, cell, focus } = await renderTable();
-    focus(1, BLOCKED);
-    await user.keyboard(" ");
-    expect(await within(cell(1, BLOCKED)).findByText("Yes")).toBeDefined();
-    await user.keyboard("{Enter}");
-    expect(await within(cell(1, BLOCKED)).findByText("No")).toBeDefined();
-    focus(1, LEFT);
-    await user.keyboard("{Enter}");
-    await user.dblClick(cell(1, LEFT));
-    expect(within(cell(1, LEFT)).queryByRole("textbox")).toBeNull();
-  });
+  it(
+    "toggles a checkbox with Space and Enter, and leaves computed cells " +
+      "alone",
+    async () => {
+      const { user, cell, focus } = await renderTable();
+      focus(1, BLOCKED);
+      await user.keyboard(" ");
+      expect(await within(cell(1, BLOCKED)).findByText("Yes")).toBeDefined();
+      await user.keyboard("{Enter}");
+      expect(await within(cell(1, BLOCKED)).findByText("No")).toBeDefined();
+      focus(1, LEFT);
+      await user.keyboard("{Enter}");
+      await user.dblClick(cell(1, LEFT));
+      expect(within(cell(1, LEFT)).queryByRole("textbox")).toBeNull();
+    },
+  );
 
-  it("shows a refused write inline and clears it after a good one", async () => {
-    const { user, cell, focus, collections } = await renderTable();
-    const spy = vi
-      .spyOn(collections, "updateRow")
-      .mockRejectedValueOnce(new Error("conflict: the file changed on disk"));
-    focus(1, 0);
-    await user.keyboard("{Enter}x{Enter}");
-    const alert = await within(cell(1, 0)).findByRole("alert");
-    expect(alert.textContent).toBe("conflict: the file changed on disk");
-    expect(cell(1, 0).getAttribute("aria-invalid")).toBe("true");
-    spy.mockRestore();
-    await user.keyboard("{Enter}y{Enter}");
-    expect(await within(cell(1, 0)).findByText("Trace sampling knobsy")).toBeDefined();
-    expect(within(cell(1, 0)).queryByRole("alert")).toBeNull();
-  });
+  it(
+    "shows a refused write inline and clears it after a good " + "one",
+    async () => {
+      const { user, cell, focus, collections } = await renderTable();
+      const spy = vi
+        .spyOn(collections, "updateRow")
+        .mockRejectedValueOnce(new Error("conflict: the file changed on disk"));
+      focus(1, 0);
+      await user.keyboard("{Enter}x{Enter}");
+      const alert = await within(cell(1, 0)).findByRole("alert");
+      expect(alert.textContent).toBe("conflict: the file changed on disk");
+      expect(cell(1, 0).getAttribute("aria-invalid")).toBe("true");
+      spy.mockRestore();
+      await user.keyboard("{Enter}y{Enter}");
+      expect(
+        await within(cell(1, 0)).findByText("Trace sampling knobsy"),
+      ).toBeDefined();
+      expect(within(cell(1, 0)).queryByRole("alert")).toBeNull();
+    },
+  );
 
   it("does not write a value that did not change", async () => {
     const { user, focus, collections } = await renderTable();
@@ -262,10 +296,14 @@ describe("TableView", () => {
     const { user, cell, focus } = await renderTable();
     focus(1, STATUS);
     await user.keyboard("{Shift>}{Enter}{/Shift}");
-    const panel = await screen.findByRole("dialog", { name: "Trace sampling knobs" });
+    const panel = await screen.findByRole("dialog", {
+      name: "Trace sampling knobs",
+    });
     await user.click(within(panel).getByRole("button", { name: "Close row" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    await user.click(within(cell(2, 0)).getByRole("button", { name: /^Open / }));
+    await user.click(
+      within(cell(2, 0)).getByRole("button", { name: /^Open / }),
+    );
     expect(await screen.findByRole("dialog")).toBeDefined();
   });
 

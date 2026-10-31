@@ -39,11 +39,19 @@ export class DocumentCache {
 
   /** Every stored update of a document, oldest first. Empty when not cached. */
   async load(documentId: string): Promise<Uint8Array[]> {
-    const tx = this.#database.transaction(["documentUpdates", "documents"], "readwrite");
-    const rows = await tx.objectStore("documentUpdates").index("byDoc").getAll(documentId);
+    const tx = this.#database.transaction(
+      ["documentUpdates", "documents"],
+      "readwrite",
+    );
+    const rows = await tx
+      .objectStore("documentUpdates")
+      .index("byDoc")
+      .getAll(documentId);
     const entry = await tx.objectStore("documents").get(documentId);
     if (entry !== undefined)
-      await tx.objectStore("documents").put({ ...entry, lastAccess: this.#now() });
+      await tx
+        .objectStore("documents")
+        .put({ ...entry, lastAccess: this.#now() });
     await tx.done;
     telemetry().count("vellum.client.doc_cache.load", { hit: rows.length > 0 });
     return rows.map((row) => row.update);
@@ -51,7 +59,10 @@ export class DocumentCache {
 
   /** Stores one more update of a document. */
   async append(documentId: string, update: Uint8Array): Promise<void> {
-    const tx = this.#database.transaction(["documentUpdates", "documents"], "readwrite");
+    const tx = this.#database.transaction(
+      ["documentUpdates", "documents"],
+      "readwrite",
+    );
     const documents = tx.objectStore("documents");
     const entry = await documents.get(documentId);
     await Promise.all([
@@ -69,7 +80,10 @@ export class DocumentCache {
 
   /** Replaces every stored update of a document with one merged state. */
   async compact(documentId: string, merged: Uint8Array): Promise<void> {
-    const tx = this.#database.transaction(["documentUpdates", "documents"], "readwrite");
+    const tx = this.#database.transaction(
+      ["documentUpdates", "documents"],
+      "readwrite",
+    );
     const updates = tx.objectStore("documentUpdates");
     const keys = await updates.index("byDoc").getAllKeys(documentId);
     const entry = await tx.objectStore("documents").get(documentId);
@@ -88,7 +102,10 @@ export class DocumentCache {
 
   /** Records which space a document belongs to, so pinning covers it. */
   async track(documentId: string, spaceId: string): Promise<void> {
-    const documents = this.#database.transaction("documents", "readwrite").store;
+    const documents = this.#database.transaction(
+      "documents",
+      "readwrite",
+    ).store;
     const entry = await documents.get(documentId);
     await documents.put({
       documentId,
@@ -117,7 +134,10 @@ export class DocumentCache {
 
   /** Removes a document, for example after it is deleted or access is lost. */
   async remove(documentId: string): Promise<void> {
-    const tx = this.#database.transaction(["documentUpdates", "documents"], "readwrite");
+    const tx = this.#database.transaction(
+      ["documentUpdates", "documents"],
+      "readwrite",
+    );
     const updates = tx.objectStore("documentUpdates");
     const keys = await updates.index("byDoc").getAllKeys(documentId);
     await Promise.all([
@@ -136,7 +156,10 @@ export class DocumentCache {
   async evict(): Promise<string[]> {
     const pinnedSpaces = await this.pinned();
     const pins = new Set(pinnedSpaces);
-    const entries: DocumentEntry[] = await this.#database.getAllFromIndex("documents", "byAccess");
+    const entries: DocumentEntry[] = await this.#database.getAllFromIndex(
+      "documents",
+      "byAccess",
+    );
     const unpinned = entries.filter((entry) => !pins.has(entry.spaceId));
     let total = unpinned.reduce((sum, entry) => sum + entry.bytes, 0);
     const evicted: string[] = [];
@@ -147,7 +170,9 @@ export class DocumentCache {
       evicted.push(entry.documentId);
     }
     if (evicted.length > 0)
-      telemetry().count("vellum.client.doc_cache.evicted", { documents: evicted.length });
+      telemetry().count("vellum.client.doc_cache.evicted", {
+        documents: evicted.length,
+      });
     return evicted;
   }
 }

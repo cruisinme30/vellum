@@ -16,6 +16,7 @@ fuzz_target!(|sealed: &[u8]| {
         return;
     };
     let keyring = LocalKeyring::new(id, key);
-    let opened = futures::executor::block_on(vellum_crypto::open(&keyring, sealed));
+    let opened =
+        futures::executor::block_on(vellum_crypto::open(&keyring, sealed));
     assert!(opened.is_err(), "opened bytes that were never sealed");
 });

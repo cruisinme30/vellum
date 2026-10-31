@@ -9,7 +9,10 @@ export interface WaterfallRow {
   readonly name: string;
   readonly lane: "server" | "browser";
   readonly depth: number;
-  /** Offset from the trace start, in microseconds (negative for browser work before the request). */
+  /**
+   * Offset from the trace start, in microseconds (negative for browser work
+   * before the request).
+   */
   readonly startUs: number;
   readonly durationUs: number;
   /** Bar position and width as percentages of the whole timeline. */
@@ -20,7 +23,10 @@ export interface WaterfallRow {
   readonly events: readonly SpanEvent[];
 }
 
-/** Lays a trace out as rows: browser spans first, then server spans depth-first in start order. */
+/**
+ * Lays a trace out as rows: browser spans first, then server spans depth-first
+ * in start order.
+ */
 export function waterfallRows(trace: Trace): WaterfallRow[] {
   const ROOT = -1;
   const children = new Map<number, Trace["spans"][number][]>();
@@ -77,7 +83,8 @@ export function waterfallRows(trace: Trace): WaterfallRow[] {
     }
   };
   visit(ROOT, 0);
-  // Spans whose parent was dropped by the per-trace cap still show, at the top level.
+  // Spans whose parent was dropped by the per-trace cap still show, at the top
+  // level.
   for (const [parent] of children) {
     if (parent !== ROOT && !known.has(parent)) {
       visit(parent, 0);

@@ -73,7 +73,9 @@ pub enum Outcome {
 impl Outcome {
     /// Classifies a transport result.
     #[must_use]
-    pub const fn classify(result: &Result<HttpResponse, TransportError>) -> Self {
+    pub const fn classify(
+        result: &Result<HttpResponse, TransportError>,
+    ) -> Self {
         match result {
             Ok(response) => match response.status {
                 200..=299 => Self::Delivered,
@@ -82,14 +84,18 @@ impl Outcome {
                 _ => Self::Rejected,
             },
             Err(TransportError::Refused(_)) => Self::Rejected,
-            Err(TransportError::Timeout | TransportError::Connect(_)) => Self::Retry(None),
+            Err(TransportError::Timeout | TransportError::Connect(_)) => {
+                Self::Retry(None)
+            }
         }
     }
 
     /// Classifies a push service's answer. Push services also answer 404
     /// for a subscription that expired, so 404 removes it too.
     #[must_use]
-    pub const fn classify_push(result: &Result<HttpResponse, TransportError>) -> Self {
+    pub const fn classify_push(
+        result: &Result<HttpResponse, TransportError>,
+    ) -> Self {
         match result {
             Ok(HttpResponse { status: 404, .. }) => Self::Gone,
             _ => Self::classify(result),
@@ -159,7 +165,17 @@ impl RetryPolicy {
 }
 
 /// Failure tracking for one subscription or push endpoint.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Default,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[serde(default)]
 pub struct EndpointHealth {
     /// Deliveries that finally failed since the last success.
     pub consecutive_failures: u32,
@@ -193,7 +209,8 @@ impl EndpointHealth {
             }
             Outcome::Gone => HealthAction::Remove,
             Outcome::Retry(_) | Outcome::Rejected => {
-                self.consecutive_failures = self.consecutive_failures.saturating_add(1);
+                self.consecutive_failures =
+                    self.consecutive_failures.saturating_add(1);
                 let since = *self.failing_since.get_or_insert(now);
                 if self.consecutive_failures >= Self::PAUSE_AFTER_FAILURES
                     && now.duration_since(since) >= Self::PAUSE_AFTER
@@ -220,6 +237,31 @@ pub async fn attempt<T: HttpTransport>(
     channel: &'static str,
     attempt_number: usize,
 ) -> Outcome {
+    attempt_detailed(transport, request, channel, attempt_number)
+        .await
+        .outcome
+}
+
+/// What one attempt did, for delivery logs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Attempted {
+    /// The classified outcome.
+    pub outcome: Outcome,
+    /// The receiver's status code, when it answered.
+    pub status: Option<u16>,
+    /// The transport error, when it did not.
+    pub error: Option<String>,
+    /// How long the attempt took.
+    pub elapsed_ms: u64,
+}
+
+/// As [`attempt`], also returning the status code and timing.
+pub async fn attempt_detailed<T: HttpTransport>(
+    transport: &T,
+    request: &OutboundRequest,
+    channel: &'static str,
+    attempt_number: usize,
+) -> Attempted {
     let span = tracing::info_span!(
         "notify.deliver",
         otel.kind = "client",
@@ -238,7 +280,8 @@ pub async fn attempt<T: HttpTransport>(
         } else {
             Outcome::classify(&result)
         };
-        let elapsed_ms = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        let elapsed_ms =
+            u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
         let span = tracing::Span::current();
         if let Ok(response) = &result {
             let _ = span.record("http.response.status_code", response.status);
@@ -253,7 +296,12 @@ pub async fn attempt<T: HttpTransport>(
             channel,
             outcome = outcome.as_str(),
         );
-        outcome
+        Attempted {
+            outcome,
+            status: result.as_ref().ok().map(|r| r.status),
+            error: result.err().map(|e| e.to_string()),
+            elapsed_ms,
+        }
     }
     .instrument(span)
     .await
@@ -290,7 +338,9 @@ mod tests {
         assert_eq!(Outcome::classify(&response(429)), Outcome::Retry(None));
         assert_eq!(Outcome::classify(&response(0)), Outcome::Retry(None));
         assert_eq!(
-            Outcome::classify(&Err(TransportError::Refused("10.0.0.1".to_owned()))),
+            Outcome::classify(&Err(TransportError::Refused(
+                "10.0.0.1".to_owned()
+            ))),
             Outcome::Rejected
         );
     }
@@ -336,7 +386,10 @@ mod tests {
             let when = at(0)
                 .checked_add(SignedDuration::from_mins(minute))
                 .unwrap_or_else(|_| at(0));
-            assert_eq!(quick.record(Outcome::Retry(None), when), HealthAction::Keep);
+            assert_eq!(
+                quick.record(Outcome::Retry(None), when),
+                HealthAction::Keep
+            );
         }
         assert_eq!(quick.record(Outcome::Delivered, at(1)), HealthAction::Keep);
         assert_eq!(quick, EndpointHealth::default());
@@ -346,7 +399,10 @@ mod tests {
     struct Fixed(u16);
 
     impl HttpTransport for Fixed {
-        async fn post(&self, _request: &OutboundRequest) -> Result<HttpResponse, TransportError> {
+        async fn post(
+            &self,
+            _request: &OutboundRequest,
+        ) -> Result<HttpResponse, TransportError> {
             Ok(HttpResponse {
                 status: self.0,
                 retry_after: None,
@@ -357,7 +413,8 @@ mod tests {
     #[tokio::test]
     async fn attempt_classifies_the_transport_result() {
         let request = OutboundRequest {
-            url: url::Url::parse("https://hooks.northstar.dev").unwrap_or_else(|_| unreachable!()),
+            url: url::Url::parse("https://hooks.northstar.dev")
+                .unwrap_or_else(|_| unreachable!()),
             headers: Vec::new(),
             body: Vec::new(),
             delivery_id: "d".to_owned(),

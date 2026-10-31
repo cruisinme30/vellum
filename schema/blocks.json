@@ -1,7 +1,17 @@
 {
   "$schema": "./blocks.schema.json",
   "version": 1,
-  "sections": ["Basic", "Lists", "Callouts", "Layout", "Data", "Charts and plans", "Diagrams", "Media", "Interactive"],
+  "sections": [
+    "Basic",
+    "Lists",
+    "Callouts",
+    "Layout",
+    "Data",
+    "Charts and plans",
+    "Diagrams",
+    "Media",
+    "Interactive"
+  ],
   "nodes": [
     {
       "name": "doc",
@@ -18,7 +28,13 @@
       "blockId": true,
       "markdown": "paragraph",
       "slash": [
-        { "title": "Text", "description": "Plain paragraph", "keywords": ["paragraph", "p"], "section": "Basic", "icon": "notes" }
+        {
+          "title": "Text",
+          "description": "Plain paragraph",
+          "keywords": ["paragraph", "p"],
+          "section": "Basic",
+          "icon": "notes"
+        }
       ]
     },
     {
@@ -35,9 +51,30 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Heading 1", "description": "Large section heading", "keywords": ["h1", "title"], "section": "Basic", "icon": "format_h1", "attrs": { "level": 1 } },
-        { "title": "Heading 2", "description": "Medium section heading", "keywords": ["h2"], "section": "Basic", "icon": "format_h2", "attrs": { "level": 2 } },
-        { "title": "Heading 3", "description": "Small section heading", "keywords": ["h3"], "section": "Basic", "icon": "format_h3", "attrs": { "level": 3 } }
+        {
+          "title": "Heading 1",
+          "description": "Large section heading",
+          "keywords": ["h1", "title"],
+          "section": "Basic",
+          "icon": "format_h1",
+          "attrs": { "level": 1 }
+        },
+        {
+          "title": "Heading 2",
+          "description": "Medium section heading",
+          "keywords": ["h2"],
+          "section": "Basic",
+          "icon": "format_h2",
+          "attrs": { "level": 2 }
+        },
+        {
+          "title": "Heading 3",
+          "description": "Small section heading",
+          "keywords": ["h3"],
+          "section": "Basic",
+          "icon": "format_h3",
+          "attrs": { "level": 3 }
+        }
       ]
     },
     {
@@ -50,7 +87,13 @@
       "blockId": true,
       "markdown": "blockquote",
       "slash": [
-        { "title": "Quote", "description": "Quoted text", "keywords": ["blockquote", "cite"], "section": "Basic", "icon": "format_quote" }
+        {
+          "title": "Quote",
+          "description": "Quoted text",
+          "keywords": ["blockquote", "cite"],
+          "section": "Basic",
+          "icon": "format_quote"
+        }
       ]
     },
     {
@@ -61,7 +104,13 @@
       "atom": true,
       "markdown": "thematic_break",
       "slash": [
-        { "title": "Divider", "description": "Horizontal line", "keywords": ["hr", "rule", "separator"], "section": "Basic", "icon": "horizontal_rule" }
+        {
+          "title": "Divider",
+          "description": "Horizontal line",
+          "keywords": ["hr", "rule", "separator"],
+          "section": "Basic",
+          "icon": "horizontal_rule"
+        }
       ]
     },
     {
@@ -81,7 +130,13 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Code", "description": "Code with syntax colours", "keywords": ["fence", "snippet", "pre"], "section": "Basic", "icon": "code" }
+        {
+          "title": "Code",
+          "description": "Code with syntax colours",
+          "keywords": ["fence", "snippet", "pre"],
+          "section": "Basic",
+          "icon": "code"
+        }
       ]
     },
     {
@@ -96,7 +151,13 @@
       "blockId": true,
       "markdown": "math",
       "slash": [
-        { "title": "Math", "description": "A TeX equation", "keywords": ["latex", "tex", "equation", "formula"], "section": "Basic", "icon": "function" }
+        {
+          "title": "Math",
+          "description": "A TeX equation",
+          "keywords": ["latex", "tex", "equation", "formula"],
+          "section": "Basic",
+          "icon": "function"
+        }
       ]
     },
     {
@@ -110,7 +171,13 @@
         "tight": { "type": "boolean", "default": true }
       },
       "slash": [
-        { "title": "Bulleted list", "description": "A simple list", "keywords": ["ul", "unordered", "bullets"], "section": "Lists", "icon": "format_list_bulleted" }
+        {
+          "title": "Bulleted list",
+          "description": "A simple list",
+          "keywords": ["ul", "unordered", "bullets"],
+          "section": "Lists",
+          "icon": "format_list_bulleted"
+        }
       ]
     },
     {
@@ -121,11 +188,22 @@
       "content": "(listItem | taskItem)+",
       "markdown": "list:ordered",
       "attrs": {
-        "start": { "type": "integer", "default": 1, "min": 0, "max": 999999999 },
+        "start": {
+          "type": "integer",
+          "default": 1,
+          "min": 0,
+          "max": 999999999
+        },
         "tight": { "type": "boolean", "default": true }
       },
       "slash": [
-        { "title": "Numbered list", "description": "A list with numbers", "keywords": ["ol", "ordered", "numbers"], "section": "Lists", "icon": "format_list_numbered" }
+        {
+          "title": "Numbered list",
+          "description": "A list with numbers",
+          "keywords": ["ol", "ordered", "numbers"],
+          "section": "Lists",
+          "icon": "format_list_numbered"
+        }
       ]
     },
     {
@@ -147,7 +225,13 @@
         "tight": { "type": "boolean", "default": true }
       },
       "slash": [
-        { "title": "To-do list", "description": "Tasks with checkboxes", "keywords": ["todo", "task", "checkbox", "checklist"], "section": "Lists", "icon": "checklist" }
+        {
+          "title": "To-do list",
+          "description": "Tasks with checkboxes",
+          "keywords": ["todo", "task", "checkbox", "checklist"],
+          "section": "Lists",
+          "icon": "checklist"
+        }
       ]
     },
     {
@@ -172,7 +256,13 @@
       "blockId": true,
       "markdown": "table",
       "slash": [
-        { "title": "Table", "description": "Rows and columns", "keywords": ["grid", "gfm", "compare", "matrix"], "section": "Data", "icon": "table" }
+        {
+          "title": "Table",
+          "description": "Rows and columns",
+          "keywords": ["grid", "gfm", "compare", "matrix"],
+          "section": "Data",
+          "icon": "table"
+        }
       ]
     },
     {
@@ -190,7 +280,11 @@
       "isolating": true,
       "markdown": "table_cell:header",
       "attrs": {
-        "align": { "type": "enum", "values": ["none", "left", "center", "right"], "default": "none" }
+        "align": {
+          "type": "enum",
+          "values": ["none", "left", "center", "right"],
+          "default": "none"
+        }
       }
     },
     {
@@ -201,7 +295,11 @@
       "isolating": true,
       "markdown": "table_cell",
       "attrs": {
-        "align": { "type": "enum", "values": ["none", "left", "center", "right"], "default": "none" }
+        "align": {
+          "type": "enum",
+          "values": ["none", "left", "center", "right"],
+          "default": "none"
+        }
       }
     },
     {
@@ -214,17 +312,63 @@
       "blockId": true,
       "markdown": "container:callout",
       "attrs": {
-        "kind": { "type": "enum", "values": ["info", "warn", "good", "crit", "tip", "note"], "default": "info" },
+        "kind": {
+          "type": "enum",
+          "values": ["info", "warn", "good", "crit", "tip", "note"],
+          "default": "info"
+        },
         "attributes": { "type": "string", "default": "" },
         "title": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Info callout", "description": "Neutral information", "keywords": ["callout", "info", "aside"], "section": "Callouts", "icon": "info", "attrs": { "kind": "info" } },
-        { "title": "Warning callout", "description": "Something to watch", "keywords": ["callout", "warn", "caution"], "section": "Callouts", "icon": "warning", "attrs": { "kind": "warn" } },
-        { "title": "Success callout", "description": "Good news or a goal", "keywords": ["callout", "good", "success"], "section": "Callouts", "icon": "check_circle", "attrs": { "kind": "good" } },
-        { "title": "Critical callout", "description": "Must not be missed", "keywords": ["callout", "crit", "danger", "error"], "section": "Callouts", "icon": "error", "attrs": { "kind": "crit" } },
-        { "title": "Tip callout", "description": "A helpful hint", "keywords": ["callout", "tip", "hint"], "section": "Callouts", "icon": "lightbulb", "attrs": { "kind": "tip" } },
-        { "title": "Note callout", "description": "A side note", "keywords": ["callout", "note"], "section": "Callouts", "icon": "sticky_note_2", "attrs": { "kind": "note" } }
+        {
+          "title": "Info callout",
+          "description": "Neutral information",
+          "keywords": ["callout", "info", "aside"],
+          "section": "Callouts",
+          "icon": "info",
+          "attrs": { "kind": "info" }
+        },
+        {
+          "title": "Warning callout",
+          "description": "Something to watch",
+          "keywords": ["callout", "warn", "caution"],
+          "section": "Callouts",
+          "icon": "warning",
+          "attrs": { "kind": "warn" }
+        },
+        {
+          "title": "Success callout",
+          "description": "Good news or a goal",
+          "keywords": ["callout", "good", "success"],
+          "section": "Callouts",
+          "icon": "check_circle",
+          "attrs": { "kind": "good" }
+        },
+        {
+          "title": "Critical callout",
+          "description": "Must not be missed",
+          "keywords": ["callout", "crit", "danger", "error"],
+          "section": "Callouts",
+          "icon": "error",
+          "attrs": { "kind": "crit" }
+        },
+        {
+          "title": "Tip callout",
+          "description": "A helpful hint",
+          "keywords": ["callout", "tip", "hint"],
+          "section": "Callouts",
+          "icon": "lightbulb",
+          "attrs": { "kind": "tip" }
+        },
+        {
+          "title": "Note callout",
+          "description": "A side note",
+          "keywords": ["callout", "note"],
+          "section": "Callouts",
+          "icon": "sticky_note_2",
+          "attrs": { "kind": "note" }
+        }
       ]
     },
     {
@@ -241,7 +385,13 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Toggle", "description": "Collapsible section", "keywords": ["details", "collapse", "expand", "accordion"], "section": "Layout", "icon": "expand_circle_down" }
+        {
+          "title": "Toggle",
+          "description": "Collapsible section",
+          "keywords": ["details", "collapse", "expand", "accordion"],
+          "section": "Layout",
+          "icon": "expand_circle_down"
+        }
       ]
     },
     {
@@ -257,8 +407,22 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Two columns", "description": "Side-by-side content", "keywords": ["columns", "split", "layout"], "section": "Layout", "icon": "view_column_2", "template": "columns2" },
-        { "title": "Three columns", "description": "Three side-by-side areas", "keywords": ["columns", "layout"], "section": "Layout", "icon": "view_week", "template": "columns3" }
+        {
+          "title": "Two columns",
+          "description": "Side-by-side content",
+          "keywords": ["columns", "split", "layout"],
+          "section": "Layout",
+          "icon": "view_column_2",
+          "template": "columns2"
+        },
+        {
+          "title": "Three columns",
+          "description": "Three side-by-side areas",
+          "keywords": ["columns", "layout"],
+          "section": "Layout",
+          "icon": "view_week",
+          "template": "columns3"
+        }
       ]
     },
     {
@@ -285,7 +449,14 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Tabs", "description": "Content behind tabs", "keywords": ["tabs", "tabbed"], "section": "Layout", "icon": "tab", "template": "tabs" }
+        {
+          "title": "Tabs",
+          "description": "Content behind tabs",
+          "keywords": ["tabs", "tabbed"],
+          "section": "Layout",
+          "icon": "tab",
+          "template": "tabs"
+        }
       ]
     },
     {
@@ -312,7 +483,13 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Table of contents", "description": "Links to the headings", "keywords": ["toc", "contents", "outline"], "section": "Layout", "icon": "toc" }
+        {
+          "title": "Table of contents",
+          "description": "Links to the headings",
+          "keywords": ["toc", "contents", "outline"],
+          "section": "Layout",
+          "icon": "toc"
+        }
       ]
     },
     {
@@ -327,7 +504,14 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Stats", "description": "Big numbers with deltas", "keywords": ["stats", "kpi", "metrics", "numbers"], "section": "Data", "icon": "monitoring", "template": "stats" }
+        {
+          "title": "Stats",
+          "description": "Big numbers with deltas",
+          "keywords": ["stats", "kpi", "metrics", "numbers"],
+          "section": "Data",
+          "icon": "monitoring",
+          "template": "stats"
+        }
       ]
     },
     {
@@ -342,7 +526,14 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Facts", "description": "Key and value pairs", "keywords": ["facts", "properties", "kv", "metadata"], "section": "Data", "icon": "fact_check", "template": "facts" }
+        {
+          "title": "Facts",
+          "description": "Key and value pairs",
+          "keywords": ["facts", "properties", "kv", "metadata"],
+          "section": "Data",
+          "icon": "fact_check",
+          "template": "facts"
+        }
       ]
     },
     {
@@ -357,7 +548,14 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Progress", "description": "Progress bars", "keywords": ["progress", "percent", "bars"], "section": "Data", "icon": "linear_scale", "template": "progress" }
+        {
+          "title": "Progress",
+          "description": "Progress bars",
+          "keywords": ["progress", "percent", "bars"],
+          "section": "Data",
+          "icon": "linear_scale",
+          "template": "progress"
+        }
       ]
     },
     {
@@ -372,7 +570,14 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Cards", "description": "A grid of cards", "keywords": ["cards", "grid", "features"], "section": "Layout", "icon": "grid_view", "template": "cards" }
+        {
+          "title": "Cards",
+          "description": "A grid of cards",
+          "keywords": ["cards", "grid", "features"],
+          "section": "Layout",
+          "icon": "grid_view",
+          "template": "cards"
+        }
       ]
     },
     {
@@ -387,7 +592,14 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Steps", "description": "A numbered procedure", "keywords": ["steps", "procedure", "howto"], "section": "Layout", "icon": "format_list_numbered", "template": "steps" }
+        {
+          "title": "Steps",
+          "description": "A numbered procedure",
+          "keywords": ["steps", "procedure", "howto"],
+          "section": "Layout",
+          "icon": "format_list_numbered",
+          "template": "steps"
+        }
       ]
     },
     {
@@ -402,7 +614,13 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Page cards", "description": "Cards for linked pages", "keywords": ["pages", "subpages", "children"], "section": "Layout", "icon": "dashboard" }
+        {
+          "title": "Page cards",
+          "description": "Cards for linked pages",
+          "keywords": ["pages", "subpages", "children"],
+          "section": "Layout",
+          "icon": "dashboard"
+        }
       ]
     },
     {
@@ -434,7 +652,13 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Link card", "description": "A rich link preview", "keywords": ["bookmark", "link", "url", "unfurl"], "section": "Media", "icon": "link" }
+        {
+          "title": "Link card",
+          "description": "A rich link preview",
+          "keywords": ["bookmark", "link", "url", "unfurl"],
+          "section": "Media",
+          "icon": "link"
+        }
       ]
     },
     {
@@ -450,7 +674,13 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Embed", "description": "Video, design or map", "keywords": ["embed", "youtube", "figma", "loom", "iframe"], "section": "Media", "icon": "smart_display" }
+        {
+          "title": "Embed",
+          "description": "Video, design or map",
+          "keywords": ["embed", "youtube", "figma", "loom", "iframe"],
+          "section": "Media",
+          "icon": "smart_display"
+        }
       ]
     },
     {
@@ -467,10 +697,20 @@
         "alt": { "type": "string", "default": "" },
         "title": { "type": "string", "default": "" },
         "width": { "type": "string", "default": "" },
-        "align": { "type": "enum", "values": ["center", "left", "right"], "default": "center" }
+        "align": {
+          "type": "enum",
+          "values": ["center", "left", "right"],
+          "default": "center"
+        }
       },
       "slash": [
-        { "title": "Image", "description": "Upload or link an image", "keywords": ["image", "picture", "photo", "figure"], "section": "Media", "icon": "image" }
+        {
+          "title": "Image",
+          "description": "Upload or link an image",
+          "keywords": ["image", "picture", "photo", "figure"],
+          "section": "Media",
+          "icon": "image"
+        }
       ]
     },
     {
@@ -488,9 +728,22 @@
         "lang": {
           "type": "enum",
           "values": [
-            "chart", "timeline", "roadmap", "risk-matrix", "board", "table", "architecture",
-            "mermaid", "d2", "plantuml", "graphviz", "excalidraw", "drawio",
-            "calculator", "image", "collection"
+            "chart",
+            "timeline",
+            "roadmap",
+            "risk-matrix",
+            "board",
+            "table",
+            "architecture",
+            "mermaid",
+            "d2",
+            "plantuml",
+            "graphviz",
+            "excalidraw",
+            "drawio",
+            "calculator",
+            "image",
+            "collection"
           ],
           "default": "chart"
         },
@@ -498,22 +751,144 @@
         "attributes": { "type": "string", "default": "" }
       },
       "slash": [
-        { "title": "Chart", "description": "Bar, line, donut and more", "keywords": ["chart", "graph", "bar", "line", "pie", "donut"], "section": "Charts and plans", "icon": "bar_chart", "attrs": { "lang": "chart" }, "template": "chart" },
-        { "title": "Timeline", "description": "Dated milestones", "keywords": ["timeline", "history", "dates"], "section": "Charts and plans", "icon": "timeline", "attrs": { "lang": "timeline" }, "template": "timeline" },
-        { "title": "Roadmap", "description": "Bars on a calendar", "keywords": ["roadmap", "gantt", "plan"], "section": "Charts and plans", "icon": "view_timeline", "attrs": { "lang": "roadmap" }, "template": "roadmap" },
-        { "title": "Risk matrix", "description": "Likelihood against impact", "keywords": ["risk", "matrix", "heatmap"], "section": "Charts and plans", "icon": "grid_on", "attrs": { "lang": "risk-matrix" }, "template": "risk" },
-        { "title": "Board", "description": "A static kanban board", "keywords": ["board", "kanban", "columns"], "section": "Charts and plans", "icon": "view_kanban", "attrs": { "lang": "board" }, "template": "board" },
-        { "title": "Data table", "description": "Sortable CSV with bars", "keywords": ["csv", "table", "sortable", "data"], "section": "Data", "icon": "table_view", "attrs": { "lang": "table", "args": "sortable" }, "template": "csv" },
-        { "title": "Architecture", "description": "Lanes and arrows", "keywords": ["architecture", "lanes", "system"], "section": "Diagrams", "icon": "account_tree", "attrs": { "lang": "architecture" }, "template": "architecture" },
-        { "title": "Mermaid diagram", "description": "Flowchart, sequence and more", "keywords": ["mermaid", "flowchart", "sequence", "diagram"], "section": "Diagrams", "icon": "schema", "attrs": { "lang": "mermaid" }, "template": "mermaid" },
-        { "title": "D2 diagram", "description": "Rendered by Kroki", "keywords": ["d2", "diagram"], "section": "Diagrams", "icon": "polyline", "attrs": { "lang": "d2" } },
-        { "title": "PlantUML diagram", "description": "Rendered by Kroki", "keywords": ["plantuml", "uml"], "section": "Diagrams", "icon": "polyline", "attrs": { "lang": "plantuml" } },
-        { "title": "Graphviz diagram", "description": "Rendered by Kroki", "keywords": ["graphviz", "dot"], "section": "Diagrams", "icon": "polyline", "attrs": { "lang": "graphviz" } },
-        { "title": "Excalidraw sketch", "description": "Rendered by Kroki", "keywords": ["excalidraw", "sketch"], "section": "Diagrams", "icon": "draw", "attrs": { "lang": "excalidraw" } },
-        { "title": "draw.io diagram", "description": "Rendered by Kroki", "keywords": ["drawio", "diagrams.net"], "section": "Diagrams", "icon": "draw", "attrs": { "lang": "drawio" } },
-        { "title": "Calculator", "description": "Sliders and a result", "keywords": ["calculator", "what-if", "sliders"], "section": "Interactive", "icon": "calculate", "attrs": { "lang": "calculator" }, "template": "calculator" },
-        { "title": "Image gallery", "description": "Images listed in a fence", "keywords": ["gallery", "images"], "section": "Media", "icon": "photo_library", "attrs": { "lang": "image" } },
-        { "title": "Collection view", "description": "Embed a live collection", "keywords": ["collection", "database", "view"], "section": "Interactive", "icon": "database", "attrs": { "lang": "collection" }, "template": "collection" }
+        {
+          "title": "Chart",
+          "description": "Bar, line, donut and more",
+          "keywords": ["chart", "graph", "bar", "line", "pie", "donut"],
+          "section": "Charts and plans",
+          "icon": "bar_chart",
+          "attrs": { "lang": "chart" },
+          "template": "chart"
+        },
+        {
+          "title": "Timeline",
+          "description": "Dated milestones",
+          "keywords": ["timeline", "history", "dates"],
+          "section": "Charts and plans",
+          "icon": "timeline",
+          "attrs": { "lang": "timeline" },
+          "template": "timeline"
+        },
+        {
+          "title": "Roadmap",
+          "description": "Bars on a calendar",
+          "keywords": ["roadmap", "gantt", "plan"],
+          "section": "Charts and plans",
+          "icon": "view_timeline",
+          "attrs": { "lang": "roadmap" },
+          "template": "roadmap"
+        },
+        {
+          "title": "Risk matrix",
+          "description": "Likelihood against impact",
+          "keywords": ["risk", "matrix", "heatmap"],
+          "section": "Charts and plans",
+          "icon": "grid_on",
+          "attrs": { "lang": "risk-matrix" },
+          "template": "risk"
+        },
+        {
+          "title": "Board",
+          "description": "A static kanban board",
+          "keywords": ["board", "kanban", "columns"],
+          "section": "Charts and plans",
+          "icon": "view_kanban",
+          "attrs": { "lang": "board" },
+          "template": "board"
+        },
+        {
+          "title": "Data table",
+          "description": "Sortable CSV with bars",
+          "keywords": ["csv", "table", "sortable", "data"],
+          "section": "Data",
+          "icon": "table_view",
+          "attrs": { "lang": "table", "args": "sortable" },
+          "template": "csv"
+        },
+        {
+          "title": "Architecture",
+          "description": "Lanes and arrows",
+          "keywords": ["architecture", "lanes", "system"],
+          "section": "Diagrams",
+          "icon": "account_tree",
+          "attrs": { "lang": "architecture" },
+          "template": "architecture"
+        },
+        {
+          "title": "Mermaid diagram",
+          "description": "Flowchart, sequence and more",
+          "keywords": ["mermaid", "flowchart", "sequence", "diagram"],
+          "section": "Diagrams",
+          "icon": "schema",
+          "attrs": { "lang": "mermaid" },
+          "template": "mermaid"
+        },
+        {
+          "title": "D2 diagram",
+          "description": "Rendered by Kroki",
+          "keywords": ["d2", "diagram"],
+          "section": "Diagrams",
+          "icon": "polyline",
+          "attrs": { "lang": "d2" }
+        },
+        {
+          "title": "PlantUML diagram",
+          "description": "Rendered by Kroki",
+          "keywords": ["plantuml", "uml"],
+          "section": "Diagrams",
+          "icon": "polyline",
+          "attrs": { "lang": "plantuml" }
+        },
+        {
+          "title": "Graphviz diagram",
+          "description": "Rendered by Kroki",
+          "keywords": ["graphviz", "dot"],
+          "section": "Diagrams",
+          "icon": "polyline",
+          "attrs": { "lang": "graphviz" }
+        },
+        {
+          "title": "Excalidraw sketch",
+          "description": "Rendered by Kroki",
+          "keywords": ["excalidraw", "sketch"],
+          "section": "Diagrams",
+          "icon": "draw",
+          "attrs": { "lang": "excalidraw" }
+        },
+        {
+          "title": "draw.io diagram",
+          "description": "Rendered by Kroki",
+          "keywords": ["drawio", "diagrams.net"],
+          "section": "Diagrams",
+          "icon": "draw",
+          "attrs": { "lang": "drawio" }
+        },
+        {
+          "title": "Calculator",
+          "description": "Sliders and a result",
+          "keywords": ["calculator", "what-if", "sliders"],
+          "section": "Interactive",
+          "icon": "calculate",
+          "attrs": { "lang": "calculator" },
+          "template": "calculator"
+        },
+        {
+          "title": "Image gallery",
+          "description": "Images listed in a fence",
+          "keywords": ["gallery", "images"],
+          "section": "Media",
+          "icon": "photo_library",
+          "attrs": { "lang": "image" }
+        },
+        {
+          "title": "Collection view",
+          "description": "Embed a live collection",
+          "keywords": ["collection", "database", "view"],
+          "section": "Interactive",
+          "icon": "database",
+          "attrs": { "lang": "collection" },
+          "template": "collection"
+        }
       ]
     },
     {
@@ -573,7 +948,13 @@
       "markdown": "date",
       "attrs": { "date": { "type": "string", "default": "today" } },
       "slash": [
-        { "title": "Date", "description": "Insert today's date", "keywords": ["date", "today", "calendar"], "section": "Basic", "icon": "calendar_today" }
+        {
+          "title": "Date",
+          "description": "Insert today's date",
+          "keywords": ["date", "today", "calendar"],
+          "section": "Basic",
+          "icon": "calendar_today"
+        }
       ]
     },
     {
@@ -602,13 +983,51 @@
     }
   ],
   "marks": [
-    { "name": "bold", "doc": "`**strong**`", "impl": "tiptap", "markdown": "strong" },
-    { "name": "italic", "doc": "`*emphasis*`", "impl": "tiptap", "markdown": "emphasis" },
-    { "name": "strike", "doc": "`~~strikethrough~~`", "impl": "tiptap", "markdown": "strikethrough" },
-    { "name": "code", "doc": "`` `code` ``", "impl": "tiptap", "markdown": "code", "excludes": "_" },
-    { "name": "highlight", "doc": "`==highlight==`", "impl": "tiptap", "markdown": "highlight" },
-    { "name": "subscript", "doc": "`~subscript~`", "impl": "tiptap", "markdown": "subscript", "excludes": "superscript" },
-    { "name": "superscript", "doc": "`^superscript^`", "impl": "tiptap", "markdown": "superscript", "excludes": "subscript" },
+    {
+      "name": "bold",
+      "doc": "`**strong**`",
+      "impl": "tiptap",
+      "markdown": "strong"
+    },
+    {
+      "name": "italic",
+      "doc": "`*emphasis*`",
+      "impl": "tiptap",
+      "markdown": "emphasis"
+    },
+    {
+      "name": "strike",
+      "doc": "`~~strikethrough~~`",
+      "impl": "tiptap",
+      "markdown": "strikethrough"
+    },
+    {
+      "name": "code",
+      "doc": "`` `code` ``",
+      "impl": "tiptap",
+      "markdown": "code",
+      "excludes": "_"
+    },
+    {
+      "name": "highlight",
+      "doc": "`==highlight==`",
+      "impl": "tiptap",
+      "markdown": "highlight"
+    },
+    {
+      "name": "subscript",
+      "doc": "`~subscript~`",
+      "impl": "tiptap",
+      "markdown": "subscript",
+      "excludes": "superscript"
+    },
+    {
+      "name": "superscript",
+      "doc": "`^superscript^`",
+      "impl": "tiptap",
+      "markdown": "superscript",
+      "excludes": "subscript"
+    },
     {
       "name": "link",
       "doc": "`[text](url \"title\")`",

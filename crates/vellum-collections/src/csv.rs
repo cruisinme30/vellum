@@ -22,8 +22,8 @@ use crate::compute::Computer;
 use crate::error::Diagnostic;
 use crate::row::{Row, parse_bool, parse_number, relation_value, slug};
 use crate::schema::{
-    MAX_KEY_LEN, MAX_PROPERTIES, NumberFormat, Property, PropertyType, RESERVED_KEYS, Schema,
-    SelectOption,
+    MAX_KEY_LEN, MAX_PROPERTIES, NumberFormat, Property, PropertyType,
+    RESERVED_KEYS, Schema, SelectOption,
 };
 use crate::telemetry;
 use crate::value::{DateValue, Value};
@@ -67,7 +67,9 @@ pub enum CsvError {
 impl From<CsvError> for vellum_kernel::Error {
     fn from(error: CsvError) -> Self {
         let kind = match &error {
-            CsvError::UnknownCollection(_) => vellum_kernel::ErrorKind::NotFound,
+            CsvError::UnknownCollection(_) => {
+                vellum_kernel::ErrorKind::NotFound
+            }
             _ => vellum_kernel::ErrorKind::InvalidInput,
         };
         Self::new(kind, error.to_string()).with_source(error)
@@ -84,13 +86,15 @@ pub fn export(
     collection: CollectionId,
     view: &ViewDef,
 ) -> Result<String, CsvError> {
-    let span = tracing::info_span!("collections.csv_export", collection = %collection);
+    let span =
+        tracing::info_span!("collections.csv_export", collection = %collection);
     let _guard = span.enter();
     let result = view::run(computer, collection, view, usize::MAX)?;
     let mut w = ::csv::Writer::from_writer(Vec::new());
     // Column names are user text too: a property named `=HYPERLINK(…)`
     // would run as a formula in the header row.
-    let header: Vec<String> = result.columns.iter().map(|c| defuse(&c.name)).collect();
+    let header: Vec<String> =
+        result.columns.iter().map(|c| defuse(&c.name)).collect();
     w.write_record(&header)
         .map_err(|e| CsvError::Malformed(e.to_string()))?;
     let mut seen = BTreeSet::new();
@@ -182,7 +186,9 @@ fn read(text: &str) -> Result<(Vec<String>, Vec<Vec<String>>), CsvError> {
         .from_reader(text.as_bytes());
     let mut records = r.records();
     let header: Vec<String> = match records.next() {
-        Some(Ok(h)) => h.iter().map(|s| undefuse(s.trim()).to_owned()).collect(),
+        Some(Ok(h)) => {
+            h.iter().map(|s| undefuse(s.trim()).to_owned()).collect()
+        }
         Some(Err(e)) => return Err(CsvError::Malformed(e.to_string())),
         None => return Err(CsvError::NoHeader),
     };
@@ -198,7 +204,8 @@ fn read(text: &str) -> Result<(Vec<String>, Vec<Vec<String>>), CsvError> {
         if rows.len() == MAX_IMPORT_ROWS {
             return Err(CsvError::TooManyRows);
         }
-        let mut cells: Vec<String> = rec.iter().map(|c| undefuse(c.trim()).to_owned()).collect();
+        let mut cells: Vec<String> =
+            rec.iter().map(|c| undefuse(c.trim()).to_owned()).collect();
         cells.resize(header.len(), String::new());
         rows.push(cells);
     }
@@ -233,8 +240,16 @@ fn strict_bool(text: &str) -> Option<bool> {
 /// # Errors
 ///
 /// Returns a [`CsvError`] when the file cannot be read.
-pub fn import_new(text: &str, id: CollectionId, title: &str) -> Result<CsvImport, CsvError> {
-    let span = tracing::info_span!("collections.csv_import", collection = %id, new = true);
+pub fn import_new(
+    text: &str,
+    id: CollectionId,
+    title: &str,
+) -> Result<CsvImport, CsvError> {
+    let span = tracing::info_span!(
+        "collections.csv_import",
+        collection = %id,
+        new = true
+    );
     let _guard = span.enter();
     let (header, rows) = read(text)?;
     let mut properties: Vec<Property> = Vec::with_capacity(header.len());
@@ -285,7 +300,8 @@ fn infer(column: &[&str], rows: usize) -> PropertyType {
     if column.is_empty() {
         return PropertyType::Text;
     }
-    let numbers: Option<Vec<(f64, bool)>> = column.iter().map(|c| csv_number(c)).collect();
+    let numbers: Option<Vec<(f64, bool)>> =
+        column.iter().map(|c| csv_number(c)).collect();
     if let Some(ns) = numbers {
         let format = if ns.iter().all(|(_, pct)| *pct) {
             NumberFormat::Percent
@@ -313,7 +329,8 @@ fn infer(column: &[&str], rows: usize) -> PropertyType {
         }
     }
     let limit = SELECT_MAX_OPTIONS.min(rows / 2).max(1);
-    if options.len() <= limit && column.iter().all(|c| c.chars().count() <= 40) {
+    if options.len() <= limit && column.iter().all(|c| c.chars().count() <= 40)
+    {
         return PropertyType::Select {
             options: options
                 .into_iter()
@@ -324,7 +341,11 @@ fn infer(column: &[&str], rows: usize) -> PropertyType {
     PropertyType::Text
 }
 
-fn unique_key(header: &str, index: usize, used: &mut BTreeSet<String>) -> String {
+pub(crate) fn unique_key(
+    header: &str,
+    index: usize,
+    used: &mut BTreeSet<String>,
+) -> String {
     let mut base: String = slug(header)
         .chars()
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
@@ -346,7 +367,11 @@ fn unique_key(header: &str, index: usize, used: &mut BTreeSet<String>) -> String
     key
 }
 
-fn unique_name(header: &str, index: usize, used: &mut BTreeSet<String>) -> String {
+pub(crate) fn unique_name(
+    header: &str,
+    index: usize,
+    used: &mut BTreeSet<String>,
+) -> String {
     let base = if header.trim().is_empty() {
         format!("Column {}", index + 1)
     } else {
@@ -377,7 +402,9 @@ fn cell_value(kind: &PropertyType, cell: &str) -> Option<Value> {
         )
     };
     match kind {
-        PropertyType::Number { .. } => csv_number(cell).map(|(n, _)| Value::Number(n)),
+        PropertyType::Number { .. } => {
+            csv_number(cell).map(|(n, _)| Value::Number(n))
+        }
         PropertyType::Checkbox => parse_bool(cell).map(Value::Bool),
         PropertyType::Date => DateValue::parse(cell).map(Value::Date),
         PropertyType::Multi { .. } => Some(split()),
@@ -409,7 +436,11 @@ pub fn import_into(
     ws: &Workspace,
     collection: CollectionId,
 ) -> Result<CsvImport, CsvError> {
-    let span = tracing::info_span!("collections.csv_import", collection = %collection, new = false);
+    let span = tracing::info_span!(
+        "collections.csv_import",
+        collection = %collection,
+        new = false
+    );
     let _guard = span.enter();
     let c = ws
         .collection(collection)
@@ -439,9 +470,14 @@ pub fn import_into(
                 continue;
             }
             let value = match &p.kind {
-                PropertyType::Relation { to, .. } => {
-                    relation_cell(ws, *to, cell, &line, &mut titles, &mut diagnostics)
-                }
+                PropertyType::Relation { to, .. } => relation_cell(
+                    ws,
+                    *to,
+                    cell,
+                    &line,
+                    &mut titles,
+                    &mut diagnostics,
+                ),
                 kind => cell_value(kind, cell),
             };
             match value {
@@ -451,7 +487,11 @@ pub fn import_into(
                 None if !matches!(p.kind, PropertyType::Relation { .. }) => {
                     diagnostics.push(Diagnostic::error(
                         &line,
-                        format!("{}: {cell:?} is not a valid {}", p.name, p.kind.name()),
+                        format!(
+                            "{}: {cell:?} is not a valid {}",
+                            p.name,
+                            p.kind.name()
+                        ),
                     ));
                 }
                 None => {}
@@ -501,7 +541,10 @@ impl Diagnostics {
 struct TitleIndex(HashMap<CollectionId, HashMap<String, DocId>>);
 
 impl TitleIndex {
-    fn get<'a>(&'a mut self, target: &Collection) -> &'a HashMap<String, DocId> {
+    fn get<'a>(
+        &'a mut self,
+        target: &Collection,
+    ) -> &'a HashMap<String, DocId> {
         self.0.entry(target.schema().id).or_insert_with(|| {
             let mut titles = HashMap::new();
             for row in target.rows() {

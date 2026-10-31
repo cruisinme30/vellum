@@ -6,7 +6,11 @@ use std::sync::Arc;
 use super::*;
 use crate::conformance;
 
-fn config(location: Location, key: Option<IndexKey>, model: Option<&str>) -> TantivyConfig {
+fn config(
+    location: Location,
+    key: Option<IndexKey>,
+    model: Option<&str>,
+) -> TantivyConfig {
     TantivyConfig {
         location,
         key,
@@ -16,7 +20,8 @@ fn config(location: Location, key: Option<IndexKey>, model: Option<&str>) -> Tan
 
 #[tokio::test(flavor = "multi_thread")]
 async fn in_memory_plaintext_conforms() {
-    let (backend, opened) = TantivyBackend::open(&config(Location::Memory, None, None)).unwrap();
+    let (backend, opened) =
+        TantivyBackend::open(&config(Location::Memory, None, None)).unwrap();
     assert_eq!(opened, Opened::NeedsRebuild);
     conformance::run(Arc::new(backend)).await.unwrap();
 }
@@ -26,7 +31,8 @@ async fn encrypted_on_disk_conforms() {
     let dir = tempfile::tempdir().unwrap();
     let key = IndexKey::from_bytes([3; 32]);
     let location = Location::Folder(dir.path().join("index"));
-    let (backend, _) = TantivyBackend::open(&config(location, Some(key), None)).unwrap();
+    let (backend, _) =
+        TantivyBackend::open(&config(location, Some(key), None)).unwrap();
     conformance::run(Arc::new(backend)).await.unwrap();
 }
 
@@ -47,7 +53,12 @@ async fn reopening_keeps_data_and_a_model_or_key_change_rebuilds() {
         let changes: Vec<Change> = corpus
             .documents()
             .into_iter()
-            .map(|doc| Change::Upsert(crate::backend::IndexEntry { doc, vectors: None }))
+            .map(|doc| {
+                Change::Upsert(crate::backend::IndexEntry {
+                    doc,
+                    vectors: None,
+                })
+            })
             .collect();
         backend.apply(&changes).await.unwrap();
     }
@@ -76,7 +87,8 @@ async fn reopening_keeps_data_and_a_model_or_key_change_rebuilds() {
     assert_eq!(opened, Opened::NeedsRebuild);
     assert!(probe(backend).await.is_none());
 
-    // A different key cannot read the stamp, so it rebuilds rather than failing.
+    // A different key cannot read the stamp, so it rebuilds rather than
+    // failing.
     let (_, opened) = TantivyBackend::open(&config(
         Location::Folder(path),
         Some(IndexKey::from_bytes([6; 32])),
@@ -88,7 +100,8 @@ async fn reopening_keeps_data_and_a_model_or_key_change_rebuilds() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn odd_queries_never_error() {
-    let (backend, _) = TantivyBackend::open(&config(Location::Memory, None, None)).unwrap();
+    let (backend, _) =
+        TantivyBackend::open(&config(Location::Memory, None, None)).unwrap();
     let corpus = conformance::Corpus::default();
     let spaces = [corpus.eng];
     let filters = crate::model::Filters::default();

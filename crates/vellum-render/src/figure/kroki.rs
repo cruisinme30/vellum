@@ -120,8 +120,16 @@ impl Kroki {
     ///
     /// [`KrokiError::Source`] when Kroki rejects the source (HTTP 400), and
     /// [`KrokiError::Unavailable`] for everything else.
-    #[tracing::instrument(name = "render.kroki", skip_all, fields(kind, bytes = source.len(), status))]
-    pub async fn render(&self, kind: &str, source: &str) -> Result<String, KrokiError> {
+    #[tracing::instrument(
+        name = "render.kroki",
+        skip_all,
+        fields(kind, bytes = source.len(), status)
+    )]
+    pub async fn render(
+        &self,
+        kind: &str,
+        source: &str,
+    ) -> Result<String, KrokiError> {
         if !self.allow() {
             return Err(KrokiError::Unavailable(
                 "circuit open after repeated failures".to_owned(),
@@ -140,7 +148,9 @@ impl Kroki {
             Ok(r) => r,
             Err(e) => {
                 self.record(false);
-                return Err(KrokiError::Unavailable(e.without_url().to_string()));
+                return Err(KrokiError::Unavailable(
+                    e.without_url().to_string(),
+                ));
             }
         };
         let status = response.status();
@@ -180,7 +190,11 @@ mod tests {
 
     /// A one-response-per-connection HTTP server that replies with `status`
     /// and `body`.
-    async fn serve(status: u16, body: &'static str, connections: usize) -> String {
+    async fn serve(
+        status: u16,
+        body: &'static str,
+        connections: usize,
+    ) -> String {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let _server = tokio::spawn(async move {
@@ -191,7 +205,8 @@ mod tests {
                 let mut buf = vec![0u8; 8192];
                 let _ = socket.read(&mut buf).await;
                 let reply = format!(
-                    "HTTP/1.1 {status} X\r\ncontent-type: image/svg+xml\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                    "HTTP/1.1 {status} X\r\ncontent-type: image/svg+xml\r\n\
+                        content-length: {}\r\nconnection: close\r\n\r\n{body}",
                     body.len()
                 );
                 let _ = socket.write_all(reply.as_bytes()).await;
@@ -202,7 +217,8 @@ mod tests {
 
     #[tokio::test]
     async fn returns_svg() {
-        let base = serve(200, "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", 1).await;
+        let base =
+            serve(200, "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", 1).await;
         let k = Kroki::new(&base, Duration::from_secs(5)).unwrap();
         assert_eq!(
             k.render("graphviz", "digraph{a->b}").await.unwrap(),
@@ -212,7 +228,8 @@ mod tests {
 
     #[tokio::test]
     async fn reports_source_errors_without_tripping() {
-        let base = serve(400, "Error 400: syntax error in line 1\nmore", 4).await;
+        let base =
+            serve(400, "Error 400: syntax error in line 1\nmore", 4).await;
         let k = Kroki::new(&base, Duration::from_secs(5)).unwrap();
         for _ in 0..4 {
             assert_eq!(
@@ -232,7 +249,9 @@ mod tests {
             let l = TcpListener::bind("127.0.0.1:0").await.unwrap();
             l.local_addr().unwrap()
         };
-        let k = Kroki::new(&format!("http://{addr}"), Duration::from_millis(500)).unwrap();
+        let k =
+            Kroki::new(&format!("http://{addr}"), Duration::from_millis(500))
+                .unwrap();
         for _ in 0..TRIP_AFTER {
             assert!(matches!(
                 k.render("d2", "a -> b").await,

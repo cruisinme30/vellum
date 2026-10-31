@@ -12,6 +12,7 @@
 //! name.book/                    a book: book.yaml + SUMMARY.md + chapters
 //! name.collection/              a collection: schema.yaml + rows/*.md
 //! name.shortcut.yaml            an ID link that never grants access
+//! Page/.attachments/            files uploaded to the page Page.md (D211)
 //! ```
 //!
 //! Identity is the front-matter ULID, never the path, so this module only
@@ -28,6 +29,14 @@ pub const BUILD_DIR: &str = ".mdbook";
 /// A book's published snapshots: data the books service owns, not
 /// documents to index.
 pub const SNAPSHOTS_DIR: &str = ".snapshots";
+/// A book's outline history (ADR 0013, D235): books-service data.
+pub const HISTORY_DIR: &str = ".history";
+/// A book's publications (ADR 0013, D237): generated output, not
+/// documents to index.
+pub const PUBLISHED_DIR: &str = ".published";
+/// A page's uploaded files, in the directory beside the page
+/// (`Plan/.attachments/` for `Plan.md`): assets, never documents (D211).
+pub const ATTACHMENTS_DIR: &str = ".attachments";
 /// Longest file name, in bytes, that every supported backend accepts.
 pub const MAX_NAME_BYTES: usize = 200;
 
@@ -72,27 +81,34 @@ impl Kind {
     pub fn of(path: &BlobPath) -> Self {
         let name = path.file_name();
         let first = path.segments().next().unwrap_or_default();
-        if first == SYSTEM_DIR || path.segments().any(|s| s == ".git" || s == BUILD_DIR) {
+        if first == SYSTEM_DIR
+            || path.segments().any(|s| s == ".git" || s == BUILD_DIR)
+        {
             return Self::System;
         }
         if is_scratch(name) {
             return Self::Scratch;
+        }
+        if in_attachments(path) {
+            return Self::Asset;
         }
         let parent = path.parent();
         let parent_name = parent.as_ref().map_or("", BlobPath::file_name);
         match name {
             FOLDER_META => return Self::FolderMeta,
             "book.yaml" | "SUMMARY.md" if has_ext(parent_name, "book") => {
-                return parent.map_or(Self::Document, |book| Self::BookManifest { book });
+                return parent.map_or(Self::Document, |book| {
+                    Self::BookManifest { book }
+                });
             }
             "schema.yaml" if has_ext(parent_name, "collection") => {
-                return parent.map_or(Self::Asset, |collection| Self::CollectionSchema {
-                    collection,
+                return parent.map_or(Self::Asset, |collection| {
+                    Self::CollectionSchema { collection }
                 });
             }
             _ => {}
         }
-        if in_book_snapshots(path) {
+        if in_book_data(path) {
             return Self::Asset;
         }
         if name.to_ascii_lowercase().ends_with(".shortcut.yaml") {
@@ -116,16 +132,30 @@ impl Kind {
 }
 
 fn has_ext(name: &str, ext: &str) -> bool {
-    name.rsplit_once('.')
-        .is_some_and(|(stem, e)| !stem.is_empty() && e.eq_ignore_ascii_case(ext))
+    name.rsplit_once('.').is_some_and(|(stem, e)| {
+        !stem.is_empty() && e.eq_ignore_ascii_case(ext)
+    })
 }
 
-/// True for anything under `<name>.book/.snapshots/`.
-fn in_book_snapshots(path: &BlobPath) -> bool {
+/// True for anything in a page's `.attachments/` directory: an uploaded
+/// `notes.md` there is a file, not a page.
+#[must_use]
+pub fn in_attachments(path: &BlobPath) -> bool {
+    path.segments().any(|s| s == ATTACHMENTS_DIR)
+}
+
+/// True for anything under `<name>.book/.snapshots/`, `.history/` or
+/// `.published/`.
+fn in_book_data(path: &BlobPath) -> bool {
     let segments: Vec<&str> = path.segments().collect();
-    segments
-        .windows(2)
-        .any(|w| matches!(w, [book, snaps] if *snaps == SNAPSHOTS_DIR && has_ext(book, "book")))
+    segments.windows(2).any(|w| {
+        matches!(w, [book, dir]
+            if [
+                SNAPSHOTS_DIR,
+                HISTORY_DIR,
+                PUBLISHED_DIR
+            ].contains(dir) && has_ext(book, "book"))
+    })
 }
 
 fn is_scratch(name: &str) -> bool {
@@ -140,7 +170,8 @@ fn is_scratch(name: &str) -> bool {
 
 fn issue_of(path: &BlobPath) -> Option<Kind> {
     let mut seg = path.segments();
-    let (teams, team, issues, file) = (seg.next()?, seg.next()?, seg.next()?, seg.next()?);
+    let (teams, team, issues, file) =
+        (seg.next()?, seg.next()?, seg.next()?, seg.next()?);
     if teams != "teams" || issues != "issues" || seg.next().is_some() {
         return None;
     }
@@ -207,10 +238,10 @@ pub mod at {
 
 /// Turns a title into a file name every backend accepts.
 ///
-/// The name stays readable: characters that Windows, macOS, S3 or Drive reject are
-/// replaced with `-`, leading dots and trailing dots or spaces are
-/// trimmed, Windows device names are suffixed, and the stem is cut on a
-/// character boundary so the name with `ext` fits [`MAX_NAME_BYTES`].
+/// The name stays readable: characters that Windows, macOS, S3 or Drive reject
+/// are replaced with `-`, leading dots and trailing dots or spaces are trimmed,
+/// Windows device names are suffixed, and the stem is cut on a character
+/// boundary so the name with `ext` fits [`MAX_NAME_BYTES`].
 #[must_use]
 pub fn file_name(title: &str, ext: &str) -> String {
     const RESERVED: [&str; 4] = ["CON", "PRN", "AUX", "NUL"];
@@ -231,7 +262,8 @@ pub fn file_name(title: &str, ext: &str) -> String {
         .to_owned();
     let upper = stem.to_ascii_uppercase();
     let device = RESERVED.contains(&upper.as_str())
-        || (upper.len() == 4 && (upper.starts_with("COM") || upper.starts_with("LPT")));
+        || (upper.len() == 4
+            && (upper.starts_with("COM") || upper.starts_with("LPT")));
     if stem.is_empty() || device {
         stem.push_str("-untitled");
         stem = stem.trim_start_matches('-').to_owned();
@@ -280,8 +312,28 @@ mod tests {
             Kind::Asset
         );
         assert_eq!(
+            kind("drives/shared/Ops/Guide.book/.published/mdbook/src/intro.md"),
+            Kind::Asset
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Guide.book/.history/01J.json"),
+            Kind::Asset
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Notes/.published/intro.md"),
+            Kind::Document
+        );
+        assert_eq!(
             kind("drives/shared/Ops/Notes/.snapshots/intro.md"),
             Kind::Document
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Plan/.attachments/notes.md"),
+            Kind::Asset
+        );
+        assert_eq!(
+            kind("drives/shared/Ops/Plan/.attachments/.vellum-folder.yaml"),
+            Kind::Asset
         );
         let collection = BlobPath::new("drives/shared/Ops/Vendors.collection")?;
         let schema = "drives/shared/Ops/Vendors.collection/schema.yaml";

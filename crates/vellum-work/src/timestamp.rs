@@ -31,7 +31,8 @@ pub fn parse(text: &str) -> Result<OffsetDateTime, String> {
             let t = text.find('T').ok_or_else(|| first.to_string())?;
             let (head, zone) = text.split_at((t + 6).min(text.len()));
             let padded = format!("{head}:00{zone}");
-            OffsetDateTime::parse(&padded, &Rfc3339).map_err(|_| first.to_string())
+            OffsetDateTime::parse(&padded, &Rfc3339)
+                .map_err(|_| first.to_string())
         })
         .map(|t| t.to_offset(UtcOffset::UTC))
 }
@@ -41,7 +42,10 @@ pub fn parse(text: &str) -> Result<OffsetDateTime, String> {
 /// # Errors
 ///
 /// Only the serializer's own errors.
-pub fn serialize<S: Serializer>(t: &OffsetDateTime, s: S) -> Result<S::Ok, S::Error> {
+pub fn serialize<S: Serializer>(
+    t: &OffsetDateTime,
+    s: S,
+) -> Result<S::Ok, S::Error> {
     s.serialize_str(&format(*t))
 }
 
@@ -50,14 +54,18 @@ pub fn serialize<S: Serializer>(t: &OffsetDateTime, s: S) -> Result<S::Ok, S::Er
 /// # Errors
 ///
 /// Fails on text that is not a timestamp.
-pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<OffsetDateTime, D::Error> {
+pub fn deserialize<'de, D: Deserializer<'de>>(
+    d: D,
+) -> Result<OffsetDateTime, D::Error> {
     let text = String::deserialize(d)?;
     parse(&text).map_err(serde::de::Error::custom)
 }
 
 /// The same for `Option<OffsetDateTime>`.
 pub mod option {
-    use super::{Deserialize, Deserializer, OffsetDateTime, Serializer, format, parse};
+    use super::{
+        Deserialize, Deserializer, OffsetDateTime, Serializer, format, parse,
+    };
 
     /// Serialises an optional timestamp.
     ///
@@ -65,7 +73,10 @@ pub mod option {
     ///
     /// Only the serializer's own errors.
     #[allow(clippy::ref_option, reason = "serde's `with` passes &Option<T>")]
-    pub fn serialize<S: Serializer>(t: &Option<OffsetDateTime>, s: S) -> Result<S::Ok, S::Error> {
+    pub fn serialize<S: Serializer>(
+        t: &Option<OffsetDateTime>,
+        s: S,
+    ) -> Result<S::Ok, S::Error> {
         match t {
             Some(t) => s.serialize_some(&format(*t)),
             None => s.serialize_none(),

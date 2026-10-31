@@ -21,7 +21,9 @@ describe("AppRoutes", () => {
     ["/no/such/route", "This page does not exist"],
   ])("renders the view of %s", (path, heading) => {
     renderApp(path);
-    expect(screen.getByRole("heading", { level: 1, name: heading })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { level: 1, name: heading }),
+    ).toBeDefined();
     expect(screen.getByRole("main")).toBeDefined();
   });
 
@@ -29,9 +31,13 @@ describe("AppRoutes", () => {
     ["/admin/requests", "Requests", { requests: [] }],
     ["/admin/routes", "Routes", { minutes: 15, routes: [], in_flight: 0 }],
   ])("mounts the admin page at %s", (path, heading, body) => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json(body));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(Response.json(body));
     renderApp(path);
-    expect(screen.getByRole("heading", { level: 1, name: heading })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { level: 1, name: heading }),
+    ).toBeDefined();
     fetchSpy.mockRestore();
   });
 
@@ -39,7 +45,11 @@ describe("AppRoutes", () => {
     renderApp(`/p/${PAGE.gateway}`);
     expect(screen.getByRole("status").textContent).toBe("Opening the page…");
     expect(
-      await screen.findByRole("textbox", { name: "Page body" }, { timeout: 5000 }),
+      await screen.findByRole(
+        "textbox",
+        { name: "Page body" },
+        { timeout: 5000 },
+      ),
     ).toBeDefined();
     expect(screen.getByRole("textbox", { name: "Page title" })).toHaveProperty(
       "value",
@@ -58,6 +68,8 @@ describe("App", () => {
       />,
     );
     expect(screen.getByRole("navigation", { name: "Main" })).toBeDefined();
-    expect(screen.getByRole("heading", { level: 1, name: "Good to see you, Priya" })).toBeDefined();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Good to see you, Priya" }),
+    ).toBeDefined();
   });
 });

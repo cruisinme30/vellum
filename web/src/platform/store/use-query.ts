@@ -21,7 +21,8 @@ export function useQuery<T>(
 ): T {
   const key = collections.join("\u0000");
   const cache = useRef<
-    { version: number; key: string; query: (tx: ReadTx) => T; value: T } | undefined
+    | { version: number; key: string; query: (tx: ReadTx) => T; value: T }
+    | undefined
   >(undefined);
   const subscribe = useCallback(
     (listener: () => void) => store.subscribe(key.split("\u0000"), listener),
@@ -29,7 +30,11 @@ export function useQuery<T>(
   );
   const snapshot = (): T => {
     const cached = cache.current;
-    if (cached?.version === store.version && cached.key === key && cached.query === query) {
+    if (
+      cached?.version === store.version &&
+      cached.key === key &&
+      cached.query === query
+    ) {
       return cached.value;
     }
     const value = query(store);

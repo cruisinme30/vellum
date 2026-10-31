@@ -2,10 +2,12 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 #
 # An example production overlay: ingress, canary releases and two shards.
-#   helm install vellum deploy/helm/vellum -f deploy/helm/vellum/values-production.yaml
+# helm install vellum deploy/helm/vellum -f
+# deploy/helm/vellum/values-production.yaml
 
 image:
-  # Pin the signed release digest; verify it first with cosign (see deploy/README.md).
+  # Pin the signed release digest; verify it first with cosign (see
+  # deploy/README.md).
   digest: ""
 
 ingress:

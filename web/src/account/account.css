@@ -1,0 +1,101 @@
+/* SPDX-FileCopyrightText: 2026 The Vellum contributors */
+/* SPDX-License-Identifier: AGPL-3.0-only */
+
+/* Account settings: API tokens and two-step verification (issue 523). */
+
+.vl-admin-form .vl-account-scope {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 1rem;
+}
+
+.vl-account-scope input {
+  margin-top: 4px;
+}
+
+.vl-account-scope span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vl-account-chip {
+  display: inline-block;
+  margin: 0 4px 4px 0;
+  padding: 0 6px;
+  border: 1px solid var(--md-outline-variant, var(--md-outline));
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.vl-admin-form select {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--md-outline);
+  border-radius: 4px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font: inherit;
+}
+
+.vl-account-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-account-qr {
+  display: block;
+  width: min(200px, 100%);
+  height: auto;
+  margin: 8px 0;
+}
+
+.vl-account-secret {
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.vl-account-code {
+  max-width: 14ch;
+  font-family: var(--vl-font-mono, monospace);
+  letter-spacing: 0.1em;
+}
+
+.vl-account-steps {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding-inline-start: 20px;
+}
+
+.vl-account-steps li {
+  display: grid;
+  gap: 4px;
+}
+
+.vl-account-recovery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14ch, 1fr));
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-account-on {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.vl-account-required {
+  padding: 8px 12px;
+  border-inline-start: 4px solid var(--md-primary);
+  background: color-mix(in srgb, var(--md-primary) 8%, transparent);
+}

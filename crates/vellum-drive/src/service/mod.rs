@@ -21,13 +21,21 @@ use vellum_kernel::{Actor, Error, ObjectId, SpaceId, UserId};
 use vellum_store::{Base, Etag};
 
 use self::api::{
-    ActivityInput, ActivityList, ActivityView, ContentView, CreateFolder, CreatePage,
-    CreateShortcut, CreateSpace, Done, FindInput, Limit, ListChildren, MyDrive, NoInput, NodeKey,
-    NodeList, NodeView, PlaceInput, RecentItem, RecentList, Removed, RenameInput, SaveInput,
-    SaveResult, SaveView, SpaceKey, SpaceKindView, SpaceList, SpaceView, StarInput, TreeInput,
-    TreeView, UpdateSpace, UsageView, VersionContent, VersionKey, VersionList, VersionView,
+    ActivityInput, ActivityList, ActivityView, AdminCreateSpace,
+    AdminSpaceList, AdminSpaceView, ContentView, CreateFolder, CreatePage,
+    CreateShortcut, CreateSpace, Done, FindInput, Limit, ListChildren, MyDrive,
+    NoInput, NodeKey, NodeList, NodeView, PlaceInput, RecentItem, RecentList,
+    Removed, RenameInput, SaveInput, SaveResult, SaveView, SetMember, SpaceKey,
+    SpaceKindView, SpaceList, SpaceView, StarInput, TreeInput, TreeView,
+    UpdateSpace, UsageView, VersionContent, VersionKey, VersionList,
+    VersionView,
 };
 use crate::drive::{Drive, Filter, SaveOutcome, Saved};
+
+/// How recent a sign-in the space admin operations need, the same
+/// window as the user admin operations (R-SE-7, D241).
+pub const ADMIN_FRESH_AUTH: std::time::Duration =
+    std::time::Duration::from_mins(15);
 
 /// The most results a list returns.
 const MAX_LIMIT: usize = 200;
@@ -53,6 +61,7 @@ pub struct DriveService {
     drive: Arc<Drive>,
     handles: Option<Handles>,
     writes: Option<Arc<dyn PageWrites>>,
+    sharing: Option<Arc<crate::sharing::Sharing>>,
 }
 
 impl std::fmt::Debug for DriveService {
@@ -61,6 +70,7 @@ impl std::fmt::Debug for DriveService {
             .field("drive", &self.drive)
             .field("handles", &self.handles.is_some())
             .field("writes", &self.writes)
+            .field("sharing", &self.sharing.is_some())
             .finish()
     }
 }
@@ -73,6 +83,7 @@ impl DriveService {
             drive,
             handles: None,
             writes: None,
+            sharing: None,
         }
     }
 
@@ -81,6 +92,17 @@ impl DriveService {
     #[must_use]
     pub fn with_handles(mut self, handles: Handles) -> Self {
         self.handles = Some(handles);
+        self
+    }
+
+    /// Serves sharing (#95); without it the sharing operations answer
+    /// `unavailable`.
+    #[must_use]
+    pub fn with_sharing(
+        mut self,
+        sharing: Arc<crate::sharing::Sharing>,
+    ) -> Self {
+        self.sharing = Some(sharing);
         self
     }
 
@@ -142,7 +164,13 @@ const fn done() -> Done {
 
 /// Declares an operation whose handler is a `DriveService` method.
 macro_rules! op {
-    ($service:expr, query $id:literal, $path:literal, $method:ident, $summary:literal) => {{
+    (
+        $service:expr,
+        query $id:literal,
+        $path:literal,
+        $method:ident,
+        $summary:literal
+    ) => {{
         let s = Arc::clone(&$service);
         Operation::query($id, $path, Scope::Read, move |ctx, input| {
             let s = Arc::clone(&s);
@@ -150,7 +178,13 @@ macro_rules! op {
         })
         .summary($summary)
     }};
-    ($service:expr, $verb:ident $id:literal, $path:literal, $method:ident, $summary:literal) => {{
+    (
+        $service:expr,
+        $verb:ident $id:literal,
+        $path:literal,
+        $method:ident,
+        $summary:literal
+    ) => {{
         let s = Arc::clone(&$service);
         Operation::mutation(
             $id,
@@ -166,9 +200,15 @@ macro_rules! op {
     }};
 }
 
+pub mod sharing;
+
 /// Reads.
 impl DriveService {
-    async fn my_drive(&self, ctx: &RequestContext, _: NoInput) -> Result<MyDrive, Error> {
+    async fn my_drive(
+        &self,
+        ctx: &RequestContext,
+        _: NoInput,
+    ) -> Result<MyDrive, Error> {
         let user = ctx.principal.require_user()?;
         // Normally made with the account; made here if that was missed.
         let handle = self.handles.as_ref().and_then(|h| h(user));
@@ -178,7 +218,11 @@ impl DriveService {
         })
     }
 
-    async fn shared_drives(&self, ctx: &RequestContext, _: NoInput) -> Result<SpaceList, Error> {
+    async fn shared_drives(
+        &self,
+        ctx: &RequestContext,
+        _: NoInput,
+    ) -> Result<SpaceList, Error> {
         let user = ctx.principal.require_user()?;
         let spaces = self.drive.shared_drives(user).await?;
         Ok(SpaceList {
@@ -186,12 +230,20 @@ impl DriveService {
         })
     }
 
-    async fn shared_with_me(&self, ctx: &RequestContext, _: NoInput) -> Result<NodeList, Error> {
+    async fn shared_with_me(
+        &self,
+        ctx: &RequestContext,
+        _: NoInput,
+    ) -> Result<NodeList, Error> {
         let user = ctx.principal.require_user()?;
         Ok(NodeList::of(&self.drive.shared_with_me(user).await?))
     }
 
-    async fn list(&self, ctx: &RequestContext, input: ListChildren) -> Result<NodeList, Error> {
+    async fn list(
+        &self,
+        ctx: &RequestContext,
+        input: ListChildren,
+    ) -> Result<NodeList, Error> {
         let nodes = self
             .drive
             .list(&actor(ctx)?, input.space_id, input.parent_id)
@@ -199,7 +251,11 @@ impl DriveService {
         Ok(NodeList::of(&nodes))
     }
 
-    async fn tree(&self, ctx: &RequestContext, input: TreeInput) -> Result<TreeView, Error> {
+    async fn tree(
+        &self,
+        ctx: &RequestContext,
+        input: TreeInput,
+    ) -> Result<TreeView, Error> {
         let tree = self
             .drive
             .tree(
@@ -216,13 +272,21 @@ impl DriveService {
         })
     }
 
-    async fn get(&self, ctx: &RequestContext, input: NodeKey) -> Result<NodeView, Error> {
+    async fn get(
+        &self,
+        ctx: &RequestContext,
+        input: NodeKey,
+    ) -> Result<NodeView, Error> {
         Ok(NodeView::from(
             &self.drive.get(&actor(ctx)?, input.id).await?,
         ))
     }
 
-    async fn read(&self, ctx: &RequestContext, input: NodeKey) -> Result<ContentView, Error> {
+    async fn read(
+        &self,
+        ctx: &RequestContext,
+        input: NodeKey,
+    ) -> Result<ContentView, Error> {
         let (node, blob) = self.drive.read(&actor(ctx)?, input.id).await?;
         Ok(ContentView {
             item: NodeView::from(&node),
@@ -240,7 +304,11 @@ impl DriveService {
         Ok(NodeView::from(&node))
     }
 
-    async fn versions(&self, ctx: &RequestContext, input: NodeKey) -> Result<VersionList, Error> {
+    async fn versions(
+        &self,
+        ctx: &RequestContext,
+        input: NodeKey,
+    ) -> Result<VersionList, Error> {
         let versions = self.drive.versions(&actor(ctx)?, input.id).await?;
         Ok(VersionList {
             versions: versions.iter().map(VersionView::from).collect(),
@@ -262,12 +330,21 @@ impl DriveService {
         })
     }
 
-    async fn starred(&self, ctx: &RequestContext, _: NoInput) -> Result<NodeList, Error> {
+    async fn starred(
+        &self,
+        ctx: &RequestContext,
+        _: NoInput,
+    ) -> Result<NodeList, Error> {
         Ok(NodeList::of(&self.drive.starred(&actor(ctx)?).await?))
     }
 
-    async fn recent(&self, ctx: &RequestContext, input: Limit) -> Result<RecentList, Error> {
-        let recent = self.drive.recent(&actor(ctx)?, limit(input.limit)).await?;
+    async fn recent(
+        &self,
+        ctx: &RequestContext,
+        input: Limit,
+    ) -> Result<RecentList, Error> {
+        let recent =
+            self.drive.recent(&actor(ctx)?, limit(input.limit)).await?;
         Ok(RecentList {
             items: recent
                 .iter()
@@ -293,13 +370,21 @@ impl DriveService {
         })
     }
 
-    async fn backlinks(&self, ctx: &RequestContext, input: NodeKey) -> Result<NodeList, Error> {
+    async fn backlinks(
+        &self,
+        ctx: &RequestContext,
+        input: NodeKey,
+    ) -> Result<NodeList, Error> {
         Ok(NodeList::of(
             &self.drive.backlinks(&actor(ctx)?, input.id).await?,
         ))
     }
 
-    async fn usage(&self, ctx: &RequestContext, input: SpaceKey) -> Result<UsageView, Error> {
+    async fn usage(
+        &self,
+        ctx: &RequestContext,
+        input: SpaceKey,
+    ) -> Result<UsageView, Error> {
         let usage = self.drive.usage(&actor(ctx)?, input.space_id).await?;
         Ok(UsageView {
             used_bytes: usage.used,
@@ -307,12 +392,20 @@ impl DriveService {
         })
     }
 
-    async fn trash_list(&self, ctx: &RequestContext, input: SpaceKey) -> Result<NodeList, Error> {
+    async fn trash_list(
+        &self,
+        ctx: &RequestContext,
+        input: SpaceKey,
+    ) -> Result<NodeList, Error> {
         let nodes = self.drive.trash_list(&actor(ctx)?, input.space_id).await?;
         Ok(NodeList::of(&nodes))
     }
 
-    async fn find(&self, ctx: &RequestContext, input: FindInput) -> Result<NodeList, Error> {
+    async fn find(
+        &self,
+        ctx: &RequestContext,
+        input: FindInput,
+    ) -> Result<NodeList, Error> {
         let filter = Filter {
             title: input.title,
             owner: input.created_by,
@@ -376,7 +469,12 @@ impl DriveService {
     ) -> Result<NodeView, Error> {
         let node = self
             .drive
-            .create_folder(&actor(ctx)?, input.space_id, input.parent_id, &input.name)
+            .create_folder(
+                &actor(ctx)?,
+                input.space_id,
+                input.parent_id,
+                &input.name,
+            )
             .await?;
         Ok(NodeView::from(&node))
     }
@@ -416,7 +514,11 @@ impl DriveService {
         Ok(NodeView::from(&node))
     }
 
-    async fn save(&self, ctx: &RequestContext, input: SaveInput) -> Result<SaveView, Error> {
+    async fn save(
+        &self,
+        ctx: &RequestContext,
+        input: SaveInput,
+    ) -> Result<SaveView, Error> {
         let base = Base {
             bytes: Bytes::from(input.base_content),
             etag: Some(Etag::new(input.base_etag)),
@@ -442,7 +544,11 @@ impl DriveService {
         Ok(saved(&outcome))
     }
 
-    async fn rename(&self, ctx: &RequestContext, input: RenameInput) -> Result<NodeView, Error> {
+    async fn rename(
+        &self,
+        ctx: &RequestContext,
+        input: RenameInput,
+    ) -> Result<NodeView, Error> {
         let node = self
             .drive
             .rename(&actor(ctx)?, input.id, &input.title)
@@ -450,7 +556,11 @@ impl DriveService {
         Ok(NodeView::from(&node))
     }
 
-    async fn move_node(&self, ctx: &RequestContext, input: PlaceInput) -> Result<NodeView, Error> {
+    async fn move_node(
+        &self,
+        ctx: &RequestContext,
+        input: PlaceInput,
+    ) -> Result<NodeView, Error> {
         let actor = actor(ctx)?;
         let mut node = self
             .drive
@@ -462,7 +572,11 @@ impl DriveService {
         Ok(NodeView::from(&node))
     }
 
-    async fn copy_node(&self, ctx: &RequestContext, input: PlaceInput) -> Result<NodeView, Error> {
+    async fn copy_node(
+        &self,
+        ctx: &RequestContext,
+        input: PlaceInput,
+    ) -> Result<NodeView, Error> {
         let actor = actor(ctx)?;
         let mut node = self
             .drive
@@ -474,25 +588,42 @@ impl DriveService {
         Ok(NodeView::from(&node))
     }
 
-    async fn trash(&self, ctx: &RequestContext, input: NodeKey) -> Result<NodeView, Error> {
+    async fn trash(
+        &self,
+        ctx: &RequestContext,
+        input: NodeKey,
+    ) -> Result<NodeView, Error> {
         Ok(NodeView::from(
             &self.drive.trash(&actor(ctx)?, input.id).await?,
         ))
     }
 
-    async fn restore(&self, ctx: &RequestContext, input: NodeKey) -> Result<NodeView, Error> {
+    async fn restore(
+        &self,
+        ctx: &RequestContext,
+        input: NodeKey,
+    ) -> Result<NodeView, Error> {
         Ok(NodeView::from(
             &self.drive.restore(&actor(ctx)?, input.id).await?,
         ))
     }
 
-    async fn purge(&self, ctx: &RequestContext, input: NodeKey) -> Result<Done, Error> {
+    async fn purge(
+        &self,
+        ctx: &RequestContext,
+        input: NodeKey,
+    ) -> Result<Done, Error> {
         self.drive.purge(&actor(ctx)?, input.id).await?;
         Ok(done())
     }
 
-    async fn empty_trash(&self, ctx: &RequestContext, input: SpaceKey) -> Result<Removed, Error> {
-        let removed = self.drive.empty_trash(&actor(ctx)?, input.space_id).await?;
+    async fn empty_trash(
+        &self,
+        ctx: &RequestContext,
+        input: SpaceKey,
+    ) -> Result<Removed, Error> {
+        let removed =
+            self.drive.empty_trash(&actor(ctx)?, input.space_id).await?;
         Ok(Removed { removed })
     }
 
@@ -508,7 +639,11 @@ impl DriveService {
         Ok(Removed { removed })
     }
 
-    async fn star(&self, ctx: &RequestContext, input: StarInput) -> Result<Done, Error> {
+    async fn star(
+        &self,
+        ctx: &RequestContext,
+        input: StarInput,
+    ) -> Result<Done, Error> {
         self.drive
             .star(&actor(ctx)?, input.id, input.starred)
             .await?;
@@ -521,34 +656,51 @@ impl DriveService {
         vec![
             op!(self, query "drive.my_drive", "/v1/drive/my-drive", my_drive,
                 "Get your My Drive, made for you if you have none yet"),
-            op!(self, query "drive.shared_drives", "/v1/drive/shared-drives", shared_drives,
+            op!(self, query "drive.shared_drives", "/v1/drive/shared-drives",
+                shared_drives,
                 "List the shared drives you can open"),
-            op!(self, query "drive.shared_with_me", "/v1/drive/shared-with-me", shared_with_me,
+            op!(self, query "drive.shared_with_me", "/v1/drive/shared-with-me",
+                shared_with_me,
                 "List items in other people's My Drives shared with you"),
-            op!(self, query "drive.list", "/v1/drive/spaces/{space_id}/items", list,
+            op!(self, query "drive.list", "/v1/drive/spaces/{space_id}/items",
+                list,
                 "List the items in a folder or at the top of a space"),
-            op!(self, query "drive.tree", "/v1/drive/spaces/{space_id}/tree", tree,
+            op!(self, query "drive.tree", "/v1/drive/spaces/{space_id}/tree",
+                tree,
                 "List every item in a space, or under one item, in tree order"),
-            op!(self, query "drive.get", "/v1/drive/items/{id}", get, "Get an item"),
+            op!(
+                self,
+                query "drive.get",
+                "/v1/drive/items/{id}",
+                get,
+                "Get an item"
+            ),
             op!(self, query "drive.read", "/v1/drive/items/{id}/content", read,
                 "Read a page's content and its etag"),
-            op!(self, query "drive.resolve_shortcut", "/v1/drive/items/{id}/target",
+            op!(self, query "drive.resolve_shortcut", "/v1/drive/items/{id}/tar\
+                get",
                 resolve_shortcut, "Get the item a shortcut points at"),
-            op!(self, query "drive.versions", "/v1/drive/items/{id}/versions", versions,
+            op!(self, query "drive.versions", "/v1/drive/items/{id}/versions",
+                versions,
                 "List a page's saved versions"),
-            op!(self, query "drive.version", "/v1/drive/items/{id}/versions/{version_id}", version,
+            op!(self, query "drive.version", "/v1/drive/items/{id}/versions/{ve\
+                rsion_id}", version,
                 "Read one saved version of a page"),
             op!(self, query "drive.starred", "/v1/drive/starred", starred,
                 "List the items you starred"),
             op!(self, query "drive.recent", "/v1/drive/recent", recent,
                 "List the items you opened recently"),
-            op!(self, query "drive.activity", "/v1/drive/items/{id}/activity", activity,
+            op!(self, query "drive.activity", "/v1/drive/items/{id}/activity",
+                activity,
                 "List the changes to an item, or to a whole space by its ID"),
-            op!(self, query "drive.backlinks", "/v1/drive/items/{id}/backlinks", backlinks,
+            op!(self, query "drive.backlinks",
+                "/v1/drive/items/{id}/backlinks", backlinks,
                 "List the pages that link to a page"),
-            op!(self, query "drive.usage", "/v1/drive/spaces/{space_id}/usage", usage,
+            op!(self, query "drive.usage", "/v1/drive/spaces/{space_id}/usage",
+                usage,
                 "Get how much of its quota a space uses"),
-            op!(self, query "drive.trash_list", "/v1/drive/spaces/{space_id}/trash", trash_list,
+            op!(self, query "drive.trash_list", "/v1/drive/spaces/{space_id}/tr\
+                ash", trash_list,
                 "List what was trashed in a space"),
             op!(self, query "drive.find", "/v1/drive/search", find,
                 "Find items by title, creator, date, kind, place or star"),
@@ -557,20 +709,27 @@ impl DriveService {
 
     fn changes(self: &Arc<Self>) -> Vec<Operation> {
         vec![
-            op!(self, Post "drive.create_space", "/v1/drive/spaces", create_space,
+            op!(self, Post "drive.create_space", "/v1/drive/spaces",
+                create_space,
                 "Create a shared drive, or your My Drive"),
-            op!(self, Patch "drive.update_space", "/v1/drive/spaces/{space_id}", update_space,
-                "Rename a space and change its quota, trash and version settings"),
-            op!(self, Post "drive.create_folder", "/v1/drive/spaces/{space_id}/folders",
+            op!(self, Patch "drive.update_space",
+                "/v1/drive/spaces/{space_id}", update_space,
+                "Rename a space and change its quota, trash and version \
+                    settings"),
+            op!(self, Post "drive.create_folder", "/v1/drive/spaces/{space_id}/\
+                folders",
                 create_folder, "Create a folder"),
-            op!(self, Post "drive.create_page", "/v1/drive/spaces/{space_id}/pages", create_page,
+            op!(self, Post "drive.create_page", "/v1/drive/spaces/{space_id}/pa\
+                ges", create_page,
                 "Create a page"),
-            op!(self, Post "drive.create_shortcut", "/v1/drive/spaces/{space_id}/shortcuts",
+            op!(self, Post "drive.create_shortcut", "/v1/drive/spaces/{space_id\
+                }/shortcuts",
                 create_shortcut, "Create a shortcut to another item"),
             op!(self, Put "drive.save", "/v1/drive/items/{id}/content", save,
                 "Save a page, merging changes made meanwhile"),
             op!(self, Post "drive.restore_version",
-                "/v1/drive/items/{id}/versions/{version_id}/restore", restore_version,
+                "/v1/drive/items/{id}/versions/{version_id}/restore",
+                    restore_version,
                 "Make an old version the page's content again"),
             op!(self, Patch "drive.rename", "/v1/drive/items/{id}", rename,
                 "Rename an item and fix the links to it"),
@@ -580,17 +739,140 @@ impl DriveService {
                 "Copy an item, with fresh IDs, into a folder or space"),
             op!(self, Post "drive.trash", "/v1/drive/items/{id}/trash", trash,
                 "Move an item, with everything in it, to the trash"),
-            op!(self, Post "drive.restore", "/v1/drive/items/{id}/restore", restore,
+            op!(self, Post "drive.restore", "/v1/drive/items/{id}/restore",
+                restore,
                 "Bring a trashed item back"),
             op!(self, Delete "drive.purge", "/v1/drive/items/{id}", purge,
                 "Delete a trashed item for good"),
-            op!(self, Delete "drive.empty_trash", "/v1/drive/spaces/{space_id}/trash",
+            op!(self, Delete "drive.empty_trash", "/v1/drive/spaces/{space_id}/\
+                trash",
                 empty_trash, "Delete everything in a space's trash for good"),
-            op!(self, Post "drive.prune_versions", "/v1/drive/spaces/{space_id}/prune-versions",
+            op!(self, Post "drive.prune_versions", "/v1/drive/spaces/{space_id}\
+                /prune-versions",
                 prune_versions, "Apply the space's version retention now"),
             op!(self, Put "drive.star", "/v1/drive/items/{id}/star", star,
                 "Star or unstar an item"),
         ]
+    }
+}
+
+/// What workspace administrators do to spaces (D242). The gateway serves
+/// these only to `admin`-scope credentials with a recent sign-in, so the
+/// drive's own member checks are skipped.
+impl DriveService {
+    async fn admin_spaces(
+        &self,
+        ctx: &RequestContext,
+        _: NoInput,
+    ) -> Result<AdminSpaceList, Error> {
+        ctx.principal.require_scope(Scope::Admin)?;
+        let spaces = self.drive.admin_spaces().await?;
+        Ok(AdminSpaceList {
+            spaces: spaces.into_iter().map(AdminSpaceView::from).collect(),
+        })
+    }
+
+    async fn admin_create_space(
+        &self,
+        ctx: &RequestContext,
+        input: AdminCreateSpace,
+    ) -> Result<AdminSpaceView, Error> {
+        ctx.principal.require_scope(Scope::Admin)?;
+        let space = self
+            .drive
+            .admin_create_space(&input.slug, &input.name, input.owner_id)
+            .await?;
+        Ok(space.into())
+    }
+
+    async fn admin_update_space(
+        &self,
+        ctx: &RequestContext,
+        input: UpdateSpace,
+    ) -> Result<AdminSpaceView, Error> {
+        ctx.principal.require_scope(Scope::Admin)?;
+        let space = self
+            .drive
+            .admin_update_space(
+                input.space_id,
+                input.name.as_deref(),
+                input.settings.into(),
+            )
+            .await?;
+        Ok(space.into())
+    }
+
+    async fn admin_set_member(
+        &self,
+        ctx: &RequestContext,
+        input: SetMember,
+    ) -> Result<AdminSpaceView, Error> {
+        ctx.principal.require_scope(Scope::Admin)?;
+        let space = self
+            .drive
+            .admin_set_member(
+                input.space_id,
+                input.user_id,
+                input.role.map(Into::into),
+            )
+            .await?;
+        Ok(space.into())
+    }
+
+    fn admin(self: &Arc<Self>) -> Vec<Operation> {
+        let s = Arc::clone(self);
+        let list = Operation::query(
+            "drive.admin_spaces",
+            "/v1/admin/spaces",
+            Scope::Admin,
+            move |ctx, input| {
+                let s = Arc::clone(&s);
+                async move { s.admin_spaces(&ctx, input).await }
+            },
+        )
+        .summary("List every space with its size and members");
+        let s = Arc::clone(self);
+        let create = Operation::mutation(
+            "drive.admin_create_space",
+            HttpMethod::Post,
+            "/v1/admin/spaces",
+            Scope::Admin,
+            move |ctx, input| {
+                let s = Arc::clone(&s);
+                async move { s.admin_create_space(&ctx, input).await }
+            },
+        )
+        .summary("Create a shared drive for someone");
+        let s = Arc::clone(self);
+        let update = Operation::mutation(
+            "drive.admin_update_space",
+            HttpMethod::Patch,
+            "/v1/admin/spaces/{space_id}",
+            Scope::Admin,
+            move |ctx, input| {
+                let s = Arc::clone(&s);
+                async move { s.admin_update_space(&ctx, input).await }
+            },
+        )
+        .summary(
+            "Rename any space and change its quota, trash and version settings",
+        );
+        let s = Arc::clone(self);
+        let member = Operation::mutation(
+            "drive.admin_set_member",
+            HttpMethod::Put,
+            "/v1/admin/spaces/{space_id}/members/{user_id}",
+            Scope::Admin,
+            move |ctx, input| {
+                let s = Arc::clone(&s);
+                async move { s.admin_set_member(&ctx, input).await }
+            },
+        )
+        .summary("Set or remove someone's role on a shared drive");
+        [list, create, update, member]
+            .into_iter()
+            .map(|op| op.fresh_auth(ADMIN_FRESH_AUTH))
+            .collect()
     }
 }
 
@@ -602,6 +884,8 @@ impl Service for DriveService {
     fn operations(self: Arc<Self>) -> Vec<Operation> {
         let mut ops = self.reads();
         ops.extend(self.changes());
+        ops.extend(self.admin());
+        ops.extend(self.sharing_ops());
         ops
     }
 
@@ -609,7 +893,9 @@ impl Service for DriveService {
         Box::pin(async move {
             match self.drive.ready().await {
                 Ok(()) => Readiness::Ready,
-                Err(err) => Readiness::NotReady(format!("the drive index is unavailable: {err}")),
+                Err(err) => Readiness::NotReady(format!(
+                    "the drive index is unavailable: {err}"
+                )),
             }
         })
     }

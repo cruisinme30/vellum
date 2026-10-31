@@ -196,7 +196,9 @@ impl WorkGraph {
                 })
             })
             .collect();
-        similar.sort_by(|a, b| b.overlap.cmp(&a.overlap).then_with(|| a.key.cmp(&b.key)));
+        similar.sort_by(|a, b| {
+            b.overlap.cmp(&a.overlap).then_with(|| a.key.cmp(&b.key))
+        });
         similar.truncate(MAX_SIMILAR);
         Ok(TriageBrief {
             id: *id,
@@ -229,10 +231,12 @@ impl WorkGraph {
         let issue = self.issue_ref(id)?;
         self.in_triage(issue)?;
         let invalid =
-            |what: &'static str, value: String, reason: &'static str| WorkError::Invalid {
-                what,
-                value,
-                reason,
+            |what: &'static str, value: String, reason: &'static str| {
+                WorkError::Invalid {
+                    what,
+                    value,
+                    reason,
+                }
             };
         let reason = suggestion.reason.trim();
         if reason.is_empty() || reason.len() > MAX_REASON {
@@ -242,7 +246,8 @@ impl WorkGraph {
                 "must be 1 to 2048 bytes",
             ));
         }
-        let team = self.team_ref(suggestion.team.as_ref().unwrap_or(&issue.team))?;
+        let team =
+            self.team_ref(suggestion.team.as_ref().unwrap_or(&issue.team))?;
         for l in &suggestion.labels {
             self.check_label(team, l)?;
         }
@@ -257,7 +262,9 @@ impl WorkGraph {
         }
         if let Some(d) = &suggestion.duplicate_of {
             let other = self.issue_ref(d)?;
-            if d == id || self.category_of(other).is_none_or(Category::is_closed) {
+            if d == id
+                || self.category_of(other).is_none_or(Category::is_closed)
+            {
                 return Err(invalid(
                     "duplicate",
                     d.to_string(),
@@ -270,10 +277,11 @@ impl WorkGraph {
             at: ctx.now,
             ..suggestion
         };
-        let value = serde_json::to_value(&stored).map_err(|e| WorkError::File {
-            path: issue.path(),
-            reason: e.to_string(),
-        })?;
+        let value =
+            serde_json::to_value(&stored).map_err(|e| WorkError::File {
+                path: issue.path(),
+                reason: e.to_string(),
+            })?;
         let mut issue = issue.clone();
         let _ = issue.extra.insert(KEY.to_owned(), value);
         self.store_issue(issue);
@@ -318,14 +326,19 @@ impl WorkGraph {
     /// issue left triage, and any error of the commands it runs. On error
     /// nothing is changed.
     #[instrument(skip_all, fields(issue = %id))]
-    pub fn accept_suggestion(&mut self, id: &IssueId, ctx: &Ctx) -> Result<Changes> {
+    pub fn accept_suggestion(
+        &mut self,
+        id: &IssueId,
+        ctx: &Ctx,
+    ) -> Result<Changes> {
         let issue = self.issue_ref(id)?;
         self.in_triage(issue)?;
         let key = issue.key().to_string();
-        let suggestion = self.suggestion(id).ok_or(WorkError::InvalidState {
-            issue: key,
-            reason: "has no triage suggestion",
-        })?;
+        let suggestion =
+            self.suggestion(id).ok_or(WorkError::InvalidState {
+                issue: key,
+                reason: "has no triage suggestion",
+            })?;
         let backup = self.clone();
         let result = self.apply_suggestion(id, &suggestion, ctx);
         if result.is_err() {
@@ -342,7 +355,11 @@ impl WorkGraph {
     ) -> Result<Changes> {
         let mut changes = self.dismiss_suggestion(id)?;
         if let Some(of) = s.duplicate_of {
-            changes.merge(self.triage(id, &TriageAction::Duplicate { of }, ctx)?);
+            changes.merge(self.triage(
+                id,
+                &TriageAction::Duplicate { of },
+                ctx,
+            )?);
         } else {
             if let Some(team) = &s.team {
                 changes.merge(self.move_issue(id, team, ctx)?);
@@ -366,7 +383,11 @@ impl WorkGraph {
             // A team with triage off has no triage status; the move has
             // already placed the issue in its normal flow.
             if self.category_of(self.issue_ref(id)?) == Some(Category::Triage) {
-                changes.merge(self.triage(id, &TriageAction::Accept { status: None }, ctx)?);
+                changes.merge(self.triage(
+                    id,
+                    &TriageAction::Accept { status: None },
+                    ctx,
+                )?);
             }
         }
         info!(monotonic_counter.work_triage_suggestions_accepted = 1_u64);

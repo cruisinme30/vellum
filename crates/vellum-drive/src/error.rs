@@ -26,12 +26,19 @@ pub enum DriveError {
     #[error("invalid request: {0}")]
     Invalid(String),
 
+    /// A [`ContentCheck`](crate::ContentCheck) refused the page text.
+    #[error("{0}")]
+    Refused(String),
+
     /// Something with that identity or name already exists.
     #[error("already exists: {0}")]
     AlreadyExists(String),
 
     /// The write would take the space over its storage quota.
-    #[error("storage quota exceeded: {used} of {quota} bytes used, {needed} more needed")]
+    #[error(
+        "storage quota exceeded: {used} of {quota} bytes used, {needed} more \
+            needed"
+    )]
     QuotaExceeded {
         /// Bytes in use now.
         used: u64,
@@ -71,6 +78,7 @@ impl DriveError {
             Self::SpaceNotFound(_) | Self::NotFound(_) => "not_found",
             Self::PermissionDenied => "permission_denied",
             Self::Invalid(_) => "invalid",
+            Self::Refused(_) => "refused",
             Self::AlreadyExists(_) => "already_exists",
             Self::QuotaExceeded { .. } => "quota_exceeded",
             Self::Malformed { .. } => "malformed",
@@ -84,19 +92,25 @@ impl DriveError {
     #[must_use]
     pub const fn kind(&self) -> ErrorKind {
         match self {
-            Self::SpaceNotFound(_) | Self::NotFound(_) | Self::Store(StoreError::NotFound(_)) => {
-                ErrorKind::NotFound
-            }
+            Self::SpaceNotFound(_)
+            | Self::NotFound(_)
+            | Self::Store(StoreError::NotFound(_)) => ErrorKind::NotFound,
             Self::PermissionDenied => ErrorKind::PermissionDenied,
             Self::Invalid(_)
+            | Self::Refused(_)
             | Self::Malformed { .. }
-            | Self::Store(StoreError::InvalidPath { .. }) => ErrorKind::InvalidInput,
-            Self::AlreadyExists(_)
-            | Self::Store(StoreError::AlreadyExists(_) | StoreError::PreconditionFailed { .. }) => {
-                ErrorKind::Conflict
+            | Self::Store(StoreError::InvalidPath { .. }) => {
+                ErrorKind::InvalidInput
             }
+            Self::AlreadyExists(_)
+            | Self::Store(
+                StoreError::AlreadyExists(_)
+                | StoreError::PreconditionFailed { .. },
+            ) => ErrorKind::Conflict,
             Self::QuotaExceeded { .. } => ErrorKind::RateLimited,
-            Self::Store(_) | Self::Index(_) | Self::Access(_) => ErrorKind::Unavailable,
+            Self::Store(_) | Self::Index(_) | Self::Access(_) => {
+                ErrorKind::Unavailable
+            }
         }
     }
 }
@@ -106,9 +120,9 @@ impl From<DriveError> for vellum_kernel::Error {
         let kind = err.kind();
         let message = match &err {
             // Internal detail stays in the source chain, out of the message.
-            DriveError::Store(_) | DriveError::Index(_) | DriveError::Access(_) => {
-                "storage is unavailable".to_owned()
-            }
+            DriveError::Store(_)
+            | DriveError::Index(_)
+            | DriveError::Access(_) => "storage is unavailable".to_owned(),
             other => other.to_string(),
         };
         Self::new(kind, message).with_source(err)

@@ -14,10 +14,14 @@ frozen as a snapshot and exported as one PDF.
 
 1. Create a book "Q4 2026 review" in the leadership shared drive.
 2. Add chapters: Summary, Engineering, Operations, Design, Next quarter.
-3. In each team chapter, embed that team's goals collection, filtered to the quarter.
-4. Add a live chart that reads the goals collection, so the numbers are never typed by hand.
-5. In the Summary, link to each chapter with `[[` so the links show "§2 Engineering" and renumber if you reorder.
-6. When the quarter closes, choose **⋯ → Take snapshot** and name it "Q4 2026 final". Live blocks in the snapshot keep the values they had.
+3. In each team chapter, embed that team's goals collection, filtered to the
+   quarter.
+4. Add a live chart that reads the goals collection, so the numbers are never
+   typed by hand.
+5. In the Summary, link to each chapter with `[[` so the links show "§2
+   Engineering" and renumber if you reorder.
+6. When the quarter closes, choose **⋯ → Take snapshot** and name it "Q4 2026
+   final". Live blocks in the snapshot keep the values they had.
 7. Export the snapshot with **Whole book** as a PDF for the board pack.
 
 ## A team chapter

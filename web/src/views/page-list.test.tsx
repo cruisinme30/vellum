@@ -34,12 +34,16 @@ describe("PageList", () => {
       `/p/${first.id}`,
       `/p/${second.id}`,
     ]);
-    expect(links[0]?.textContent).toBe(`${first.icon}${first.title}…the gateway…`);
+    expect(links[0]?.textContent).toBe(
+      `${first.icon}${first.title}…the gateway…`,
+    );
     expect(links[1]?.textContent).toBe(`${second.icon}${second.title}`);
   });
 
   it("names untitled pages", () => {
-    renderWithProviders(<PageList items={[{ page: { ...first, title: "" } }]} empty="" />);
+    renderWithProviders(
+      <PageList items={[{ page: { ...first, title: "" } }]} empty="" />,
+    );
     expect(screen.getByRole("link", { name: "Untitled" })).toBeDefined();
   });
 });

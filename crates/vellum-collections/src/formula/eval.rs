@@ -48,7 +48,10 @@ impl<'e> Eval<'e> {
     pub(super) fn eval(&mut self, node: &Node) -> R {
         self.steps += 1;
         if self.steps > MAX_STEPS {
-            return Err(FormulaError::new("formula does too much work", node.span));
+            return Err(FormulaError::new(
+                "formula does too much work",
+                node.span,
+            ));
         }
         let v = match &node.expr {
             Expr::Number(n) => Value::Number(*n),
@@ -63,7 +66,11 @@ impl<'e> Eval<'e> {
                 match v {
                     Value::Number(n) => Value::Number(-n),
                     Value::Empty => Value::Empty,
-                    other => return Err(type_error("-", "a number", &other, e.span)),
+                    other => {
+                        return Err(type_error(
+                            "-", "a number", &other, e.span,
+                        ));
+                    }
                 }
             }
             Expr::Unary(UnOp::Not, e) => Value::Bool(!self.eval(e)?.truthy()),
@@ -109,12 +116,21 @@ impl<'e> Eval<'e> {
                         let scale = 10f64.powi(digits);
                         Value::Number((n * scale).round() / scale)
                     }
-                    other => return Err(type_error("round", "a number", &other, arg_span(0))),
+                    other => {
+                        return Err(type_error(
+                            "round",
+                            "a number",
+                            &other,
+                            arg_span(0),
+                        ));
+                    }
                 }
             }
             Func::Len => match first {
                 Value::Text(t) => count(t.chars().count()),
-                Value::List(items) => count(items.iter().filter(|v| !v.is_empty()).count()),
+                Value::List(items) => {
+                    count(items.iter().filter(|v| !v.is_empty()).count())
+                }
                 Value::Empty => count(0),
                 other => count(other.to_string().chars().count()),
             },
@@ -129,7 +145,9 @@ impl<'e> Eval<'e> {
                 Value::Text(out)
             }
             Func::Min | Func::Max => extreme(func, &vals, span)?,
-            Func::Sum => Value::Number(numbers(&vals, args, "sum")?.iter().sum()),
+            Func::Sum => {
+                Value::Number(numbers(&vals, args, "sum")?.iter().sum())
+            }
             Func::Avg => {
                 let ns = numbers(&vals, args, "avg")?;
                 if ns.is_empty() {
@@ -143,30 +161,41 @@ impl<'e> Eval<'e> {
             Func::Year => match first {
                 Value::Date(d) => Value::Number(f64::from(d.date().year())),
                 Value::Empty => Value::Empty,
-                other => return Err(type_error("year", "a date", &other, arg_span(0))),
-            },
-            Func::Days => match (&first, vals.get(1)) {
-                (Value::Date(a), Some(Value::Date(b))) => days_value(a.days_since(*b)),
-                (Value::Empty, _) | (_, Some(Value::Empty) | None) => Value::Empty,
-                (Value::Date(_), Some(other)) => {
-                    return Err(type_error("days", "two dates", other, arg_span(1)));
+                other => {
+                    return Err(type_error(
+                        "year",
+                        "a date",
+                        &other,
+                        arg_span(0),
+                    ));
                 }
-                (other, _) => return Err(type_error("days", "two dates", other, arg_span(0))),
             },
+            Func::Days => {
+                days_between(&first, vals.get(1), arg_span(0), arg_span(1))?
+            }
             Func::Format => Value::Text(first.to_string()),
             Func::Percent => {
                 let digits = digits_arg(vals.get(1), arg_span(1))?;
                 match first {
                     Value::Empty => Value::Empty,
                     Value::Number(n) => Value::Text(percent(n, digits)),
-                    other => return Err(type_error("percent", "a number", &other, arg_span(0))),
+                    other => {
+                        return Err(type_error(
+                            "percent",
+                            "a number",
+                            &other,
+                            arg_span(0),
+                        ));
+                    }
                 }
             }
             Func::Empty => Value::Bool(first.is_empty()),
             Func::Contains => {
                 let needle = vals.get(1).cloned().unwrap_or_default();
                 Value::Bool(match &first {
-                    Value::List(items) => items.iter().any(|i| loose_eq(i, &needle)),
+                    Value::List(items) => {
+                        items.iter().any(|i| loose_eq(i, &needle))
+                    }
                     Value::Empty => false,
                     hay => hay.to_string().contains(&needle.to_string()),
                 })
@@ -220,7 +249,9 @@ const fn days_value(d: i64) -> Value {
 fn digits_arg(v: Option<&Value>, span: Span) -> Result<i32, FormulaError> {
     match v {
         None | Some(Value::Empty) => Ok(0),
-        Some(Value::Number(n)) if n.fract() == 0.0 && (0.0..=10.0).contains(n) => {
+        Some(Value::Number(n))
+            if n.fract() == 0.0 && (0.0..=10.0).contains(n) =>
+        {
             // Checked to be a whole number in 0..=10 above.
             #[allow(clippy::cast_possible_truncation)]
             let d = *n as i32;
@@ -247,7 +278,11 @@ fn text_map(v: Value, f: impl Fn(&str) -> String) -> Value {
     }
 }
 
-fn numbers(vals: &[Value], args: &[Node], what: &str) -> Result<Vec<f64>, FormulaError> {
+fn numbers(
+    vals: &[Value],
+    args: &[Node],
+    what: &str,
+) -> Result<Vec<f64>, FormulaError> {
     let mut out = Vec::new();
     for (i, v) in vals.iter().enumerate() {
         for leaf in v.leaves() {
@@ -267,7 +302,12 @@ fn extreme(func: Func, vals: &[Value], span: Span) -> R {
     let mut best: Option<&Value> = None;
     for leaf in vals.iter().flat_map(Value::leaves) {
         if !matches!(leaf, Value::Number(_) | Value::Date(_)) {
-            return Err(type_error(func.name(), "numbers or dates", leaf, span));
+            return Err(type_error(
+                func.name(),
+                "numbers or dates",
+                leaf,
+                span,
+            ));
         }
         best = match best {
             None => Some(leaf),
@@ -290,7 +330,9 @@ fn extreme(func: Func, vals: &[Value], span: Span) -> R {
 pub fn loose_eq(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (x, y) if x.is_empty() && y.is_empty() => true,
-        (Value::Number(x), Value::Number(y)) => (x - y).abs() < f64::EPSILON * x.abs().max(1.0),
+        (Value::Number(x), Value::Number(y)) => {
+            (x - y).abs() < f64::EPSILON * x.abs().max(1.0)
+        }
         _ => a == b,
     }
 }
@@ -350,15 +392,21 @@ fn binary(op: BinOp, a: &Value, b: &Value, span: Span) -> R {
             }))
         }
         BinOp::Add => match (a, b) {
-            (Value::Text(_), _) | (_, Value::Text(_)) => Ok(Value::Text(format!("{a}{b}"))),
-            (Value::Date(d), x) | (x, Value::Date(d)) => date_shift(*d, x, 1, span),
+            (Value::Text(_), _) | (_, Value::Text(_)) => {
+                Ok(Value::Text(format!("{a}{b}")))
+            }
+            (Value::Date(d), x) | (x, Value::Date(d)) => {
+                date_shift(*d, x, 1, span)
+            }
             _ => match (num_or_zero(a), num_or_zero(b)) {
                 (Some(x), Some(y)) => Ok(Value::Number(x + y)),
                 _ => Err(arith_err(a, b)),
             },
         },
         BinOp::Sub => match (a, b) {
-            (Value::Date(x), Value::Date(y)) => Ok(days_value(x.days_since(*y))),
+            (Value::Date(x), Value::Date(y)) => {
+                Ok(days_value(x.days_since(*y)))
+            }
             (Value::Date(d), x) => date_shift(*d, x, -1, span),
             _ => match (num_or_zero(a), num_or_zero(b)) {
                 (Some(x), Some(y)) => Ok(Value::Number(x - y)),
@@ -400,5 +448,24 @@ fn date_shift(d: DateValue, by: &Value, sign: i64, span: Span) -> R {
             format!("dates move by whole days, not {}", other.type_name()),
             span,
         )),
+    }
+}
+
+/// `days(a, b)`: the days from `b` to `a`, empty when either is empty.
+fn days_between(
+    first: &Value,
+    second: Option<&Value>,
+    first_span: Span,
+    second_span: Span,
+) -> R {
+    match (first, second) {
+        (Value::Date(a), Some(Value::Date(b))) => {
+            Ok(days_value(a.days_since(*b)))
+        }
+        (Value::Empty, _) | (_, Some(Value::Empty) | None) => Ok(Value::Empty),
+        (Value::Date(_), Some(other)) => {
+            Err(type_error("days", "two dates", other, second_span))
+        }
+        (other, _) => Err(type_error("days", "two dates", other, first_span)),
     }
 }

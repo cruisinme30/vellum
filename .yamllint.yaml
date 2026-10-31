@@ -13,8 +13,10 @@ ignore: |
   deploy/helm/*/templates/
 
 rules:
-  line-length:
-    max: 120
+  # scripts/ci/check-line-length.sh holds YAML to 80 characters with the
+  # same exemptions as every other file (pinned action hashes, URLs);
+  # yamllint's own rule can't make them (ADR 0074).
+  line-length: disable
   document-start: disable
   truthy:
     allowed-values: ["true", "false", "on"]

@@ -143,7 +143,9 @@ fn corrupt(what: &'static str) -> Error {
     Error::new(ErrorKind::Conflict, what)
 }
 
-fn crypto(what: &'static str) -> impl FnOnce(vellum_crypto::CryptoError) -> Error {
+fn crypto(
+    what: &'static str,
+) -> impl FnOnce(vellum_crypto::CryptoError) -> Error {
     move |e| Error::new(ErrorKind::Conflict, what).with_source(e)
 }
 
@@ -162,7 +164,10 @@ fn record_run(op: &'static str, ok: bool, start: Instant) {
             start.elapsed().as_secs_f64(),
             &[
                 KeyValue::new("operation", op),
-                KeyValue::new("outcome", if ok { "success" } else { "failure" }),
+                KeyValue::new(
+                    "outcome",
+                    if ok { "success" } else { "failure" },
+                ),
             ],
         );
 }
@@ -187,7 +192,9 @@ fn safe_join(root: &Path, portable: &str) -> Option<PathBuf> {
         let p = Path::new(part);
         let mut comps = p.components();
         match (comps.next(), comps.next()) {
-            (Some(Component::Normal(n)), None) if !part.contains('\\') => out.push(n),
+            (Some(Component::Normal(n)), None) if !part.contains('\\') => {
+                out.push(n);
+            }
             _ => return None,
         }
     }
@@ -257,8 +264,9 @@ async fn write_frame<K: KeyProvider, W: tokio::io::AsyncWrite + Unpin>(
 }
 
 fn chunk_payload(path: &str, index: u32, data: &[u8]) -> Result<Vec<u8>> {
-    let len = u16::try_from(path.len())
-        .map_err(|_| Error::new(ErrorKind::InvalidInput, "path too long for a backup"))?;
+    let len = u16::try_from(path.len()).map_err(|_| {
+        Error::new(ErrorKind::InvalidInput, "path too long for a backup")
+    })?;
     let mut payload = Vec::with_capacity(2 + path.len() + 4 + data.len());
     payload.extend_from_slice(&len.to_be_bytes());
     payload.extend_from_slice(path.as_bytes());
@@ -276,7 +284,11 @@ fn chunk_payload(path: &str, index: u32, data: &[u8]) -> Result<Vec<u8>> {
 ///
 /// Returns an error when a file cannot be read or the backup cannot be
 /// written; a partial backup file is removed.
-#[tracing::instrument(name = "backup.create", skip_all, fields(source = %source.display()))]
+#[tracing::instrument(
+    name = "backup.create",
+    skip_all,
+    fields(source = %source.display())
+)]
 pub async fn create<K: KeyProvider>(
     keys: &K,
     source: &Path,
@@ -333,12 +345,20 @@ async fn create_inner<K: KeyProvider>(
         let mut buf = vec![0_u8; CHUNK];
         for rel in files {
             let Some(path) = portable(&rel) else { continue };
-            let entry = back_up_file(keys, &mut out, &source.join(&rel), path, &mut buf).await?;
+            let entry = back_up_file(
+                keys,
+                &mut out,
+                &source.join(&rel),
+                path,
+                &mut buf,
+            )
+            .await?;
             manifest.bytes += entry.size;
             manifest.files.push(entry);
         }
         let json = serde_json::to_vec(&manifest).map_err(|e| {
-            Error::new(ErrorKind::Internal, "cannot encode the manifest").with_source(e)
+            Error::new(ErrorKind::Internal, "cannot encode the manifest")
+                .with_source(e)
         })?;
         write_frame(keys, &mut out, KIND_MANIFEST, &json).await?;
         out.flush().await.map_err(io("cannot write the backup"))?;
@@ -398,7 +418,8 @@ async fn back_up_file<K: KeyProvider, W: tokio::io::AsyncWrite + Unpin>(
         let data = buf.get(..n).unwrap_or_default();
         hasher.update(data);
         size += n as u64;
-        write_frame(keys, out, KIND_CHUNK, &chunk_payload(&path, index, data)?).await?;
+        write_frame(keys, out, KIND_CHUNK, &chunk_payload(&path, index, data)?)
+            .await?;
         index += 1;
         if n < buf.len() {
             break;
@@ -471,7 +492,9 @@ impl<'k, K: KeyProvider> Reader<'k, K> {
         let mut kind = [0_u8; 1];
         match self.input.read_exact(&mut kind).await {
             Ok(_) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                return Ok(None);
+            }
             Err(e) => return Err(io("cannot read the backup")(e)),
         }
         let mut len = [0_u8; 8];
@@ -490,11 +513,12 @@ impl<'k, K: KeyProvider> Reader<'k, K> {
             .read_exact(&mut sealed)
             .await
             .map_err(|_| corrupt("backup is truncated"))?;
-        let plain = vellum_crypto::open(self.keys, &sealed)
-            .await
-            .map_err(crypto(
-                "cannot decrypt the backup (wrong key or damaged file)",
-            ))?;
+        let plain =
+            vellum_crypto::open(self.keys, &sealed)
+                .await
+                .map_err(crypto(
+                    "cannot decrypt the backup (wrong key or damaged file)",
+                ))?;
         match kind {
             [KIND_CHUNK] => decode_chunk(&plain).map(Some),
             [KIND_MANIFEST] => serde_json::from_slice(&plain)
@@ -530,7 +554,10 @@ fn decode_chunk(plain: &[u8]) -> Result<Frame> {
 /// # Errors
 ///
 /// Returns a conflict error when the file is damaged or the key is wrong.
-pub async fn read_manifest<K: KeyProvider>(keys: &K, file: &Path) -> Result<Manifest> {
+pub async fn read_manifest<K: KeyProvider>(
+    keys: &K,
+    file: &Path,
+) -> Result<Manifest> {
     let mut reader = Reader::open(keys, file).await?;
     while let Some(frame) = reader.next().await? {
         if let Frame::Manifest(m) = frame {
@@ -555,7 +582,11 @@ struct Pending {
 /// Returns invalid input when `target` is not empty, and a conflict error
 /// when the backup is damaged, the key is wrong, or a file does not match
 /// the manifest.
-#[tracing::instrument(name = "backup.restore", skip_all, fields(file = %file.display()))]
+#[tracing::instrument(
+    name = "backup.restore",
+    skip_all,
+    fields(file = %file.display())
+)]
 pub async fn restore<K: KeyProvider>(
     keys: &K,
     file: &Path,
@@ -607,9 +638,9 @@ async fn restore_inner<K: KeyProvider>(
                         return Err(corrupt("backup chunks are out of order"));
                     }
                     if let Some(parent) = dest.parent() {
-                        tokio::fs::create_dir_all(parent)
-                            .await
-                            .map_err(io("cannot create a restored directory"))?;
+                        tokio::fs::create_dir_all(parent).await.map_err(io(
+                            "cannot create a restored directory",
+                        ))?;
                     }
                     let f = tokio::fs::File::create(&dest)
                         .await
@@ -663,7 +694,10 @@ async fn restore_inner<K: KeyProvider>(
         let Some((size, sha, chunks)) = done.get(&entry.path) else {
             return Err(corrupt("a file in the manifest is missing"));
         };
-        if *size != entry.size || *sha != entry.sha256 || *chunks != entry.chunks {
+        if *size != entry.size
+            || *sha != entry.sha256
+            || *chunks != entry.chunks
+        {
             return Err(corrupt("a restored file does not match the manifest"));
         }
     }
@@ -696,11 +730,20 @@ async fn finish(mut pending: Pending) -> Result<(u64, String, u32)> {
 /// Restores `file` into a fresh directory under `scratch`, verifies it,
 /// removes it again and reports the result. A failed drill is a report,
 /// not an error, so it can be audited and alerted on.
-#[tracing::instrument(name = "backup.drill", skip_all, fields(file = %file.display()))]
-pub async fn drill<K: KeyProvider>(keys: &K, file: &Path, scratch: &Path) -> DrillReport {
+#[tracing::instrument(
+    name = "backup.drill",
+    skip_all,
+    fields(file = %file.display())
+)]
+pub async fn drill<K: KeyProvider>(
+    keys: &K,
+    file: &Path,
+    scratch: &Path,
+) -> DrillReport {
     let start = Instant::now();
     let ran_at = Timestamp::now();
-    let target = scratch.join(format!("drill-{}", crate::settings::new_install_id()));
+    let target =
+        scratch.join(format!("drill-{}", crate::settings::new_install_id()));
     let result = restore(keys, file, &target).await;
     let _ = tokio::fs::remove_dir_all(&target).await;
     let duration_ms = millis(start);
@@ -719,7 +762,8 @@ pub async fn drill<K: KeyProvider>(keys: &K, file: &Path, scratch: &Path) -> Dri
             bytes: r.bytes,
             duration_ms,
             within_rto,
-            error: (!within_rto).then(|| "restore exceeded the 15-minute RTO".to_owned()),
+            error: (!within_rto)
+                .then(|| "restore exceeded the 15-minute RTO".to_owned()),
         },
         Err(e) => DrillReport {
             backup,
@@ -754,7 +798,9 @@ pub async fn list(dir: &Path) -> Result<Vec<BackupFile>> {
         .map_err(io("cannot list backups"))?
     {
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with("vellum-") && name.ends_with(&format!(".{EXTENSION}")) {
+        if name.starts_with("vellum-")
+            && name.ends_with(&format!(".{EXTENSION}"))
+        {
             let size = entry
                 .metadata()
                 .await
@@ -786,8 +832,14 @@ pub async fn prune(dir: &Path, keep: usize) -> Result<Vec<String>> {
 
 /// Whether a drill is due: never run, or older than `interval_days`.
 #[must_use]
-pub fn drill_due(last_ms: Option<i64>, now_ms: i64, interval_days: u32) -> bool {
-    last_ms.is_none_or(|last| now_ms - last >= i64::from(interval_days) * 86_400_000)
+pub fn drill_due(
+    last_ms: Option<i64>,
+    now_ms: i64,
+    interval_days: u32,
+) -> bool {
+    last_ms.is_none_or(|last| {
+        now_ms - last >= i64::from(interval_days) * 86_400_000
+    })
 }
 
 #[cfg(test)]

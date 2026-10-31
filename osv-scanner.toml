@@ -1,0 +1,60 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+
+# Advisories triaged as not affecting Vellum (ADR 0025, D261). OpenSSF
+# Scorecard's Vulnerabilities check reads this file. The RUSTSEC entries
+# mirror [advisories].ignore in deny.toml and .cargo/audit.toml, where the
+# reasons are kept in full; change all three together.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0215"
+reason = """\
+    smallstr is unmaintained, not vulnerable; pulled by yrs with no safe \
+    upgrade yet"""
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2025-0141"
+reason = "bincode unmaintained; Typst's syntect loads only bundled syntax dumps"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0436"
+reason = "paste unmaintained; a build-time proc-macro of biblatex"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0194"
+reason = """\
+    quick-xml 0.38 in citationberg; export never parses CSL or bibliography \
+    XML"""
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0195"
+reason = """\
+    quick-xml 0.38 NsReader in citationberg; export never parses CSL or \
+    bibliography XML"""
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0206"
+reason = "rustybuzz unmaintained; Typst's shaper only sees our bundled fonts"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0192"
+reason = """\
+    ttf-parser unmaintained; Typst's font reader only sees our bundled fonts"""
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0449"
+reason = "unsafe-libyaml unmaintained; hayagriva YAML is never read by export"
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0320"
+reason = "yaml-rust unmaintained; syntect YAML grammars are never loaded"
+
+[[IgnoredVulns]]
+# block-buffer 0.10.4 through digest 0.10 (hmac, sha1, sha2 for axum,
+# tungstenite, sqlx). The bug needs a hasher that panics mid-update and is
+# then reused after catch_unwind; no Vellum code catches a panic around a
+# hasher, and 0.10 has no fixed release. Our own crates use 0.12.1.
+id = "GHSA-qwgh-2vcv-g2f7"
+reason = """\
+    only reachable by reusing a hasher after a caught panic, which Vellum \
+    never does; no fixed 0.10 release"""

@@ -58,7 +58,7 @@ pub use crate::writer::{ID_PREFIX, TocEntry, Warning};
 
 /// Bumped whenever the HTML for the same input changes, so stored renders
 /// are rebuilt.
-pub const RENDER_VERSION: u32 = 2;
+pub const RENDER_VERSION: u32 = 3;
 
 /// Per-render settings.
 #[derive(Debug, Clone, Default)]
@@ -166,10 +166,11 @@ impl Renderer {
             .enumerate()
             .map(|(n, f)| slot(options, f, n))
             .collect();
-        let results = join_all(fences.iter().zip(&slots).map(|(f, s)| async move {
-            (figure::content_key(f), self.figures.kroki(f, Some(s)).await)
-        }))
-        .await;
+        let results =
+            join_all(fences.iter().zip(&slots).map(|(f, s)| async move {
+                (figure::content_key(f), self.figures.kroki(f, Some(s)).await)
+            }))
+            .await;
         let resolved: writer::Resolved = results.into_iter().collect();
         self.finish(doc, resolver, &resolved, started)
     }
@@ -204,7 +205,8 @@ impl Renderer {
         resolved: &writer::Resolved,
         started: Instant,
     ) -> RenderedPage {
-        let span = tracing::info_span!("render.page", blocks = doc.blocks.len());
+        let span =
+            tracing::info_span!("render.page", blocks = doc.blocks.len());
         let _entered = span.enter();
         let mut w = writer::Writer::new(resolver, &self.figures, resolved);
         w.document(&doc.blocks);
@@ -214,7 +216,9 @@ impl Renderer {
             .as_ref()
             .and_then(|fm| fm.title())
             .map(str::to_owned)
-            .or_else(|| w.toc.iter().find(|e| e.level == 1).map(|e| e.text.clone()));
+            .or_else(|| {
+                w.toc.iter().find(|e| e.level == 1).map(|e| e.text.clone())
+            });
         let page = RenderedPage {
             html,
             title,
@@ -226,8 +230,10 @@ impl Renderer {
         tracing::info!(
             histogram.vellum_render_page_ms = ms,
             monotonic_counter.vellum_render_pages = 1_u64,
-            monotonic_counter.vellum_render_warnings = page.warnings.len() as u64,
-            monotonic_counter.vellum_render_stale_figures = page.stale_figures as u64,
+            monotonic_counter.vellum_render_warnings =
+                page.warnings.len() as u64,
+            monotonic_counter.vellum_render_stale_figures =
+                page.stale_figures as u64,
             bytes = page.html.len(),
             "rendered page"
         );
@@ -252,12 +258,22 @@ fn kroki_fences(blocks: &[Block]) -> Vec<&Fence> {
         }
         for b in blocks {
             match b {
-                Block::Fence(f) if matches!(figure::engine(f), Some(Engine::Kroki(_))) => {
+                Block::Fence(f)
+                    if matches!(figure::engine(f), Some(Engine::Kroki(_))) =>
+                {
                     out.push(f);
                 }
-                Block::BlockQuote { blocks, .. } => walk(blocks, out, depth + 1),
-                Block::List(l) => l.items.iter().for_each(|i| walk(&i.blocks, out, depth + 1)),
-                Block::Container(c) => c.sections.iter().for_each(|s| walk(s, out, depth + 1)),
+                Block::BlockQuote { blocks, .. } => {
+                    walk(blocks, out, depth + 1);
+                }
+                Block::List(l) => {
+                    l.items
+                        .iter()
+                        .for_each(|i| walk(&i.blocks, out, depth + 1));
+                }
+                Block::Container(c) => {
+                    c.sections.iter().for_each(|s| walk(s, out, depth + 1));
+                }
                 _ => {}
             }
         }

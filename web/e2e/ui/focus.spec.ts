@@ -29,7 +29,10 @@ interface Stop {
 const scrollSettled = (page: Page): Promise<void> =>
   page.evaluate(async () => {
     const deadline = performance.now() + 1000;
-    for (let still = 0, last = Number.NaN; still < 3 && performance.now() < deadline;) {
+    for (
+      let still = 0, last = Number.NaN;
+      still < 3 && performance.now() < deadline;
+    ) {
       await new Promise((resolve) => requestAnimationFrame(resolve));
       const position = scrollX * 100_000 + scrollY;
       still = position === last ? still + 1 : 0;
@@ -41,7 +44,11 @@ const focusedStop = async (page: Page): Promise<Stop | undefined> => {
   await scrollSettled(page);
   return page.evaluate(() => {
     const element = document.activeElement;
-    if (element === null || element === document.body || element === document.documentElement)
+    if (
+      element === null ||
+      element === document.body ||
+      element === document.documentElement
+    )
       return;
     const parts: string[] = [];
     for (
@@ -50,12 +57,18 @@ const focusedStop = async (page: Page): Promise<Stop | undefined> => {
       node = node.parentElement
     ) {
       parts.unshift(
-        node.id === "" ? node.tagName.toLowerCase() : `${node.tagName.toLowerCase()}#${node.id}`,
+        node.id === ""
+          ? node.tagName.toLowerCase()
+          : `${node.tagName.toLowerCase()}#${node.id}`,
       );
     }
     const rect = element.getBoundingClientRect();
-    const top = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
-    const obscured = top !== null && !element.contains(top) && !top.contains(element);
+    const top = document.elementFromPoint(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    );
+    const obscured =
+      top !== null && !element.contains(top) && !top.contains(element);
     const text = element.textContent.trim().slice(0, 30);
     return {
       path: `${parts.join(" > ")} "${text}"`,
@@ -78,15 +91,39 @@ async function indicatorVisible(page: Page, stop: Stop): Promise<boolean> {
     width: Math.max(1, Math.min(size.width - x, stop.width + 2 * PAD)),
     height: Math.max(1, Math.min(size.height - y, stop.height + 2 * PAD)),
   };
-  const focused = await page.screenshot({ clip, animations: "disabled", caret: "hide" });
+  const focused = await page.screenshot({
+    clip,
+    animations: "disabled",
+    caret: "hide",
+  });
   await page.evaluate(() => {
     const element = document.activeElement;
-    (globalThis as unknown as { vellumFocus?: Element | null }).vellumFocus = element;
-    if (element instanceof HTMLElement || element instanceof SVGElement) element.blur();
+    (globalThis as unknown as { vellumFocus?: Element | null }).vellumFocus =
+      element;
+    if (element instanceof HTMLElement || element instanceof SVGElement)
+      element.blur();
+    // Chromium with touch keeps a date input focused through blur(); park
+    // focus on an invisible probe instead, so the "blurred" shot is unfocused.
+    if (element !== null && document.activeElement === element) {
+      const probe = document.createElement("span");
+      probe.tabIndex = -1;
+      probe.style.cssText =
+        "position:fixed;inset:0 auto auto 0;width:1px;height:1px;opacity:0";
+      probe.dataset["vellumProbe"] = "";
+      document.body.append(probe);
+      probe.focus({ preventScroll: true });
+    }
   });
-  const blurred = await page.screenshot({ clip, animations: "disabled", caret: "hide" });
+  const blurred = await page.screenshot({
+    clip,
+    animations: "disabled",
+    caret: "hide",
+  });
   await page.evaluate(() => {
-    const element = (globalThis as unknown as { vellumFocus?: Element | null }).vellumFocus;
+    for (const probe of document.querySelectorAll("[data-vellum-probe]"))
+      probe.remove();
+    const element = (globalThis as unknown as { vellumFocus?: Element | null })
+      .vellumFocus;
     if (element instanceof HTMLElement || element instanceof SVGElement)
       element.focus({ preventScroll: true });
   });
@@ -95,9 +132,17 @@ async function indicatorVisible(page: Page, stop: Stop): Promise<boolean> {
 
 // Sweep pages share the template of the pages checked here (D165).
 for (const target of TARGETS.filter((candidate) => !candidate.sweep)) {
-  test(`${target.name} keyboard focus`, async ({ page, browserName, isMobile }, testInfo) => {
-    // WebKit skips links on Tab unless the OS setting is on; phones have no Tab key.
-    test.skip(browserName === "webkit" || isMobile, "no Tab navigation to test");
+  test(`${target.name} keyboard focus`, async ({
+    page,
+    browserName,
+    isMobile,
+  }, testInfo) => {
+    // WebKit skips links on Tab unless the OS setting is on; phones have no Tab
+    // key.
+    test.skip(
+      browserName === "webkit" || isMobile,
+      "no Tab navigation to test",
+    );
     await fakeServer(page, target.server);
     await page.goto(target.url);
     await settle(page);
@@ -118,7 +163,9 @@ for (const target of TARGETS.filter((candidate) => !candidate.sweep)) {
         problems.push({
           rule: "focus-offscreen",
           target: stop.path,
-          message: `focused at x=${stop.x.toFixed(0)} y=${stop.y.toFixed(0)}, out of view`,
+          message:
+            `focused at x=${stop.x.toFixed(0)} ` +
+            `y=${stop.y.toFixed(0)}, out of view`,
         });
         continue;
       }
@@ -136,7 +183,10 @@ for (const target of TARGETS.filter((candidate) => !candidate.sweep)) {
         });
       }
     }
-    await testInfo.attach("focus-order", { body: [...seen].join("\n"), contentType: "text/plain" });
+    await testInfo.attach("focus-order", {
+      body: [...seen].join("\n"),
+      contentType: "text/plain",
+    });
     expect(lines(problems)).toEqual([]);
   });
 }

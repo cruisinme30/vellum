@@ -19,12 +19,31 @@ export const NORTHSTAR_PEOPLE: readonly Person[] = [
 ];
 
 const SPACES: readonly Space[] = [
-  { id: "01JB3K0000SPACE0ENG0000001", slug: "engineering", name: "Engineering", icon: "🛰" },
-  { id: "01JB3K0000SPACE0PRD0000002", slug: "product", name: "Product", icon: "📐" },
-  { id: "01JB3K0000SPACE0HBK0000003", slug: "handbook", name: "Handbook", icon: "📘" },
+  {
+    id: "01JB3K0000SPACE0ENG0000001",
+    slug: "engineering",
+    name: "Engineering",
+    icon: "🛰",
+  },
+  {
+    id: "01JB3K0000SPACE0PRD0000002",
+    slug: "product",
+    name: "Product",
+    icon: "📐",
+  },
+  {
+    id: "01JB3K0000SPACE0HBK0000003",
+    slug: "handbook",
+    name: "Handbook",
+    icon: "📘",
+  },
 ];
 
-const [ENG, PRODUCT, HANDBOOK] = SPACES.map((s) => s.id) as [string, string, string];
+const [ENG, PRODUCT, HANDBOOK] = SPACES.map((s) => s.id) as [
+  string,
+  string,
+  string,
+];
 
 type Row = [
   id: string,
@@ -38,23 +57,117 @@ type Row = [
 ];
 
 const ROWS: readonly Row[] = [
-  [PAGE.engHome, ENG, undefined, "Engineering home", "🏠", "verified", "dev", true],
-  [PAGE.gateway, ENG, PAGE.engHome, "Gateway architecture", "🛰", "verified", "dev"],
-  [PAGE.rateLimits, ENG, PAGE.gateway, "Rate limiting design", "🚦", "in-review", "alice"],
-  [PAGE.runbook, ENG, PAGE.gateway, "Runbook: deploy the gateway", "🧭", "verified", "sam"],
+  [
+    PAGE.engHome,
+    ENG,
+    undefined,
+    "Engineering home",
+    "🏠",
+    "verified",
+    "dev",
+    true,
+  ],
+  [
+    PAGE.gateway,
+    ENG,
+    PAGE.engHome,
+    "Gateway architecture",
+    "🛰",
+    "verified",
+    "dev",
+  ],
+  [
+    PAGE.rateLimits,
+    ENG,
+    PAGE.gateway,
+    "Rate limiting design",
+    "🚦",
+    "in-review",
+    "alice",
+  ],
+  [
+    PAGE.runbook,
+    ENG,
+    PAGE.gateway,
+    "Runbook: deploy the gateway",
+    "🧭",
+    "verified",
+    "sam",
+  ],
   [PAGE.onCall, ENG, PAGE.engHome, "On-call handbook", "📟", "outdated", "sam"],
-  [PAGE.roadmap, ENG, undefined, "Platform roadmap 2027", "🗓", "in-review", "priya", true],
-  [PAGE.prd, PRODUCT, undefined, "PRD: Policy simulator", "📐", "in-review", "priya", true],
-  [PAGE.interviews, PRODUCT, undefined, "Customer interviews", "🎙", "draft", "alice"],
-  [PAGE.acme, PRODUCT, PAGE.interviews, "Interview: Acme Logistics", "🚚", "draft", "alice"],
+  [
+    PAGE.roadmap,
+    ENG,
+    undefined,
+    "Platform roadmap 2027",
+    "🗓",
+    "in-review",
+    "priya",
+    true,
+  ],
+  [
+    PAGE.prd,
+    PRODUCT,
+    undefined,
+    "PRD: Policy simulator",
+    "📐",
+    "in-review",
+    "priya",
+    true,
+  ],
+  [
+    PAGE.interviews,
+    PRODUCT,
+    undefined,
+    "Customer interviews",
+    "🎙",
+    "draft",
+    "alice",
+  ],
+  [
+    PAGE.acme,
+    PRODUCT,
+    PAGE.interviews,
+    "Interview: Acme Logistics",
+    "🚚",
+    "draft",
+    "alice",
+  ],
   [PAGE.launch, PRODUCT, undefined, "Launch checklist", "✅", "draft", "priya"],
-  [PAGE.welcome, HANDBOOK, undefined, "Welcome to Northstar", "👋", "verified", "priya"],
-  [PAGE.onboarding, HANDBOOK, PAGE.welcome, "Onboarding checklist", "✅", "verified", "sam"],
-  [PAGE.directory, HANDBOOK, undefined, "Team directory", "👥", "verified", "priya"],
+  [
+    PAGE.welcome,
+    HANDBOOK,
+    undefined,
+    "Welcome to Northstar",
+    "👋",
+    "verified",
+    "priya",
+  ],
+  [
+    PAGE.onboarding,
+    HANDBOOK,
+    PAGE.welcome,
+    "Onboarding checklist",
+    "✅",
+    "verified",
+    "sam",
+  ],
+  [
+    PAGE.directory,
+    HANDBOOK,
+    undefined,
+    "Team directory",
+    "👥",
+    "verified",
+    "priya",
+  ],
 ];
 
 const PAGES: readonly PageMeta[] = ROWS.map(
-  ([id, spaceId, parentId, title, icon, status, owner, starred = false], index) => ({
+  (
+    [id, spaceId, parentId, title, icon, status, owner, starred = false],
+    index,
+  ) => ({
     id,
     spaceId,
     parentId,
@@ -63,7 +176,9 @@ const PAGES: readonly PageMeta[] = ROWS.map(
     icon,
     status,
     owner,
-    updatedAt: new Date(Date.UTC(2026, 9, 28 - (index % 6), 9 + index, 30)).toISOString(),
+    updatedAt: new Date(
+      Date.UTC(2026, 9, 28 - (index % 6), 9 + index, 30),
+    ).toISOString(),
     starred,
   }),
 );

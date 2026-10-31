@@ -12,7 +12,8 @@ client's capabilities in `_meta`, and there is no session to keep.
 
 ::: facts
 
-- Transports: Streamable HTTP at `/mcp`, and standard input and output with `vellum mcp`
+- Transports: Streamable HTTP at `/mcp`, and standard input and output with
+  `vellum mcp`
 - Sign-in: OAuth 2.1 with Client ID Metadata Documents
 - Discovery: `server/discover`
 - Change feed: `subscriptions/listen`
@@ -26,7 +27,9 @@ implemented.
 
 ## Tools {#tools}
 
-`search`, `get_doc`, `get_blocks`, `get_outline`, `create_draft`, `propose_edit`, `create_issue`, `update_issue`, `add_comment`, `create_task`, `query_collection`, `upsert_rows`, `export` and `list_changes`.
+`search`, `get_doc`, `get_blocks`, `get_outline`, `get_template`,
+`create_draft`, `propose_edit`, `create_issue`, `update_issue`, `add_comment`,
+`create_task`, `query_collection`, `upsert_rows`, `export` and `list_changes`.
 
 ## Resources {#resources}
 
@@ -40,7 +43,8 @@ implemented.
 
 ## Prompts {#prompts}
 
-`summarise-space`, `write-prd`, `weekly-status`, `verify-page` and `triage-issue`.
+`summarise-space`, `write-prd`, `weekly-status`, `verify-page` and
+`triage-issue`.
 
 ## Retrieval {#retrieval}
 

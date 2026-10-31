@@ -24,7 +24,9 @@ export function useOnline(): boolean {
 }
 
 /** Subscribes the sync scheduler (or anything else) to connectivity changes. */
-export function watchConnectivity(onChange: (online: boolean) => void): () => void {
+export function watchConnectivity(
+  onChange: (online: boolean) => void,
+): () => void {
   return subscribe(() => {
     onChange(navigator.onLine);
   });

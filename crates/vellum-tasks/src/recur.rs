@@ -131,7 +131,9 @@ fn parse_list<T>(
 ) -> Result<Vec<T>, RRuleError> {
     value
         .split(',')
-        .map(|item| parse(item.trim()).ok_or_else(|| RRuleError::Value(part.to_owned())))
+        .map(|item| {
+            parse(item.trim()).ok_or_else(|| RRuleError::Value(part.to_owned()))
+        })
         .collect()
 }
 
@@ -194,29 +196,31 @@ impl FromStr for RRule {
                         "WEEKLY" => Freq::Weekly,
                         "MONTHLY" => Freq::Monthly,
                         "YEARLY" => Freq::Yearly,
-                        _ => return Err(RRuleError::Unsupported(part.to_owned())),
+                        _ => {
+                            return Err(RRuleError::Unsupported(
+                                part.to_owned(),
+                            ));
+                        }
                     });
                 }
                 "INTERVAL" => {
-                    rule.interval = value
-                        .parse()
-                        .ok()
-                        .filter(|n| *n >= 1)
-                        .ok_or_else(|| RRuleError::Value(part.to_owned()))?;
+                    rule.interval =
+                        value.parse().ok().filter(|n| *n >= 1).ok_or_else(
+                            || RRuleError::Value(part.to_owned()),
+                        )?;
                 }
                 "COUNT" => {
                     rule.count = Some(
-                        value
-                            .parse()
-                            .ok()
-                            .filter(|n| *n >= 1)
-                            .ok_or_else(|| RRuleError::Value(part.to_owned()))?,
+                        value.parse().ok().filter(|n| *n >= 1).ok_or_else(
+                            || RRuleError::Value(part.to_owned()),
+                        )?,
                     );
                 }
                 "UNTIL" => {
-                    rule.until = Some(
-                        parse_until(&value).ok_or_else(|| RRuleError::Value(part.to_owned()))?,
-                    );
+                    rule.until =
+                        Some(parse_until(&value).ok_or_else(|| {
+                            RRuleError::Value(part.to_owned())
+                        })?);
                 }
                 "BYDAY" => {
                     rule.by_day = parse_list(part, &value, |item| {
@@ -232,7 +236,8 @@ impl FromStr for RRule {
                     })?;
                 }
                 "BYMONTHDAY" => {
-                    rule.by_month_day = parse_list(part, &value, |v| parse_signed_in(v, 31))?;
+                    rule.by_month_day =
+                        parse_list(part, &value, |v| parse_signed_in(v, 31))?;
                 }
                 "BYMONTH" => {
                     rule.by_month = parse_list(part, &value, |v| {
@@ -240,11 +245,12 @@ impl FromStr for RRule {
                     })?;
                 }
                 "BYSETPOS" => {
-                    rule.by_set_pos = parse_list(part, &value, |v| parse_signed_in(v, 366))?;
+                    rule.by_set_pos =
+                        parse_list(part, &value, |v| parse_signed_in(v, 366))?;
                 }
                 "WKST" => {
-                    rule.week_start =
-                        parse_weekday(&value).ok_or_else(|| RRuleError::Value(part.to_owned()))?;
+                    rule.week_start = parse_weekday(&value)
+                        .ok_or_else(|| RRuleError::Value(part.to_owned()))?;
                 }
                 _ => return Err(RRuleError::Unsupported(part.to_owned())),
             }
@@ -282,7 +288,11 @@ impl fmt::Display for RRule {
             write!(f, ";UNTIL={}", until.strftime("%Y%m%d"))?;
         }
         if !self.by_month.is_empty() {
-            write!(f, ";BYMONTH={}", join(&self.by_month, ToString::to_string))?;
+            write!(
+                f,
+                ";BYMONTH={}",
+                join(&self.by_month, ToString::to_string)
+            )?;
         }
         if !self.by_month_day.is_empty() {
             write!(
@@ -293,7 +303,8 @@ impl fmt::Display for RRule {
         }
         if !self.by_day.is_empty() {
             let days = join(&self.by_day, |d| {
-                d.nth.map_or_else(String::new, |n| n.to_string()) + weekday_code(d.weekday)
+                d.nth.map_or_else(String::new, |n| n.to_string())
+                    + weekday_code(d.weekday)
             });
             write!(f, ";BYDAY={days}")?;
         }
@@ -331,8 +342,9 @@ fn month_day(year: i16, month: i8, day: i8) -> Option<Date> {
 /// Every date in `[first, last]` falling on `weekday`.
 fn weekdays_between(first: Date, last: Date, weekday: Weekday) -> Vec<Date> {
     let mut out = Vec::new();
-    let offset =
-        (weekday.to_monday_zero_offset() - first.weekday().to_monday_zero_offset()).rem_euclid(7);
+    let offset = (weekday.to_monday_zero_offset()
+        - first.weekday().to_monday_zero_offset())
+    .rem_euclid(7);
     let mut day = first.checked_add(i64::from(offset).days()).ok();
     while let Some(d) = day {
         if d > last {
@@ -380,14 +392,15 @@ impl RRule {
 
     fn month_day_allowed(&self, date: Date) -> bool {
         self.by_month_day.is_empty()
-            || self
-                .by_month_day
-                .iter()
-                .any(|d| month_day(date.year(), date.month(), *d).is_some_and(|m| m == date))
+            || self.by_month_day.iter().any(|d| {
+                month_day(date.year(), date.month(), *d)
+                    .is_some_and(|m| m == date)
+            })
     }
 
     fn weekday_allowed(&self, date: Date) -> bool {
-        self.by_day.is_empty() || self.by_day.iter().any(|d| d.weekday == date.weekday())
+        self.by_day.is_empty()
+            || self.by_day.iter().any(|d| d.weekday == date.weekday())
     }
 
     /// Candidate dates of one month for monthly and yearly rules.
@@ -398,7 +411,9 @@ impl RRule {
         let last = first.last_of_month();
         if self.by_day.is_empty() {
             if self.by_month_day.is_empty() {
-                return month_day(year, month, anchor.day()).into_iter().collect();
+                return month_day(year, month, anchor.day())
+                    .into_iter()
+                    .collect();
             }
             return self
                 .by_month_day
@@ -433,7 +448,9 @@ impl RRule {
                 };
                 (0..7)
                     .filter_map(|i| period.checked_add(i.days()).ok())
-                    .filter(|d| days.contains(&d.weekday()) && self.month_allowed(*d))
+                    .filter(|d| {
+                        days.contains(&d.weekday()) && self.month_allowed(*d)
+                    })
                     .collect()
             }
             Freq::Monthly => {
@@ -457,12 +474,15 @@ impl RRule {
                     } else {
                         self.by_month.clone()
                     };
-                    let only_month_days = self.by_day.is_empty() && self.by_month_day.is_empty();
+                    let only_month_days =
+                        self.by_day.is_empty() && self.by_month_day.is_empty();
                     months
                         .into_iter()
                         .flat_map(|m| {
                             if only_month_days {
-                                month_day(year, m, anchor.day()).into_iter().collect()
+                                month_day(year, m, anchor.day())
+                                    .into_iter()
+                                    .collect()
                             } else {
                                 self.expand_month(year, m, anchor)
                             }
@@ -634,7 +654,8 @@ pub fn next_occurrence(
             let mut next_rule = rule.clone();
             if let Some(count) = rule.count {
                 // Each completion uses one occurrence, wherever it fell.
-                next_rule.count = Some(count.checked_sub(1).filter(|c| *c > 0)?);
+                next_rule.count =
+                    Some(count.checked_sub(1).filter(|c| *c > 0)?);
             }
             let unbounded = RRule {
                 count: None,
@@ -760,7 +781,10 @@ mod tests {
             take("FREQ=WEEKLY;UNTIL=20260115T000000Z", date(2026, 1, 1), 5),
             ["2026-01-01", "2026-01-08", "2026-01-15"]
         );
-        assert!(take("FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=30", date(2026, 1, 1), 1).is_empty());
+        assert!(
+            take("FREQ=YEARLY;BYMONTH=2;BYMONTHDAY=30", date(2026, 1, 1), 1)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -807,12 +831,22 @@ mod tests {
     #[test]
     fn count_runs_out() {
         let r = rule("FREQ=DAILY;COUNT=2");
-        let next =
-            next_occurrence(&r, RecurFrom::Schedule, date(2026, 1, 1), date(2026, 1, 1)).unwrap();
+        let next = next_occurrence(
+            &r,
+            RecurFrom::Schedule,
+            date(2026, 1, 1),
+            date(2026, 1, 1),
+        )
+        .unwrap();
         assert_eq!(next.date, date(2026, 1, 2));
         assert_eq!(next.rule.count, Some(1));
         assert_eq!(
-            next_occurrence(&next.rule, RecurFrom::Schedule, next.date, next.date),
+            next_occurrence(
+                &next.rule,
+                RecurFrom::Schedule,
+                next.date,
+                next.date
+            ),
             None
         );
         let r = rule("FREQ=DAILY;COUNT=1");

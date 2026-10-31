@@ -10,7 +10,9 @@ use std::time::{Duration, Instant};
 
 use axum::Router;
 use axum::body::{Body, Bytes, to_bytes};
-use axum::extract::{ConnectInfo, MatchedPath, RawPathParams, RawQuery, Request, State};
+use axum::extract::{
+    ConnectInfo, MatchedPath, RawPathParams, RawQuery, Request, State,
+};
 use axum::middleware::{Next, from_fn_with_state};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{MethodRouter, get, on, post};
@@ -36,7 +38,9 @@ use crate::idempotency::{
 use crate::public::{NothingPublished, PublicSite};
 use crate::registry::{RegisteredOp, Registry};
 use crate::request_id::REQUEST_ID;
-use crate::security::{CSRF_HEADER, Surface, apply_headers, check_csrf, csrf_token};
+use crate::security::{
+    CSRF_HEADER, Surface, apply_headers, check_csrf, csrf_token,
+};
 use crate::{graphql, input, openapi};
 use vellum_observe::server_timing::collect;
 use vellum_observe::{RequestObservation, RouteMetrics, UNMATCHED_ROUTE};
@@ -49,12 +53,31 @@ const READINESS_TIMEOUT: Duration = Duration::from_secs(2);
 /// Callers tracked by the rate limiter before drained ones are evicted.
 const RATE_LIMIT_KEYS: usize = 100_000;
 
+/// A rate allowance shared by every replica of a deployment (ADR 0040,
+/// D173). The gateway's own limiter stays the first line on each replica;
+/// this one sees the requests the other replicas served too.
+pub trait SharedLimit: Send + Sync + 'static {
+    /// Counts one request by `caller` and returns how long to wait when
+    /// the cluster has used up the caller's allowance. Must not block: it
+    /// runs on every request.
+    fn hit(&self, caller: &str) -> Option<Duration>;
+}
+
+/// Says whether a request is exempt from rate limits.
+///
+/// Replicas forwarding signed live-editing joins to each other share one
+/// address, and would otherwise spend one caller's allowance for every
+/// editor they carry.
+pub type RateExempt = Arc<dyn Fn(&HeaderMap, &str) -> bool + Send + Sync>;
+
 /// A router mounted by the binary (collab rooms, MCP, downloads, auth
 /// callbacks).
 struct Mount {
     prefix: String,
     router: Router,
     csrf_exempt: bool,
+    /// The largest request body; `None` for the gateway's own limit.
+    max_body: Option<usize>,
 }
 
 /// Builds a [`Gateway`].
@@ -69,6 +92,8 @@ pub struct GatewayBuilder {
     mounts: Vec<Mount>,
     web_app: Option<Router>,
     metrics: RouteMetrics,
+    shared_limit: Option<Arc<dyn SharedLimit>>,
+    rate_exempt: Option<RateExempt>,
 }
 
 impl std::fmt::Debug for GatewayBuilder {
@@ -103,7 +128,26 @@ impl GatewayBuilder {
             mounts: Vec::new(),
             web_app: None,
             metrics: RouteMetrics::new(),
+            shared_limit: None,
+            rate_exempt: None,
         }
+    }
+
+    /// Adds a rate allowance shared with the other replicas, checked after
+    /// this replica's own limiter.
+    #[must_use]
+    pub fn shared_limit(mut self, limit: Arc<dyn SharedLimit>) -> Self {
+        self.shared_limit = Some(limit);
+        self
+    }
+
+    /// Exempts requests from rate limits when `exempt(headers, path)` says
+    /// so. Keep it cheap and strict: it must only accept requests carrying
+    /// proof, such as a signature, that another replica sent them.
+    #[must_use]
+    pub fn rate_exempt(mut self, exempt: RateExempt) -> Self {
+        self.rate_exempt = Some(exempt);
+        self
     }
 
     /// Serves a service's operations.
@@ -115,14 +159,20 @@ impl GatewayBuilder {
 
     /// Sets the authenticator (the identity service).
     #[must_use]
-    pub fn authenticator(mut self, authenticator: Arc<dyn Authenticator>) -> Self {
+    pub fn authenticator(
+        mut self,
+        authenticator: Arc<dyn Authenticator>,
+    ) -> Self {
         self.authenticator = authenticator;
         self
     }
 
     /// Sets the idempotency store.
     #[must_use]
-    pub fn idempotency_store(mut self, store: Arc<dyn IdempotencyStore>) -> Self {
+    pub fn idempotency_store(
+        mut self,
+        store: Arc<dyn IdempotencyStore>,
+    ) -> Self {
         self.idempotency = store;
         self
     }
@@ -160,6 +210,27 @@ impl GatewayBuilder {
             prefix: prefix.into(),
             router,
             csrf_exempt: false,
+            max_body: None,
+        });
+        self
+    }
+
+    /// Mounts an upload router under `prefix`, like [`Self::mount`] but
+    /// taking request bodies up to `max_body` bytes instead of
+    /// [`GatewayConfig::max_body_bytes`]. The router reads the caller and
+    /// checks their rights before it reads the body.
+    #[must_use]
+    pub fn mount_uploads(
+        mut self,
+        prefix: impl Into<String>,
+        router: Router,
+        max_body: usize,
+    ) -> Self {
+        self.mounts.push(Mount {
+            prefix: prefix.into(),
+            router,
+            csrf_exempt: false,
+            max_body: Some(max_body),
         });
         self
     }
@@ -169,22 +240,26 @@ impl GatewayBuilder {
     /// the CSRF check is skipped. Such routes must carry their own
     /// protection (signed assertions, PKCE).
     #[must_use]
-    pub fn mount_cross_site(mut self, prefix: impl Into<String>, router: Router) -> Self {
+    pub fn mount_cross_site(
+        mut self,
+        prefix: impl Into<String>,
+        router: Router,
+    ) -> Self {
         self.mounts.push(Mount {
             prefix: prefix.into(),
             router,
             csrf_exempt: true,
+            max_body: None,
         });
         self
     }
 
-    /// Serves the web app on the app host for every path the gateway does
-    /// not own. Paths under `/api`, `/healthz`, `/readyz`, `/collab` and
-    /// every mount prefix never reach it, matched or not, so an unknown `/auth/…` or
-    /// `/api/…` path stays the gateway's not-found, never the app's index.
-    /// It gets the edge middleware and the app's security headers, but no
-    /// authentication or rate limiting: it serves only the app's static
-    /// files.
+    /// Serves the web app on the app host for every path the gateway does not
+    /// own. Paths under `/api`, `/healthz`, `/readyz`, `/collab` and every
+    /// mount prefix never reach it, matched or not, so an unknown `/auth/…` or
+    /// `/api/…` path stays the gateway's not-found, never the app's index. It
+    /// gets the edge middleware and the app's security headers, but no
+    /// authentication or rate limiting: it serves only the app's static files.
     #[must_use]
     pub fn web_app(mut self, router: Router) -> Self {
         self.web_app = Some(router);
@@ -200,14 +275,24 @@ impl GatewayBuilder {
     pub fn build(self) -> Result<Gateway, Error> {
         let registry = Registry::new(self.services, self.breaker)?;
         let openapi = openapi::document(&registry, self.version);
-        let graphql = graphql::schema(&registry, self.version)
-            .map_err(|e| Error::new(ErrorKind::Internal, format!("invalid GraphQL schema: {e}")))?;
+        let graphql =
+            graphql::schema(&registry, self.version).map_err(|e| {
+                Error::new(
+                    ErrorKind::Internal,
+                    format!("invalid GraphQL schema: {e}"),
+                )
+            })?;
         let quota = Quota::new(
             self.config.rate_burst.max(1),
             Duration::from_secs(1) * self.config.rate_burst.max(1)
                 / self.config.rate_per_second.max(1),
         )
-        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "the rate limit must be positive"))?;
+        .ok_or_else(|| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                "the rate limit must be positive",
+            )
+        })?;
         let limiter = RateLimiter::new(quota, RATE_LIMIT_KEYS);
         let state = Arc::new(Shared {
             config: self.config,
@@ -216,6 +301,8 @@ impl GatewayBuilder {
             authenticator: self.authenticator,
             idempotency: self.idempotency,
             limiter,
+            cluster_limit: self.shared_limit,
+            rate_exempt: self.rate_exempt,
             draining: AtomicBool::new(false),
             openapi,
             graphql,
@@ -236,6 +323,8 @@ struct Shared {
     authenticator: Arc<dyn Authenticator>,
     idempotency: Arc<dyn IdempotencyStore>,
     limiter: RateLimiter<String>,
+    cluster_limit: Option<Arc<dyn SharedLimit>>,
+    rate_exempt: Option<RateExempt>,
     draining: AtomicBool,
     openapi: Value,
     graphql: async_graphql::dynamic::Schema,
@@ -265,17 +354,19 @@ impl Gateway {
         let app = self.app.clone();
         let public = self.public.clone();
         let public_host = self.state.config.public_host();
-        Router::new().fallback_service(tower::service_fn(move |request: Request| {
-            let is_public = public_host
-                .as_deref()
-                .is_some_and(|host| request_host(request.headers()) == host);
-            let router = if is_public {
-                public.clone()
-            } else {
-                app.clone()
-            };
-            tower::ServiceExt::oneshot(router, request)
-        }))
+        Router::new().fallback_service(tower::service_fn(
+            move |request: Request| {
+                let is_public = public_host.as_deref().is_some_and(|host| {
+                    request_host(request.headers()) == host
+                });
+                let router = if is_public {
+                    public.clone()
+                } else {
+                    app.clone()
+                };
+                tower::ServiceExt::oneshot(router, request)
+            },
+        ))
     }
 
     /// Marks the process as draining: `/readyz` fails so load balancers stop
@@ -333,8 +424,12 @@ fn edge(router: Router, state: &Arc<Shared>, surface: Surface) -> Router {
     router
         .layer(CatchPanicLayer::custom(
             |_: Box<dyn std::any::Any + Send>| {
-                ErrorResponse::of(ErrorKind::Internal, "panic", RequestId::generate())
-                    .into_response()
+                ErrorResponse::of(
+                    ErrorKind::Internal,
+                    "panic",
+                    RequestId::generate(),
+                )
+                .into_response()
             },
         ))
         .layer(from_fn_with_state((Arc::clone(state), surface), observe))
@@ -364,7 +459,8 @@ async fn observe(
         &id.to_string(),
     );
     let span = obs.span().clone();
-    let (mut response, timings) = collect(next.run(request).instrument(span)).await;
+    let (mut response, timings) =
+        collect(next.run(request).instrument(span)).await;
     let done = obs.finish(response.status().as_u16(), timings);
     let headers = response.headers_mut();
     if let Ok(value) = HeaderValue::from_str(&id.to_string()) {
@@ -377,9 +473,35 @@ async fn observe(
     response
 }
 
+/// How long `caller` must wait, if this replica's limiter or the shared
+/// allowance refuses the request.
+fn limited(
+    state: &Shared,
+    caller: &str,
+    request: &Request,
+) -> Option<Duration> {
+    if state
+        .rate_exempt
+        .as_ref()
+        .is_some_and(|exempt| exempt(request.headers(), request.uri().path()))
+    {
+        return None;
+    }
+    if let Err(limited) =
+        state.limiter.check(&caller.to_owned(), Instant::now())
+    {
+        return Some(limited.retry_after);
+    }
+    state
+        .cluster_limit
+        .as_ref()
+        .and_then(|shared| shared.hit(caller))
+}
+
 #[derive(Clone, Copy)]
 struct Protect {
     csrf: bool,
+    max_body: usize,
 }
 
 async fn protect(
@@ -392,7 +514,13 @@ async fn protect(
     let meta = RequestMeta {
         headers: request.headers().clone(),
         client_ip: ip,
-        path: request.uri().path().to_owned(),
+        // Inside a mounted router the URI has lost its mount prefix; the
+        // authenticator sees the path the client asked for.
+        path: request
+            .extensions()
+            .get::<axum::extract::OriginalUri>()
+            .map_or_else(|| request.uri().path(), |original| original.0.path())
+            .to_owned(),
     };
     let authenticated = match state.authenticator.authenticate(&meta).await {
         Ok(a) => a,
@@ -402,13 +530,21 @@ async fn protect(
         .principal
         .user_id()
         .map(|u| format!("user:{u}"))
-        .or_else(|| ip.map(|ip| format!("ip:{ip}")))
+        // An IPv6 client counts as its /64, so rotating addresses inside
+        // it does not reset the limit.
+        .or_else(|| {
+            ip.map(|ip| {
+                format!("ip:{}", vellum_security::rate::client_bucket(ip))
+            })
+        })
         .unwrap_or_else(|| "anonymous".to_owned());
-    if let Err(limited) = state.limiter.check(&caller, Instant::now()) {
-        let wait = limited.retry_after;
-        let mut response =
-            ErrorResponse::of(ErrorKind::RateLimited, "too many requests; slow down", id)
-                .into_response();
+    if let Some(wait) = limited(&state, &caller, &request) {
+        let mut response = ErrorResponse::of(
+            ErrorKind::RateLimited,
+            "too many requests; slow down",
+            id,
+        )
+        .into_response();
         let seconds = wait.as_secs().max(1).to_string();
         if let Ok(value) = HeaderValue::from_str(&seconds) {
             let _ = response.headers_mut().insert(header::RETRY_AFTER, value);
@@ -435,12 +571,19 @@ async fn protect(
     if request.headers().contains_key(&IDEMPOTENCY_KEY)
         && crate::security::is_unsafe(request.method())
     {
-        return idempotent(&state, caller, request, next).await;
+        return idempotent(&state, caller, request, next, policy.max_body)
+            .await;
     }
     next.run(request).await
 }
 
-async fn idempotent(state: &Shared, caller: String, request: Request, next: Next) -> Response {
+async fn idempotent(
+    state: &Shared,
+    caller: String,
+    request: Request,
+    next: Next,
+    max_body: usize,
+) -> Response {
     let id = request_id(&request);
     let key = request
         .headers()
@@ -457,9 +600,13 @@ async fn idempotent(state: &Shared, caller: String, request: Request, next: Next
         .into_response();
     };
     let (parts, body) = request.into_parts();
-    let Ok(bytes) = to_bytes(body, state.config.max_body_bytes).await else {
-        return ErrorResponse::of(ErrorKind::InvalidInput, "the request body is too large", id)
-            .into_response();
+    let Ok(bytes) = to_bytes(body, max_body).await else {
+        return ErrorResponse::of(
+            ErrorKind::InvalidInput,
+            "the request body is too large",
+            id,
+        )
+        .into_response();
     };
     let mut hasher = Sha256::new();
     hasher.update(parts.method.as_str());
@@ -528,20 +675,30 @@ async fn idempotent(state: &Shared, caller: String, request: Request, next: Next
                 }
             } else {
                 state.idempotency.abandon(scoped).await;
-                ErrorResponse::of(ErrorKind::Internal, "response too large to store", id)
-                    .into_response()
+                ErrorResponse::of(
+                    ErrorKind::Internal,
+                    "response too large to store",
+                    id,
+                )
+                .into_response()
             }
         }
     }
 }
 
-fn layered(router: Router, state: &Arc<Shared>, csrf: bool) -> Router {
+fn layered(
+    router: Router,
+    state: &Arc<Shared>,
+    csrf: bool,
+    max_body: Option<usize>,
+) -> Router {
+    let max_body = max_body.unwrap_or(state.config.max_body_bytes);
     router
         .layer(from_fn_with_state(
-            (Arc::clone(state), Protect { csrf }),
+            (Arc::clone(state), Protect { csrf, max_body }),
             protect,
         ))
-        .layer(RequestBodyLimitLayer::new(state.config.max_body_bytes))
+        .layer(RequestBodyLimitLayer::new(max_body))
 }
 
 /// Whether `path` is `prefix` itself or below it.
@@ -550,7 +707,11 @@ fn under(path: &str, prefix: &str) -> bool {
         .is_some_and(|rest| rest.is_empty() || rest.starts_with('/'))
 }
 
-fn app_router(state: &Arc<Shared>, mounts: Vec<Mount>, web_app: Option<Router>) -> Router {
+fn app_router(
+    state: &Arc<Shared>,
+    mounts: Vec<Mount>,
+    web_app: Option<Router>,
+) -> Router {
     // `/collab` is the live-editing socket's, mounted or not.
     let mut owned: Vec<String> = ["/api", "/healthz", "/readyz", "/collab"]
         .into_iter()
@@ -562,15 +723,17 @@ fn app_router(state: &Arc<Shared>, mounts: Vec<Mount>, web_app: Option<Router>) 
         return gateway;
     };
     let web_app = edge(web_app, state, Surface::App);
-    Router::new().fallback_service(tower::service_fn(move |request: Request| {
-        let path = request.uri().path();
-        let router = if owned.iter().any(|prefix| under(path, prefix)) {
-            gateway.clone()
-        } else {
-            web_app.clone()
-        };
-        tower::ServiceExt::oneshot(router, request)
-    }))
+    Router::new().fallback_service(tower::service_fn(
+        move |request: Request| {
+            let path = request.uri().path();
+            let router = if owned.iter().any(|prefix| under(path, prefix)) {
+                gateway.clone()
+            } else {
+                web_app.clone()
+            };
+            tower::ServiceExt::oneshot(router, request)
+        },
+    ))
 }
 
 fn gateway_router(state: &Arc<Shared>, mounts: Vec<Mount>) -> Router {
@@ -587,6 +750,7 @@ fn gateway_router(state: &Arc<Shared>, mounts: Vec<Mount>) -> Router {
         api.fallback(api_not_found).with_state(Arc::clone(state)),
         state,
         true,
+        None,
     );
     let mut app = Router::new()
         .route("/healthz", get(healthz))
@@ -596,13 +760,15 @@ fn gateway_router(state: &Arc<Shared>, mounts: Vec<Mount>) -> Router {
     for mount in mounts {
         app = app.nest(
             &mount.prefix,
-            layered(mount.router, state, !mount.csrf_exempt),
+            layered(mount.router, state, !mount.csrf_exempt, mount.max_body),
         );
     }
     edge(app, state, Surface::App)
 }
 
-fn operation_route(registered: &Arc<RegisteredOp>) -> MethodRouter<Arc<Shared>> {
+fn operation_route(
+    registered: &Arc<RegisteredOp>,
+) -> MethodRouter<Arc<Shared>> {
     let filter = match registered.op.method() {
         HttpMethod::Get => axum::routing::MethodFilter::GET,
         HttpMethod::Post => axum::routing::MethodFilter::POST,
@@ -665,13 +831,65 @@ async fn rest(
             .map(str::to_owned),
     };
     match registered.invoke(ctx, input).await {
+        Ok(output) if op.revalidates() => conditional(&output, headers),
         Ok(output) => Json(output).into_response(),
         Err(e) => ErrorResponse::new(e, id).into_response(),
     }
 }
 
+/// The answer to a query that browsers may revalidate (ADR 0061, D270): a
+/// weak `ETag` over the JSON, `Cache-Control: private, no-cache`, and `304
+/// Not Modified` without a body when `If-None-Match` names that tag. The
+/// tag is weak because the compression layer may re-encode the body.
+fn conditional(output: &Value, headers: &HeaderMap) -> Response {
+    let Ok(body) = serde_json::to_vec(output) else {
+        return Json(output).into_response();
+    };
+    let digest = Sha256::digest(&body);
+    let mut tag = String::with_capacity(36);
+    tag.push_str("W/\"");
+    for byte in digest.iter().take(16) {
+        use std::fmt::Write as _;
+        let _ = write!(tag, "{byte:02x}");
+    }
+    tag.push('"');
+    let matches = headers
+        .get_all(header::IF_NONE_MATCH)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(','))
+        .map(str::trim)
+        .any(|candidate| {
+            candidate == "*"
+                || candidate.trim_start_matches("W/")
+                    == tag.trim_start_matches("W/")
+        });
+    let mut response = if matches {
+        StatusCode::NOT_MODIFIED.into_response()
+    } else {
+        (
+            [(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            )],
+            body,
+        )
+            .into_response()
+    };
+    let headers = response.headers_mut();
+    if let Ok(value) = HeaderValue::from_str(&tag) {
+        let _ = headers.insert(header::ETAG, value);
+    }
+    let _ = headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, no-cache"),
+    );
+    response
+}
+
 async fn api_not_found(Extension(id): Extension<RequestId>) -> Response {
-    ErrorResponse::of(ErrorKind::NotFound, "no such API route", id).into_response()
+    ErrorResponse::of(ErrorKind::NotFound, "no such API route", id)
+        .into_response()
 }
 
 async fn openapi_json(State(state): State<Arc<Shared>>) -> Response {
@@ -712,10 +930,24 @@ async fn csrf(
     Extension(auth): Extension<Authenticated>,
 ) -> Response {
     auth.csrf_binding.map_or_else(
-        || ErrorResponse::of(ErrorKind::Unauthenticated, "no browser session", id).into_response(),
+        || {
+            ErrorResponse::of(
+                ErrorKind::Unauthenticated,
+                "no browser session",
+                id,
+            )
+            .into_response()
+        },
         |binding| {
-            let mut response = Json(json!({ "token": csrf_token(&state.config.csrf_key, &binding), "header": CSRF_HEADER.as_str() })).into_response();
-            let _ = response.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            let mut response = Json(json!({
+                "token": csrf_token(&state.config.csrf_key, &binding),
+                "header": CSRF_HEADER.as_str()
+            }))
+            .into_response();
+            let _ = response.headers_mut().insert(
+                header::CACHE_CONTROL,
+                HeaderValue::from_static("no-store"),
+            );
             response
         },
     )
@@ -736,9 +968,12 @@ async fn readyz(State(state): State<Arc<Shared>>) -> Response {
     let mut ready = true;
     let mut services = serde_json::Map::new();
     for service in state.registry.services() {
-        let readiness = tokio::time::timeout(READINESS_TIMEOUT, service.readiness())
-            .await
-            .unwrap_or_else(|_| Readiness::NotReady("readiness probe timed out".into()));
+        let readiness =
+            tokio::time::timeout(READINESS_TIMEOUT, service.readiness())
+                .await
+                .unwrap_or_else(|_| {
+                    Readiness::NotReady("readiness probe timed out".into())
+                });
         ready &= !matches!(readiness, Readiness::NotReady(_));
         let _ = services.insert(
             service.name().to_owned(),
@@ -750,6 +985,9 @@ async fn readyz(State(state): State<Arc<Shared>>) -> Response {
     } else {
         StatusCode::SERVICE_UNAVAILABLE
     };
-    let body = json!({ "status": if ready { "ready" } else { "not_ready" }, "services": services });
+    let body = json!({
+        "status": if ready { "ready" } else { "not_ready" },
+        "services": services
+    });
     (status, Json(body)).into_response()
 }

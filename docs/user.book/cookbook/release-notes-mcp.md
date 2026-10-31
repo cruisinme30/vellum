@@ -11,10 +11,14 @@ completed in a cycle, review the draft in Vellum and publish it.
 
 ## Steps
 
-1. Connect Claude Desktop to Vellum with the `write:draft` and `work` scopes, as in [Connect Claude](../ai/README.md).
-2. In Claude, ask: "Draft release notes for ENG cycle 2027-C04 in the Release notes folder. Group by feature, fix and chore, and link each issue."
-3. Claude calls `list_changes` and `search` to find the completed issues, then `create_draft` to write the page.
-4. In Vellum, open the draft from your Inbox. It shows "Drafted by Claude for Priya Shah".
+1. Connect Claude Desktop to Vellum with the `write:draft` and `work` scopes, as
+   in [Connect Claude](../ai/README.md).
+2. In Claude, ask: "Draft release notes for ENG cycle 2027-C04 in the Release
+   notes folder. Group by feature, fix and chore, and link each issue."
+3. Claude calls `list_changes` and `search` to find the completed issues, then
+   `create_draft` to write the page.
+4. In Vellum, open the draft from your Inbox. It shows "Drafted by Claude for
+   Priya Shah".
 5. Edit what needs editing, then select **Accept**.
 
 The page is now an ordinary page, with Claude's draft and your edits in

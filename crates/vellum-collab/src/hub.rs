@@ -278,7 +278,8 @@ impl Hub {
         for _ in 0..JOIN_ATTEMPTS {
             let entry = self.room(request.room);
             let peer = PeerId(self.next_peer.fetch_add(1, Ordering::Relaxed));
-            let (tx, outbound) = mpsc::channel(self.deps.config.peer_queue.max(1));
+            let (tx, outbound) =
+                mpsc::channel(self.deps.config.peer_queue.max(1));
             let (reply, joined) = oneshot::channel();
             let command = Command::Join {
                 peer,
@@ -336,7 +337,11 @@ impl Hub {
     /// # Errors
     ///
     /// When the Markdown cannot be converted.
-    pub async fn apply_markdown(&self, room: RoomKey, markdown: String) -> Result<bool> {
+    pub async fn apply_markdown(
+        &self,
+        room: RoomKey,
+        markdown: String,
+    ) -> Result<bool> {
         let Some(entry) = self.registry.lock().get(&room).cloned() else {
             return Ok(false);
         };
@@ -368,8 +373,17 @@ impl Hub {
     /// # Errors
     ///
     /// When the room cannot be loaded or the Markdown cannot be converted.
-    #[tracing::instrument(name = "collab.merge_markdown", skip_all, fields(room = %room), err)]
-    pub async fn merge_markdown(&self, room: RoomKey, markdown: String) -> Result<()> {
+    #[tracing::instrument(
+        name = "collab.merge_markdown",
+        skip_all,
+        fields(room = %room),
+        err
+    )]
+    pub async fn merge_markdown(
+        &self,
+        room: RoomKey,
+        markdown: String,
+    ) -> Result<()> {
         // A page never edited live has no log; its first room reads the file.
         let open = self.registry.lock().contains_key(&room);
         if !open && self.deps.store.load(room).await?.is_empty() {
@@ -397,7 +411,12 @@ impl Hub {
 
     /// Changes a user's access to an open room at once: `None` disconnects
     /// their connections, `Read` stops applying their edits.
-    pub fn set_access(&self, room: RoomKey, user: UserId, access: Option<Access>) {
+    pub fn set_access(
+        &self,
+        room: RoomKey,
+        user: UserId,
+        access: Option<Access>,
+    ) {
         if let Some(entry) = self.registry.lock().get(&room) {
             let _closed = entry.ctl.send(Control::SetAccess { user, access });
         }
@@ -431,7 +450,8 @@ impl Hub {
     /// Drains every room: appends pending updates, writes Markdown
     /// versions and closes connections so editors reconnect elsewhere.
     pub async fn shutdown(&self) {
-        let entries: Vec<RoomEntry> = self.registry.lock().values().cloned().collect();
+        let entries: Vec<RoomEntry> =
+            self.registry.lock().values().cloned().collect();
         let mut acks = Vec::with_capacity(entries.len());
         for entry in entries {
             let (ack, done) = oneshot::channel();

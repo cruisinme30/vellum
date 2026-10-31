@@ -30,7 +30,11 @@ pub(super) fn parse_rfc3339(s: &str) -> Option<SystemTime> {
     sep(16, b":")?;
     let (year, month, day) = (num(0, 4)?, num(5, 7)?, num(8, 10)?);
     let (hour, minute, second) = (num(11, 13)?, num(14, 16)?, num(17, 19)?);
-    if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || minute > 59 {
+    if !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || hour > 23
+        || minute > 59
+    {
         return None;
     }
     // Leap seconds (`:60`) are folded into the next second.
@@ -70,11 +74,16 @@ pub(super) fn parse_rfc3339(s: &str) -> Option<SystemTime> {
         }
     };
 
-    let secs =
-        days_from_civil(year, month, day) * 86_400 + hour * 3600 + minute * 60 + second - offset;
+    let secs = days_from_civil(year, month, day) * 86_400
+        + hour * 3600
+        + minute * 60
+        + second
+        - offset;
     let nanos = Duration::from_nanos(u64::from(nanos));
     if secs >= 0 {
-        Some(UNIX_EPOCH + Duration::from_secs(u64::try_from(secs).ok()?) + nanos)
+        Some(
+            UNIX_EPOCH + Duration::from_secs(u64::try_from(secs).ok()?) + nanos,
+        )
     } else {
         Some(UNIX_EPOCH - Duration::from_secs(secs.unsigned_abs()) + nanos)
     }
@@ -88,7 +97,8 @@ const fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let year_of_era = year - era * 400;
     let month_index = (month + 9) % 12;
     let day_of_year = (153 * month_index + 2) / 5 + day - 1;
-    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let day_of_era =
+        year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
     era * 146_097 + day_of_era - 719_468
 }
 

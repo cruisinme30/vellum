@@ -56,7 +56,10 @@ pub trait Access: Send + Sync + 'static {
     /// # Errors
     ///
     /// Only when the groups cannot be read.
-    async fn principals(&self, principal: &Principal) -> Result<BTreeSet<BookPrincipal>, Error>;
+    async fn principals(
+        &self,
+        principal: &Principal,
+    ) -> Result<BTreeSet<BookPrincipal>, Error>;
 
     /// Brings the engine's markers and grants on the book's sections in
     /// line with `restrictions`.
@@ -96,7 +99,8 @@ impl<S> AuthzAccess<S> {
 }
 
 fn unavailable(e: impl std::error::Error + Send + Sync + 'static) -> Error {
-    Error::new(ErrorKind::Unavailable, "access could not be checked").with_source(e)
+    Error::new(ErrorKind::Unavailable, "access could not be checked")
+        .with_source(e)
 }
 
 /// The engine subject for a request principal, if it has one.
@@ -119,7 +123,9 @@ impl<S: AuthzStore + 'static> Access for AuthzAccess<S> {
         book: BookId,
         dir: &BlobPath,
     ) -> Result<Option<Relation>, Error> {
-        let (Some(who), Some(space)) = (subject(principal), (self.space_of)(dir)) else {
+        let (Some(who), Some(space)) =
+            (subject(principal), (self.space_of)(dir))
+        else {
             return Ok(None);
         };
         let decision = self
@@ -130,20 +136,27 @@ impl<S: AuthzStore + 'static> Access for AuthzAccess<S> {
         Ok(decision.relation.filter(|_| decision.allowed))
     }
 
-    async fn principals(&self, principal: &Principal) -> Result<BTreeSet<BookPrincipal>, Error> {
+    async fn principals(
+        &self,
+        principal: &Principal,
+    ) -> Result<BTreeSet<BookPrincipal>, Error> {
         let Some(user) = principal.user_id() else {
             return Ok(BTreeSet::new());
         };
-        let invalid = |e| Error::new(ErrorKind::Internal, "bad principal").with_source(e);
-        let mut out = BTreeSet::from([BookPrincipal::user(user).map_err(invalid)?]);
+        let invalid =
+            |e| Error::new(ErrorKind::Internal, "bad principal").with_source(e);
+        let mut out =
+            BTreeSet::from([BookPrincipal::user(user).map_err(invalid)?]);
         let groups = self
             .authz
             .groups_of(vellum_authz::Principal::User(Id(user.as_u128())))
             .await
             .map_err(unavailable)?;
         for group in groups {
-            let _ =
-                out.insert(BookPrincipal::group(ObjectId::from_u128(group.0)).map_err(invalid)?);
+            let _ = out.insert(
+                BookPrincipal::group(ObjectId::from_u128(group.0))
+                    .map_err(invalid)?,
+            );
         }
         Ok(out)
     }

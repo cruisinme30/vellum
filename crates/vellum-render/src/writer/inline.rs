@@ -9,7 +9,8 @@ use super::Writer;
 use crate::html::{self, push_attr};
 
 const MONTHS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct",
+    "Nov", "Dec",
 ];
 
 /// `2026-11-24` → `Nov 24, 2026`.
@@ -26,7 +27,9 @@ fn display_date(iso: &str) -> Option<String> {
 /// `vellum://` URLs are mapped by the resolver.
 pub(super) fn safe_url(w: &Writer<'_>, url: &str) -> Option<String> {
     let url = url.trim();
-    if url.is_empty() || url.chars().any(|c| c.is_control() || html::is_invisible(c)) {
+    if url.is_empty()
+        || url.chars().any(|c| c.is_control() || html::is_invisible(c))
+    {
         return None;
     }
     if url.starts_with("vellum://") {
@@ -34,14 +37,16 @@ pub(super) fn safe_url(w: &Writer<'_>, url: &str) -> Option<String> {
     }
     // Same-page links follow the prefixed ids.
     if let Some(fragment) = url.strip_prefix('#') {
-        return html::is_user_id(fragment).then(|| format!("#{}{fragment}", super::ID_PREFIX));
+        return html::is_user_id(fragment)
+            .then(|| format!("#{}{fragment}", super::ID_PREFIX));
     }
     let scheme_end = url.find(':');
     let path_start = url.find(['/', '?', '#']);
     match (scheme_end, path_start) {
         (Some(c), p) if p.is_none_or(|p| c < p) => {
             let scheme = url.get(..c)?.to_ascii_lowercase();
-            matches!(scheme.as_str(), "http" | "https" | "mailto" | "tel").then(|| url.to_owned())
+            matches!(scheme.as_str(), "http" | "https" | "mailto" | "tel")
+                .then(|| url.to_owned())
         }
         _ => Some(url.to_owned()),
     }
@@ -55,10 +60,11 @@ pub(super) fn safe_image(url: &str) -> Option<String> {
         .find(':')
         .filter(|c| lower.find(['/', '?', '#']).is_none_or(|p| *c < p));
     match scheme {
-        Some(_) => {
-            (lower.starts_with("https://") || lower.starts_with("http://")).then(|| url.to_owned())
-        }
-        None => (!url.is_empty() && !url.chars().any(char::is_control)).then(|| url.to_owned()),
+        Some(_) => (lower.starts_with("https://")
+            || lower.starts_with("http://"))
+        .then(|| url.to_owned()),
+        None => (!url.is_empty() && !url.chars().any(char::is_control))
+            .then(|| url.to_owned()),
     }
 }
 
@@ -111,7 +117,10 @@ impl Writer<'_> {
                     self.out.push_str("</a>");
                 }
                 None => {
-                    self.warn(format!("link to {url:?} was removed: only http, https, mailto, tel and relative links are allowed"));
+                    self.warn(format!(
+                        "link to {url:?} was removed: only http, \
+                        https, mailto, tel and relative links are allowed"
+                    ));
                     self.wrap("span", content);
                 }
             },
@@ -119,7 +128,11 @@ impl Writer<'_> {
                 Some(src) => {
                     self.out.push_str("<img");
                     push_attr(&mut self.out, "src", &src);
-                    push_attr(&mut self.out, "alt", &vellum_format::plain_text(alt));
+                    push_attr(
+                        &mut self.out,
+                        "alt",
+                        &vellum_format::plain_text(alt),
+                    );
                     if !title.is_empty() {
                         push_attr(&mut self.out, "title", title);
                     }
@@ -127,12 +140,15 @@ impl Writer<'_> {
                 }
                 None => {
                     self.warn(format!(
-                        "image {url:?} was removed: only https and relative images are allowed"
+                        "image {url:?} was removed: only https and relative \
+                            images are allowed"
                     ));
                     html::text(&mut self.out, &vellum_format::plain_text(alt));
                 }
             },
-            Inline::WikiLink { target, label } => self.wikilink(target, label.as_deref()),
+            Inline::WikiLink { target, label } => {
+                self.wikilink(target, label.as_deref());
+            }
             Inline::Mention { handle } => {
                 let name = self.resolver().mention(handle);
                 self.out.push_str("<span class=\"vl-mention\"");
@@ -161,8 +177,10 @@ impl Writer<'_> {
             Inline::Date { date } => {
                 if date == "today" {
                     // Stays relative: the client renders the reader's today.
-                    self.out
-                        .push_str("<time class=\"vl-date\" data-relative=\"today\">Today</time>");
+                    self.out.push_str(
+                        "<time class=\"vl-date\" \
+                            data-relative=\"today\">Today</time>",
+                    );
                 } else {
                     self.out.push_str("<time class=\"vl-date\"");
                     push_attr(&mut self.out, "datetime", date);
@@ -190,7 +208,11 @@ impl Writer<'_> {
                 self.out
                     .push_str("<span class=\"vl-wikilink vl-unresolved\"");
                 push_attr(&mut self.out, "data-target", target);
-                push_attr(&mut self.out, "title", "No page with this title yet");
+                push_attr(
+                    &mut self.out,
+                    "title",
+                    "No page with this title yet",
+                );
                 self.out.push('>');
                 html::text(&mut self.out, label.unwrap_or(target));
                 self.out.push_str("</span>");

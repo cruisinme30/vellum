@@ -8,7 +8,9 @@ export interface Destination {
   readonly icon: string;
 }
 
-/** Rail order: New, Home, Search, Favorites, Inbox, Data, Theme, Help, Admin. */
+/**
+ * Rail order: New, Home, Search, Favorites, Inbox, Data, Theme, Help, Admin.
+ */
 export const DESTINATIONS = {
   home: { id: "home", path: "/", icon: "home" },
   search: { id: "search", path: "/search", icon: "search" },

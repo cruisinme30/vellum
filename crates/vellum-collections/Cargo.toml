@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-collections"
-description = "Collections: schemas, rows, relations, rollups, formulas, views and the collections service."
+description = """\
+    Collections: schemas, rows, relations, rollups, formulas, views and the \
+    collections service."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -24,8 +26,12 @@ csv = "1.4.0"
 futures = "0.3.34"
 opentelemetry = "0.33.1"
 serde = { version = "1.0.229", features = ["derive"] }
-schemars = { version = "1.2.3", default-features = false, features = ["std", "derive"] }
-serde-saphyr = { version = "2.0.0", default-features = false, features = ["serialize", "deserialize"] }
+schemars.version = "1.2.3"
+schemars.default-features = false
+schemars.features = ["std", "derive"]
+serde-saphyr.version = "2.0.0"
+serde-saphyr.default-features = false
+serde-saphyr.features = ["serialize", "deserialize"]
 thiserror = "2.0.21"
 time = "0.3.55"
 tokio = { version = "1.49.0", features = ["sync"] }
@@ -36,7 +42,7 @@ vellum-kernel.workspace = true
 vellum-store = { path = "../vellum-store" }
 
 [dev-dependencies]
-proptest = ">=1.11.0, <1.12"
+proptest = ">=1.11.0, <1.13"
 serde_json = "1.0.154"
 tempfile = "3.27.0"
 tokio = { version = "1.49.0", features = ["macros", "rt"] }

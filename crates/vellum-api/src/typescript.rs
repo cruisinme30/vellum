@@ -21,8 +21,10 @@ pub const HEADER: &str = concat!(
     "FileCopyrightText: 2026 The Vellum contributors\n",
     "// SPDX-",
     "License-Identifier: AGPL-3.0-only\n\n",
-    "// Generated from the server's operations by `vellum openapi --typescript`.\n",
-    "// Do not edit: run `VELLUM_BLESS=1 cargo test -p vellum-cli typescript_client`.\n",
+    "// Generated from the server's operations by `vellum openapi \
+        --typescript`.\n",
+    "// Do not edit: run `VELLUM_BLESS=1 cargo test -p vellum-cli \
+        typescript_client`.\n",
 );
 
 /// The deepest schema nesting rendered; deeper parts become `unknown`.
@@ -51,7 +53,9 @@ fn type_name(name: &str) -> String {
 
 fn literal(value: &Value) -> String {
     match value {
-        Value::String(_) | Value::Number(_) | Value::Bool(_) | Value::Null => value.to_string(),
+        Value::String(_) | Value::Number(_) | Value::Bool(_) | Value::Null => {
+            value.to_string()
+        }
         _ => "unknown".to_owned(),
     }
 }
@@ -120,7 +124,9 @@ fn object_type(schema: &Map<String, Value>, depth: usize) -> String {
     let properties = schema.get("properties").and_then(Value::as_object);
     let extra = match schema.get("additionalProperties") {
         Some(Value::Bool(false)) => None,
-        Some(Value::Object(s)) => Some(ts_type(&Value::Object(s.clone()), depth + 1)),
+        Some(Value::Object(s)) => {
+            Some(ts_type(&Value::Object(s.clone()), depth + 1))
+        }
         // Absent or `true`: other keys may appear.
         _ if properties.is_none_or(Map::is_empty) => Some("unknown".to_owned()),
         _ => None,
@@ -158,20 +164,28 @@ fn object_type(schema: &Map<String, Value>, depth: usize) -> String {
     out
 }
 
-fn single_type(kind: &str, schema: &Map<String, Value>, depth: usize) -> String {
+fn single_type(
+    kind: &str,
+    schema: &Map<String, Value>,
+    depth: usize,
+) -> String {
     match kind {
         "string" => "string".to_owned(),
         "integer" | "number" => "number".to_owned(),
         "boolean" => "boolean".to_owned(),
         "null" => "null".to_owned(),
         "array" => {
-            if let Some(prefix) = schema.get("prefixItems").and_then(Value::as_array) {
-                let items: Vec<String> = prefix.iter().map(|s| ts_type(s, depth + 1)).collect();
+            if let Some(prefix) =
+                schema.get("prefixItems").and_then(Value::as_array)
+            {
+                let items: Vec<String> =
+                    prefix.iter().map(|s| ts_type(s, depth + 1)).collect();
                 return format!("[{}]", items.join(", "));
             }
-            let item = schema
-                .get("items")
-                .map_or_else(|| "unknown".to_owned(), |s| ts_type(s, depth + 1));
+            let item = schema.get("items").map_or_else(
+                || "unknown".to_owned(),
+                |s| ts_type(s, depth + 1),
+            );
             if item.contains(' ') || item.contains('\n') {
                 format!("Array<{item}>")
             } else {
@@ -210,7 +224,8 @@ pub fn ts_type(schema: &Value, depth: usize) -> String {
     }
     for key in ["oneOf", "anyOf"] {
         if let Some(options) = schema.get(key).and_then(Value::as_array) {
-            let mut parts: Vec<String> = options.iter().map(|o| ts_type(o, depth)).collect();
+            let mut parts: Vec<String> =
+                options.iter().map(|o| ts_type(o, depth)).collect();
             // A schema can name a type next to its variants (`type` plus
             // `oneOf` of `required` groups); the variants alone are enough
             // unless they carry no type of their own.
@@ -223,7 +238,8 @@ pub fn ts_type(schema: &Value, depth: usize) -> String {
         }
     }
     if let Some(all) = schema.get("allOf").and_then(Value::as_array) {
-        let parts: Vec<String> = all.iter().map(|o| ts_type(o, depth)).collect();
+        let parts: Vec<String> =
+            all.iter().map(|o| ts_type(o, depth)).collect();
         return match parts.len() {
             0 => "unknown".to_owned(),
             1 => parts.into_iter().next().unwrap_or_default(),
@@ -265,12 +281,14 @@ fn operations(document: &Value) -> Vec<Op> {
             continue;
         };
         for (method, op) in methods {
-            let Some(id) = op.get("x-vellum-operation").and_then(Value::as_str) else {
+            let Some(id) = op.get("x-vellum-operation").and_then(Value::as_str)
+            else {
                 continue;
             };
-            let input = op
-                .get("x-vellum-input")
-                .map_or_else(|| "Record<string, never>".to_owned(), |s| ts_type(s, 0));
+            let input = op.get("x-vellum-input").map_or_else(
+                || "Record<string, never>".to_owned(),
+                |s| ts_type(s, 0),
+            );
             let output = op
                 .pointer("/responses/200/content/application~1json/schema")
                 .map_or_else(|| "unknown".to_owned(), |s| ts_type(s, 0));
@@ -278,7 +296,8 @@ fn operations(document: &Value) -> Vec<Op> {
                 id: id.to_owned(),
                 method: method.to_uppercase(),
                 path: path.clone(),
-                mutation: op.get("x-vellum-kind").and_then(Value::as_str) == Some("mutation"),
+                mutation: op.get("x-vellum-kind").and_then(Value::as_str)
+                    == Some("mutation"),
                 input,
                 output,
                 summary: op
@@ -324,21 +343,26 @@ pub fn client(document: &Value) -> String {
         out.push_str(&doc_comment(schema, ""));
         let ts = ts_type(schema, 0);
         if ts.starts_with("{\n") && is_plain_object(schema) {
-            let _ = writeln!(out, "export interface {} {ts}\n", type_name(name));
+            let _ =
+                writeln!(out, "export interface {} {ts}\n", type_name(name));
         } else {
             let _ = writeln!(out, "export type {} = {ts};\n", type_name(name));
         }
     }
     let ops = operations(document);
-    out.push_str("/** Every operation: its method, path, input and output. */\n");
+    out.push_str(
+        "/** Every operation: its method, path, input and output. */\n",
+    );
     out.push_str("export interface Operations {\n");
     for op in &ops {
         if !op.summary.is_empty() {
-            let _ = writeln!(out, "  /** {} */", op.summary.replace("*/", "*\\/"));
+            let _ =
+                writeln!(out, "  /** {} */", op.summary.replace("*/", "*\\/"));
         }
         let _ = writeln!(
             out,
-            "  {}: {{\n    method: {};\n    path: {};\n    input: {};\n    output: {};\n  }};",
+            "  {}: {{\n    method: {};\n    path: {};\n    input: {};\n    \
+                output: {};\n  }};",
             Value::String(op.id.clone()),
             Value::String(op.method.clone()),
             Value::String(op.path.clone()),
@@ -380,7 +404,12 @@ mod tests {
             (json!({"const": 3}), "3"),
             (json!({"$ref": "#/components/schemas/NodeView"}), "NodeView"),
             (
-                json!({"anyOf": [{"$ref": "#/components/schemas/A"}, {"type": "null"}]}),
+                json!({
+                    "anyOf": [
+                        {"$ref": "#/components/schemas/A"},
+                        {"type": "null"}
+                    ]
+                }),
                 "A | null",
             ),
             (
@@ -392,7 +421,10 @@ mod tests {
                 "Array<string | null>",
             ),
             (
-                json!({"type": "object", "additionalProperties": {"type": "number"}}),
+                json!({
+                    "type": "object",
+                    "additionalProperties": {"type": "number"}
+                }),
                 "Record<string, number>",
             ),
             (json!({"type": "object"}), "Record<string, unknown>"),
@@ -410,7 +442,8 @@ mod tests {
         // `preserve_order` is on.
         let mut properties = Map::new();
         for name in ["zeta", "mid", "alpha"] {
-            let _ = properties.insert(name.to_owned(), json!({"type": "string"}));
+            let _ =
+                properties.insert(name.to_owned(), json!({"type": "string"}));
         }
         let schema = json!({
             "type": "object",
@@ -434,7 +467,8 @@ mod tests {
         });
         assert_eq!(
             ts_type(&schema, 0),
-            "{\n  /**\n   * The ID.\n   */\n  id: string;\n  \"x-count\"?: number;\n}"
+            "{\n  /**\n   * The ID.\n   */\n  id: string;\n  \"x-count\"?: \
+                number;\n}"
         );
     }
 
@@ -469,7 +503,8 @@ mod tests {
             "{ts}"
         );
         assert!(ts.contains(
-            "\"drive.get\": { method: \"GET\", path: \"/v1/drive/items/{id}\", mutation: false },"
+            "\"drive.get\": { method: \"GET\", path: \"/v1/drive/items/{id}\", \
+                mutation: false },"
         ));
     }
 }

@@ -8,7 +8,11 @@ import { describe, expect, it, vi } from "vitest";
 import type { CollabConnector } from "../editor/collab/provider";
 
 import { createNorthstarStore } from "./mock/northstar";
-import { useServices, useWorkspace, WorkspaceProvider } from "./workspace-context";
+import {
+  useServices,
+  useWorkspace,
+  WorkspaceProvider,
+} from "./workspace-context";
 
 /** Swallows React's logged error for an expected throw. */
 const quiet = () => {
@@ -59,7 +63,9 @@ describe("WorkspaceProvider", () => {
 
   it("throws a clear error outside a provider", () => {
     const silence = vi.spyOn(console, "error").mockImplementation(quiet);
-    expect(() => renderHook(() => useServices())).toThrow(/needs a WorkspaceProvider/);
+    expect(() => renderHook(() => useServices())).toThrow(
+      /needs a WorkspaceProvider/,
+    );
     silence.mockRestore();
   });
 });

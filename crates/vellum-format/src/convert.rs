@@ -7,7 +7,10 @@
 use comrak::nodes::{AlertType, AstNode, ListType, NodeValue, TableAlignment};
 use comrak::{Arena, Options, parse_document};
 
-use crate::ast::{Alignment, Attributes, Block, Container, Fence, Inline, List, ListItem, Table};
+use crate::ast::{
+    Alignment, Attributes, Block, Container, Fence, Inline, List, ListItem,
+    Table,
+};
 use crate::diagnostic::{Diagnostic, DiagnosticCode};
 use crate::extras;
 
@@ -68,7 +71,9 @@ fn attach_trailing_ids(blocks: Vec<Block>) -> Vec<Block> {
                     table.id = Some(*id);
                     continue;
                 }
-                Some(Block::BlockQuote { id: quote_id, .. }) if quote_id.is_none() => {
+                Some(Block::BlockQuote { id: quote_id, .. })
+                    if quote_id.is_none() =>
+                {
                     *quote_id = Some(*id);
                     continue;
                 }
@@ -174,6 +179,7 @@ impl Cx<'_> {
             NodeValue::Paragraph => {
                 let mut content = self.inlines(node);
                 let id = extras::take_block_id(&mut content);
+                let content = trim_blank_ends(content);
                 Block::Paragraph {
                     content: extras::recognize(content),
                     id,
@@ -181,7 +187,8 @@ impl Cx<'_> {
             }
             NodeValue::Heading(heading) => {
                 // A setext heading may span lines; an ATX heading cannot.
-                let mut content = trim_ends(extras::merge_text(unbreak(self.inlines(node))));
+                let mut content =
+                    trim_ends(extras::merge_text(unbreak(self.inlines(node))));
                 let id = extras::take_block_id(&mut content);
                 Block::Heading {
                     level: heading.level,
@@ -191,10 +198,12 @@ impl Cx<'_> {
                 }
             }
             NodeValue::ThematicBreak => Block::ThematicBreak,
-            NodeValue::BlockQuote | NodeValue::MultilineBlockQuote(_) => Block::BlockQuote {
-                blocks: self.nested_blocks(node),
-                id: None,
-            },
+            NodeValue::BlockQuote | NodeValue::MultilineBlockQuote(_) => {
+                Block::BlockQuote {
+                    blocks: self.nested_blocks(node),
+                    id: None,
+                }
+            }
             NodeValue::Alert(alert) => {
                 // Read the title as a container line would be read.
                 let title = alert.title.unwrap_or_default();
@@ -209,21 +218,27 @@ impl Cx<'_> {
                 })
             }
             NodeValue::List(list) => {
-                let items: Vec<_> = node.children().map(|item| self.item(item)).collect();
+                let items: Vec<_> =
+                    node.children().map(|item| self.item(item)).collect();
                 // One item with at most one block has no blank line that
                 // could show it is loose, so it is always tight.
-                let single = matches!(items.as_slice(), [item] if item.blocks.len() <= 1);
+                let single = matches!(
+                    items.as_slice(),
+                    [item] if item.blocks.len() <= 1
+                );
                 // A quote or table writes its ID after a blank line, which
                 // makes the list loose, so such a list always is.
-                let id_line = items.iter().flat_map(|item| &item.blocks).any(|block| {
-                    matches!(
-                        block,
-                        Block::BlockQuote { id: Some(_), .. }
-                            | Block::Table(Table { id: Some(_), .. })
-                    )
-                });
+                let id_line =
+                    items.iter().flat_map(|item| &item.blocks).any(|block| {
+                        matches!(
+                            block,
+                            Block::BlockQuote { id: Some(_), .. }
+                                | Block::Table(Table { id: Some(_), .. })
+                        )
+                    });
                 Block::List(List {
-                    start: (list.list_type == ListType::Ordered).then_some(list.start as u64),
+                    start: (list.list_type == ListType::Ordered)
+                        .then_some(list.start as u64),
                     tight: !id_line && (list.tight || single),
                     items,
                 })
@@ -234,8 +249,10 @@ impl Cx<'_> {
                     literal.push('\n');
                 }
                 let (info, id) = extras::split_block_id(code.info.trim());
-                let (lang, args) = info.split_once(char::is_whitespace).unwrap_or((info, ""));
-                if lang == "math" && args.trim().is_empty() && attrs.is_empty() {
+                let (lang, args) =
+                    info.split_once(char::is_whitespace).unwrap_or((info, ""));
+                if lang == "math" && args.trim().is_empty() && attrs.is_empty()
+                {
                     Block::Math { literal, id }
                 } else {
                     Block::Fence(Fence {
@@ -273,7 +290,9 @@ impl Cx<'_> {
         self.depth += 1;
         let mut attrs = Attributes::default();
         let blocks = match (task, node.first_child()) {
-            (Some(_), Some(first)) if matches!(first.data().value, NodeValue::Paragraph) => {
+            (Some(_), Some(first))
+                if matches!(first.data().value, NodeValue::Paragraph) =>
+            {
                 // A task's `{…}` span (D82) ends its first paragraph, before
                 // the block ID; it is read before dates and mentions are.
                 let mut content = self.inlines(first);
@@ -284,7 +303,8 @@ impl Cx<'_> {
                         attrs = found;
                         *text = before.to_owned();
                         trim_end(&mut content);
-                        // `text ^blk-… {}` writes the ID last, so read it again.
+                        // `text ^blk-… {}` writes the ID last, so read it
+                        // again.
                         if id.is_none() {
                             id = extras::take_block_id(&mut content);
                         }
@@ -315,15 +335,24 @@ impl Cx<'_> {
         }
     }
 
-    fn table<'a>(&mut self, node: &'a AstNode<'a>, alignments: &[TableAlignment]) -> Block {
+    fn table<'a>(
+        &mut self,
+        node: &'a AstNode<'a>,
+        alignments: &[TableAlignment],
+    ) -> Block {
         let mut rows = node.children().map(|row| {
             row.children()
-                .map(|cell| extras::recognize(self.inlines(cell)))
+                .map(|cell| {
+                    extras::recognize(trim_blank_ends(self.inlines(cell)))
+                })
                 .collect::<Vec<_>>()
         });
         let header = rows.next().unwrap_or_default();
         Block::Table(Table {
-            alignments: alignments.iter().map(|a| convert_alignment(*a)).collect(),
+            alignments: alignments
+                .iter()
+                .map(|a| convert_alignment(*a))
+                .collect(),
             header,
             rows: rows.collect(),
             id: None,
@@ -357,7 +386,8 @@ impl Cx<'_> {
             NodeValue::LineBreak => Inline::HardBreak,
             NodeValue::HtmlInline(html) => {
                 self.raw_html(node);
-                Inline::Text { text: html }
+                out.extend(html_text(&html));
+                return;
             }
             NodeValue::Emph => Inline::Emphasis {
                 content: self.inlines(node),
@@ -400,9 +430,11 @@ impl Cx<'_> {
                 }
             }
             NodeValue::WikiLink(link) => {
-                let label = plain_text(&self.inlines(node)).replace(extras::ESCAPED, "");
+                let label = plain_text(&self.inlines(node))
+                    .replace(extras::ESCAPED, "");
                 Inline::WikiLink {
-                    label: (label != link.url && !label.is_empty()).then_some(label),
+                    label: (label != link.url && !label.is_empty())
+                        .then_some(label),
                     target: link.url,
                 }
             }
@@ -418,6 +450,44 @@ impl Cx<'_> {
     }
 }
 
+/// Raw inline HTML shown as text. A tag may span lines, but text cannot
+/// hold a line ending: each one becomes the break it reads back as once
+/// the text is escaped, with the whitespace around it dropped as at the
+/// end and start of any paragraph line.
+fn html_text(html: &str) -> Vec<Inline> {
+    let mut out = Vec::new();
+    let mut lines = html.split('\n').peekable();
+    let mut first = true;
+    while let Some(line) = lines.next() {
+        let line = if first {
+            line
+        } else {
+            line.trim_start_matches([' ', '\t'])
+        };
+        first = false;
+        let last = lines.peek().is_none();
+        let text = if last {
+            line
+        } else {
+            line.trim_end_matches([' ', '\t'])
+        };
+        if !text.is_empty() {
+            out.push(Inline::Text {
+                text: text.to_owned(),
+            });
+        }
+        if !last {
+            let spaces = line.len() - line.trim_end_matches(' ').len();
+            out.push(if spaces >= 2 {
+                Inline::HardBreak
+            } else {
+                Inline::SoftBreak
+            });
+        }
+    }
+    out
+}
+
 /// Trims whitespace from the start of the first and end of the last text
 /// run, as an ATX heading line is read.
 fn trim_ends(mut content: Vec<Inline>) -> Vec<Inline> {
@@ -428,6 +498,38 @@ fn trim_ends(mut content: Vec<Inline>) -> Vec<Inline> {
         *text = text.trim_end().to_owned();
     }
     extras::merge_text(content)
+}
+
+/// Drops spaces, tabs, vertical tabs and form feeds from both ends of a
+/// paragraph's or cell's content. The parser keeps a vertical tab or form
+/// feed where a line starts or ends, but drops it once the canonical text
+/// puts the content after `| ` or before a block ID, so the document keeps
+/// only what reads back.
+fn trim_blank_ends(mut content: Vec<Inline>) -> Vec<Inline> {
+    const BLANK: [char; 4] = [' ', '\t', '\u{b}', '\u{c}'];
+    loop {
+        let before = content.len();
+        if let Some(Inline::Text { text }) = content.first_mut() {
+            *text = text.trim_start_matches(BLANK).to_owned();
+        }
+        if let Some(Inline::Text { text }) = content.last_mut() {
+            *text = text.trim_end_matches(BLANK).to_owned();
+        }
+        // A line that held only a vertical tab leaves its line break.
+        let blank = |i: Option<&Inline>| {
+            matches!(i, Some(Inline::SoftBreak))
+                || matches!(i, Some(Inline::Text { text }) if text.is_empty())
+        };
+        while blank(content.last()) {
+            let _ = content.pop();
+        }
+        while blank(content.first()) {
+            let _ = content.remove(0);
+        }
+        if content.len() == before {
+            return content;
+        }
+    }
 }
 
 /// Drops trailing whitespace and line breaks from inline content.
@@ -455,6 +557,12 @@ fn unbreak(inlines: Vec<Inline>) -> Vec<Inline> {
         .map(|inline| match inline {
             Inline::SoftBreak | Inline::HardBreak => Inline::Text {
                 text: " ".to_owned(),
+            },
+            // A wiki link can span the lines of a setext heading too; its
+            // line breaks would end an ATX heading when written back.
+            Inline::WikiLink { target, label } => Inline::WikiLink {
+                target: target.replace('\n', " "),
+                label: label.map(|l| l.replace('\n', " ")),
             },
             other => extras::map_children(other, unbreak),
         })
@@ -500,7 +608,9 @@ fn descendant_text<'a>(node: &'a AstNode<'a>) -> String {
             NodeValue::CodeBlock(code) => out.push_str(&code.literal),
             NodeValue::HtmlInline(html) => out.push_str(html),
             NodeValue::HtmlBlock(html) => out.push_str(&html.literal),
-            NodeValue::SoftBreak | NodeValue::LineBreak | NodeValue::Paragraph
+            NodeValue::SoftBreak
+            | NodeValue::LineBreak
+            | NodeValue::Paragraph
                 if !out.is_empty() && !out.ends_with(' ') =>
             {
                 out.push(' ');
@@ -528,8 +638,12 @@ pub fn plain_text(inlines: &[Inline]) -> String {
             | Inline::Subscript { content }
             | Inline::Superscript { content }
             | Inline::Link { content, .. }
-            | Inline::Image { alt: content, .. } => out.push_str(&plain_text(content)),
-            Inline::WikiLink { target, label } => out.push_str(label.as_deref().unwrap_or(target)),
+            | Inline::Image { alt: content, .. } => {
+                out.push_str(&plain_text(content));
+            }
+            Inline::WikiLink { target, label } => {
+                out.push_str(label.as_deref().unwrap_or(target));
+            }
             Inline::Mention { handle } => {
                 out.push('@');
                 out.push_str(handle);

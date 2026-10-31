@@ -13,6 +13,10 @@ export interface BridgeServices {
   accessToken(): Promise<string | undefined>;
   openExternal(url: string): Promise<void>;
   notify(notice: Notice): void;
+  /** Private spaces; the inputs are checked by the implementation. */
+  privateDeviceKey(): Promise<unknown>;
+  privateEnrol(spaceId: unknown, label: unknown): Promise<unknown>;
+  privateReseal(spaceId: unknown, trust: unknown): Promise<unknown>;
 }
 
 /** A notification; `url` is an app path opened on click. */
@@ -28,7 +32,9 @@ type Handler = (input: unknown) => Promise<unknown>;
  * Builds the IPC handlers. Every call is checked: it must come from an app
  * page, and its arguments are validated here rather than trusted.
  */
-export function bridgeHandlers(services: BridgeServices): ReadonlyMap<ChannelName, Handler> {
+export function bridgeHandlers(
+  services: BridgeServices,
+): ReadonlyMap<ChannelName, Handler> {
   return new Map<ChannelName, Handler>([
     [Channel.serverUrl, () => Promise.resolve(services.serverUrl())],
     [Channel.signIn, () => services.signIn()],
@@ -40,6 +46,31 @@ export function bridgeHandlers(services: BridgeServices): ReadonlyMap<ChannelNam
         if (typeof input !== "string" || !isSafeExternal(input))
           throw new TypeError("Only web and mail links open outside Vellum");
         await services.openExternal(input);
+      },
+    ],
+    [Channel.privateDeviceKey, () => services.privateDeviceKey()],
+    [
+      Channel.privateEnrol,
+      (input) => {
+        const { spaceId, label } = (
+          typeof input === "object" && input !== null ? input : {}
+        ) as {
+          spaceId?: unknown;
+          label?: unknown;
+        };
+        return services.privateEnrol(spaceId, label);
+      },
+    ],
+    [
+      Channel.privateReseal,
+      (input) => {
+        const { spaceId, trust } = (
+          typeof input === "object" && input !== null ? input : {}
+        ) as {
+          spaceId?: unknown;
+          trust?: unknown;
+        };
+        return services.privateReseal(spaceId, trust);
       },
     ],
     [
@@ -59,7 +90,8 @@ export async function dispatch(
   senderUrl: string,
   input?: unknown,
 ): Promise<unknown> {
-  if (!isAppUrl(senderUrl)) throw new Error("Vellum desktop calls are only allowed from app pages");
+  if (!isAppUrl(senderUrl))
+    throw new Error("Vellum desktop calls are only allowed from app pages");
   const handler = handlers.get(channel);
   if (handler === undefined) throw new Error(`Unknown channel ${channel}`);
   return handler(input);
@@ -71,10 +103,16 @@ export function parseNotice(input: unknown): Notice {
     throw new TypeError("A notification needs a title, body and url");
   const record = input as Record<string, unknown>;
   const { title, body, url } = record;
-  if (typeof title !== "string" || typeof body !== "string" || typeof url !== "string") {
+  if (
+    typeof title !== "string" ||
+    typeof body !== "string" ||
+    typeof url !== "string"
+  ) {
     throw new TypeError("A notification needs a title, body and url");
   }
   const target = new URL(url, APP_URL);
-  const path = isAppUrl(target.href) ? `${target.pathname}${target.search}` : "/inbox";
+  const path = isAppUrl(target.href)
+    ? `${target.pathname}${target.search}`
+    : "/inbox";
   return { title: title.slice(0, 200), body: body.slice(0, 1000), url: path };
 }

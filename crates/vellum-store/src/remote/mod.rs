@@ -58,7 +58,11 @@ impl Http {
             .timeout(Duration::from_mins(2))
             .user_agent(concat!("vellum/", env!("CARGO_PKG_VERSION")))
             .build()
-            .map_err(|e| StoreError::Backend(format!("{backend}: cannot build client: {e}")))?;
+            .map_err(|e| {
+                StoreError::Backend(format!(
+                    "{backend}: cannot build client: {e}"
+                ))
+            })?;
         Ok(Self { client, backend })
     }
 
@@ -77,26 +81,42 @@ impl Http {
     ///
     /// # Errors
     /// Returns [`StoreError::Backend`] once the attempts are used up.
-    pub async fn send(&self, build: impl Fn() -> RequestBuilder) -> StoreResult<Response> {
+    pub async fn send(
+        &self,
+        build: impl Fn() -> RequestBuilder,
+    ) -> StoreResult<Response> {
         let mut delay = BACKOFF;
         let mut attempt = 1;
         loop {
             let outcome = build().send().await;
             let wait = match &outcome {
-                Ok(r) if retryable(r.status()) => Some(retry_after(r).unwrap_or(delay)),
+                Ok(r) if retryable(r.status()) => {
+                    Some(retry_after(r).unwrap_or(delay))
+                }
                 Err(e) if !e.is_builder() => Some(delay),
                 _ => None,
             };
             match wait {
-                Some(wait) if attempt < MAX_ATTEMPTS && wait <= MAX_RETRY_AFTER => {
-                    tracing::debug!(backend = self.backend, attempt, ?wait, "retrying request");
+                Some(wait)
+                    if attempt < MAX_ATTEMPTS && wait <= MAX_RETRY_AFTER =>
+                {
+                    tracing::debug!(
+                        backend = self.backend,
+                        attempt,
+                        ?wait,
+                        "retrying request"
+                    );
                     tokio::time::sleep(wait).await;
                     delay = delay.saturating_mul(2);
                     attempt += 1;
                 }
                 _ => {
                     return outcome.map_err(|e| {
-                        StoreError::Backend(format!("{}: {}", self.backend, redact(e)))
+                        StoreError::Backend(format!(
+                            "{}: {}",
+                            self.backend,
+                            redact(e)
+                        ))
                     });
                 }
             }
@@ -129,9 +149,14 @@ fn redact(e: reqwest::Error) -> String {
 /// Turns a non-success response into a [`StoreError`].
 ///
 /// `404` is [`StoreError::NotFound`], `412` is
-/// [`StoreError::PreconditionFailed`], and everything else is [`StoreError::Backend`] with the status and the
-/// start of the body (never headers, which may hold credentials).
-pub async fn status_error(backend: &str, path: &BlobPath, response: Response) -> StoreError {
+/// [`StoreError::PreconditionFailed`], and everything else is
+/// [`StoreError::Backend`] with the status and the start of the body (never
+/// headers, which may hold credentials).
+pub async fn status_error(
+    backend: &str,
+    path: &BlobPath,
+    response: Response,
+) -> StoreError {
     let status = response.status();
     match status {
         StatusCode::NOT_FOUND => StoreError::NotFound(path.clone()),
@@ -154,8 +179,13 @@ pub fn backend_error(
     status: StatusCode,
     body: &Bytes,
 ) -> StoreError {
-    let excerpt = String::from_utf8_lossy(body.get(..body.len().min(300)).unwrap_or_default());
-    StoreError::Backend(format!("{backend}: {status} on {path}: {}", excerpt.trim()))
+    let excerpt = String::from_utf8_lossy(
+        body.get(..body.len().min(300)).unwrap_or_default(),
+    );
+    StoreError::Backend(format!(
+        "{backend}: {status} on {path}: {}",
+        excerpt.trim()
+    ))
 }
 
 /// A secret that never appears in `Debug` output or logs.

@@ -20,10 +20,36 @@ pub fn merge_text(inlines: Vec<Inline>) -> Vec<Inline> {
         let inline = flatten_same(map_children(inline, merge_text));
         match (out.last_mut(), inline) {
             (_, Inline::Text { text }) if text.is_empty() => {}
-            (Some(Inline::Text { text: last }), Inline::Text { text }) => last.push_str(&text),
-            // `<em>a</em><em>b</em>` reads as `<em>ab</em>`.
-            (Some(Inline::Emphasis { content: last }), Inline::Emphasis { content })
-            | (Some(Inline::Strong { content: last }), Inline::Strong { content }) => {
+            (Some(Inline::Text { text: last }), Inline::Text { text }) => {
+                last.push_str(&text);
+            }
+            // `<em>a</em><em>b</em>` reads as `<em>ab</em>`, and the
+            // delimiters of two adjacent marks of a kind would run together
+            // when written (`^a^^b^` is one superscript).
+            (
+                Some(Inline::Emphasis { content: last }),
+                Inline::Emphasis { content },
+            )
+            | (
+                Some(Inline::Strong { content: last }),
+                Inline::Strong { content },
+            )
+            | (
+                Some(Inline::Strikethrough { content: last }),
+                Inline::Strikethrough { content },
+            )
+            | (
+                Some(Inline::Highlight { content: last }),
+                Inline::Highlight { content },
+            )
+            | (
+                Some(Inline::Subscript { content: last }),
+                Inline::Subscript { content },
+            )
+            | (
+                Some(Inline::Superscript { content: last }),
+                Inline::Superscript { content },
+            ) => {
                 last.extend(content);
                 *last = merge_text(std::mem::take(last));
             }
@@ -34,7 +60,10 @@ pub fn merge_text(inlines: Vec<Inline>) -> Vec<Inline> {
 }
 
 fn flatten_same(inline: Inline) -> Inline {
-    fn splice(content: Vec<Inline>, same: fn(&Inline) -> Option<&Vec<Inline>>) -> Vec<Inline> {
+    fn splice(
+        content: Vec<Inline>,
+        same: fn(&Inline) -> Option<&Vec<Inline>>,
+    ) -> Vec<Inline> {
         let mut out = Vec::with_capacity(content.len());
         for child in content {
             match same(&child) {
@@ -147,7 +176,8 @@ pub fn extra_escapes(text: &str) -> Vec<usize> {
 /// (a fence info string, a container line or an alert title).
 pub fn split_block_id(text: &str) -> (&str, Option<BlockId>) {
     let text = text.trim_end();
-    let (before, last) = text.rsplit_once(char::is_whitespace).unwrap_or(("", text));
+    let (before, last) =
+        text.rsplit_once(char::is_whitespace).unwrap_or(("", text));
     last.strip_prefix('^')
         .and_then(|id| id.parse().ok())
         .map_or((text, None), |id| (before.trim_end(), Some(id)))
@@ -166,7 +196,8 @@ pub fn take_block_id(content: &mut Vec<Inline>) -> Option<BlockId> {
     let before = text.get(..start)?;
     // On its own line, or the whole paragraph (as in `- [ ] ^blk-…`).
     let own_line = before.is_empty()
-        && (content.len() == 1 || matches!(content.iter().rev().nth(1), Some(Inline::SoftBreak)));
+        && (content.len() == 1
+            || matches!(content.iter().rev().nth(1), Some(Inline::SoftBreak)));
     if !own_line && !before.ends_with(char::is_whitespace) {
         return None;
     }
@@ -187,7 +218,9 @@ pub fn recognize(inlines: Vec<Inline>) -> Vec<Inline> {
     for inline in inlines {
         match inline {
             Inline::Text { text } => split_text(&text, &mut out),
-            Inline::Link { .. } | Inline::Image { .. } => out.push(map_children(inline, unmark)),
+            Inline::Link { .. } | Inline::Image { .. } => {
+                out.push(map_children(inline, unmark));
+            }
             other => out.push(map_children(other, recognize)),
         }
     }
@@ -208,7 +241,10 @@ fn unmark(inlines: Vec<Inline>) -> Vec<Inline> {
 }
 
 /// Applies `f` to the children of a mark, link or image.
-pub fn map_children(inline: Inline, f: fn(Vec<Inline>) -> Vec<Inline>) -> Inline {
+pub fn map_children(
+    inline: Inline,
+    f: fn(Vec<Inline>) -> Vec<Inline>,
+) -> Inline {
     match inline {
         Inline::Emphasis { content } => Inline::Emphasis {
             content: f(content),
@@ -285,7 +321,8 @@ fn split_text(text: &str, out: &mut Vec<Inline>) {
 /// cannot be part of a word, e-mail address or longer identifier.
 fn at_boundary(prev: Option<char>) -> bool {
     prev.is_none_or(|c| {
-        !(c.is_alphanumeric() || matches!(c, '_' | '-' | '.' | '/' | '@' | ':' | ESCAPED))
+        !(c.is_alphanumeric()
+            || matches!(c, '_' | '-' | '.' | '/' | '@' | ':' | ESCAPED))
     })
 }
 
@@ -329,14 +366,18 @@ fn match_extra(rest: &str) -> Option<(usize, Inline)> {
     } else {
         return None;
     };
-    // The extra must end at a word boundary too.
-    let after = rest.get(len..)?;
+    // The extra must end at a word boundary too. A backslash does not make
+    // one: the canonical text escapes `@` after a word character, so
+    // `@ann\@x` must read as `@ann@x` does.
+    let after = rest.get(len..)?.trim_start_matches(ESCAPED);
     let mut tail = after.chars();
     let ends_cleanly = match tail.next() {
         Some(c) if c.is_alphanumeric() || c == '_' => false,
         // `ENG-1-2`, `2026-11-24-x`, `@a-` are not extras; `@a.` is.
         Some('-' | '@') => false,
-        Some('.' | ':' | '/') => !tail.next().is_some_and(char::is_alphanumeric),
+        Some('.' | ':' | '/') => {
+            !tail.next().is_some_and(char::is_alphanumeric)
+        }
         Some(_) | None => true,
     };
     ends_cleanly.then_some((len, node))
@@ -345,7 +386,9 @@ fn match_extra(rest: &str) -> Option<(usize, Inline)> {
 /// A handle: letters, digits and inner `.`, `_` or `-`.
 fn word(s: &str) -> &str {
     let end = s
-        .find(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-')))
+        .find(|c: char| {
+            !(c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'))
+        })
         .unwrap_or(s.len());
     let candidate = s.get(..end).unwrap_or_default();
     candidate.trim_end_matches(['.', '_', '-'])
@@ -384,8 +427,12 @@ pub fn is_date(s: &str) -> bool {
     if !shape {
         return false;
     }
-    let num = |range: std::ops::Range<usize>| s.get(range).and_then(|t| t.parse::<u32>().ok());
-    let (Some(year), Some(month), Some(day)) = (num(0..4), num(5..7), num(8..10)) else {
+    let num = |range: std::ops::Range<usize>| {
+        s.get(range).and_then(|t| t.parse::<u32>().ok())
+    };
+    let (Some(year), Some(month), Some(day)) =
+        (num(0..4), num(5..7), num(8..10))
+    else {
         return false;
     };
     let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
@@ -463,7 +510,8 @@ mod tests {
         );
         assert_eq!(content, [text("Ship it")]);
 
-        let mut content = vec![text("Ship it"), Inline::SoftBreak, text("^blk-a1b2c3d4")];
+        let mut content =
+            vec![text("Ship it"), Inline::SoftBreak, text("^blk-a1b2c3d4")];
         assert!(take_block_id(&mut content).is_some());
         assert_eq!(content, [text("Ship it")]);
 
@@ -475,7 +523,10 @@ mod tests {
     fn splits_block_ids_off_directive_lines() {
         let (rest, id) = split_block_id("rust title ^blk-a1b2c3d4");
         assert_eq!(rest, "rust title");
-        assert_eq!(id.map(|id| id.to_string()).as_deref(), Some("blk-a1b2c3d4"));
+        assert_eq!(
+            id.map(|id| id.to_string()).as_deref(),
+            Some("blk-a1b2c3d4")
+        );
         assert_eq!(split_block_id("^blk-a1b2c3d4").0, "");
         for s in ["rust", "x^blk-a1b2c3d4", "^blk-nope", "a ^blk-a1b2c3d4 b"] {
             assert_eq!(split_block_id(s), (s, None), "{s}");

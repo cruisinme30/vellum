@@ -127,7 +127,12 @@ impl Blocked {
 /// The Google Calendar event body for a blocked task. `zone` is the
 /// owner's IANA time zone and `link` opens the task in Vellum.
 #[must_use]
-pub fn event_body(task: &Blocked, block: TimeBlock, zone: &str, link: &str) -> Value {
+pub fn event_body(
+    task: &Blocked,
+    block: TimeBlock,
+    zone: &str,
+    link: &str,
+) -> Value {
     let at = |time: DateTime| {
         json!({
             "dateTime": time.strftime("%Y-%m-%dT%H:%M:%S").to_string(),
@@ -170,7 +175,8 @@ fn instant(value: &Value, zone: &TimeZone) -> Option<DateTime> {
 #[must_use]
 pub fn parse_event(value: &Value, zone: &TimeZone) -> Option<Remote> {
     let id = value.get("id")?.as_str()?.to_owned();
-    let cancelled = value.get("status").and_then(Value::as_str) == Some("cancelled");
+    let cancelled =
+        value.get("status").and_then(Value::as_str) == Some("cancelled");
     let summary = value
         .get("summary")
         .and_then(Value::as_str)
@@ -183,7 +189,8 @@ pub fn parse_event(value: &Value, zone: &TimeZone) -> Option<Remote> {
     ) {
         (Some(start), Some(end)) => {
             let minutes = start.duration_until(end).as_mins();
-            let minutes = u32::try_from(minutes.clamp(1, i64::from(MAX_MINUTES))).ok()?;
+            let minutes =
+                u32::try_from(minutes.clamp(1, i64::from(MAX_MINUTES))).ok()?;
             Some(TimeBlock { start, minutes })
         }
         _ => None,
@@ -271,10 +278,15 @@ struct Planning<'a> {
 impl<'a> Planning<'a> {
     fn new(tasks: &'a [Blocked]) -> Self {
         Self {
-            current: tasks.iter().map(|t| (t.task.as_str(), t.clone())).collect(),
+            current: tasks
+                .iter()
+                .map(|t| (t.task.as_str(), t.clone()))
+                .collect(),
             by_event: tasks
                 .iter()
-                .filter_map(|t| t.event.as_deref().map(|e| (e, t.task.as_str())))
+                .filter_map(|t| {
+                    t.event.as_deref().map(|e| (e, t.task.as_str()))
+                })
                 .collect(),
             steps: Vec::new(),
             settled: HashSet::new(),
@@ -302,7 +314,9 @@ impl<'a> Planning<'a> {
         let found = owner.and_then(|task| self.current.get_mut(task));
         match (found, remote.block) {
             (Some(task), Some(block)) => {
-                if task.block != Some(block) || task.event.as_deref() != Some(&remote.id) {
+                if task.block != Some(block)
+                    || task.event.as_deref() != Some(&remote.id)
+                {
                     self.steps.push(Step::Move {
                         task: task.task.clone(),
                         event: remote.id.clone(),
@@ -349,7 +363,9 @@ impl<'a> Planning<'a> {
         ordered.sort_by(|a, b| a.task.cmp(&b.task));
         for task in ordered {
             match (&task.event, task.block) {
-                (None, Some(_)) => self.steps.push(Step::Insert { task: task.clone() }),
+                (None, Some(_)) => {
+                    self.steps.push(Step::Insert { task: task.clone() });
+                }
                 (Some(event), None) => {
                     if !self.settled.contains(event) {
                         self.steps.push(Step::Delete {
@@ -394,7 +410,11 @@ impl<'a> Planning<'a> {
 /// are the events that changed since the last sync (or every event, on a
 /// full sync).
 #[must_use]
-pub fn plan(tasks: &[Blocked], changes: &[Remote], state: &SyncState) -> Vec<Step> {
+pub fn plan(
+    tasks: &[Blocked],
+    changes: &[Remote],
+    state: &SyncState,
+) -> Vec<Step> {
     let mut planning = Planning::new(tasks);
     for remote in changes {
         planning.pull(remote);
@@ -414,7 +434,11 @@ mod tests {
         }
     }
 
-    fn task(id: &str, block: Option<TimeBlock>, event: Option<&str>) -> Blocked {
+    fn task(
+        id: &str,
+        block: Option<TimeBlock>,
+        event: Option<&str>,
+    ) -> Blocked {
         Blocked {
             task: id.to_owned(),
             title: format!("Task {id}"),
@@ -424,7 +448,11 @@ mod tests {
         }
     }
 
-    fn remote(id: &str, task: Option<&str>, block: Option<TimeBlock>) -> Remote {
+    fn remote(
+        id: &str,
+        task: Option<&str>,
+        block: Option<TimeBlock>,
+    ) -> Remote {
         Remote {
             id: id.to_owned(),
             cancelled: false,
@@ -462,7 +490,8 @@ mod tests {
     #[test]
     fn events_carry_the_task_and_read_back() {
         let t = task("d.b1", Some(block(15, 90)), None);
-        let body = event_body(&t, block(15, 90), "Europe/Berlin", "https://x/t");
+        let body =
+            event_body(&t, block(15, 90), "Europe/Berlin", "https://x/t");
         assert_eq!(body["start"]["dateTime"], "2026-11-03T15:00:00");
         assert_eq!(body["end"]["dateTime"], "2026-11-03T16:30:00");
         let mut back = body;
@@ -473,8 +502,11 @@ mod tests {
         let read = parse_event(&back, &zone).unwrap();
         assert_eq!(read.task.as_deref(), Some("d.b1"));
         assert_eq!(read.block, Some(block(15, 90)));
-        let all_day =
-            json!({"id": "e2", "start": {"date": "2026-11-03"}, "end": {"date": "2026-11-04"}});
+        let all_day = json!({
+            "id": "e2",
+            "start": {"date": "2026-11-03"},
+            "end": {"date": "2026-11-04"}
+        });
         assert_eq!(parse_event(&all_day, &zone).unwrap().block, None);
     }
 
@@ -485,7 +517,8 @@ mod tests {
         let mut renamed = task("d.b3", Some(block(11, 30)), Some("e3"));
         let state = pushed(&[("e2", &synced), ("e3", &renamed)]);
         renamed.title = "Renamed".to_owned();
-        let steps = plan(&[fresh.clone(), synced, renamed.clone()], &[], &state);
+        let steps =
+            plan(&[fresh.clone(), synced, renamed.clone()], &[], &state);
         assert_eq!(
             steps,
             vec![
@@ -517,9 +550,12 @@ mod tests {
             })
         );
         // The new title still goes out, at the calendar's time.
-        assert!(
-            matches!(steps.get(1), Some(Step::Patch { task, .. }) if task.block == Some(block(14, 60)))
-        );
+        assert!(matches!(
+            steps.get(1),
+            Some(
+                Step::Patch { task, .. }
+            ) if task.block == Some(block(14, 60))
+        ));
     }
 
     #[test]
@@ -578,7 +614,10 @@ mod tests {
                 block: block(8, 45)
             }]
         );
-        assert!(plan(&[], &[remote("e9", None, None)], &SyncState::default()).is_empty());
+        assert!(
+            plan(&[], &[remote("e9", None, None)], &SyncState::default())
+                .is_empty()
+        );
     }
 
     #[test]

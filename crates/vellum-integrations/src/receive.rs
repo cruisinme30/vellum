@@ -151,7 +151,8 @@ impl<W, L> Receivers<W, L> {
             return false;
         };
         while seen.front().is_some_and(|(at, _)| {
-            now.as_second().saturating_sub(at.as_second()) > SLACK_WINDOW_SECONDS
+            now.as_second().saturating_sub(at.as_second())
+                > SLACK_WINDOW_SECONDS
         }) {
             let _ = seen.pop_front();
         }
@@ -303,7 +304,9 @@ async fn slack_hook<W: WorkCommands, L: LinkStore>(
             .into_response()
     };
     let Some(draft) = slack::to_draft(&request, &r.config.routing, None) else {
-        return Ok(reply("Usage: /vellum [TEAM] title of the issue".to_owned()));
+        return Ok(reply(
+            "Usage: /vellum [TEAM] title of the issue".to_owned(),
+        ));
     };
     // verify() succeeded, so the signature header is present.
     let signature = signature.unwrap_or_default();
@@ -333,7 +336,8 @@ async fn sentry_hook<W: WorkCommands, L: LinkStore>(
         header(&headers, sentry::SIGNATURE_HEADER),
         &body,
     )?;
-    let resource = header(&headers, sentry::RESOURCE_HEADER).unwrap_or_default();
+    let resource =
+        header(&headers, sentry::RESOURCE_HEADER).unwrap_or_default();
     let Some(draft) = sentry::to_draft(
         resource,
         &body,
@@ -373,6 +377,8 @@ async fn email_hook<W: WorkCommands, L: LinkStore>(
             Ok(accepted(json!({ "comment": key.to_string() })))
         }
         // Dropped mail is still a delivery: a retry would be dropped too.
-        EmailIntake::Ignored(reason) => Ok(accepted(json!({ "ignored": reason }))),
+        EmailIntake::Ignored(reason) => {
+            Ok(accepted(json!({ "ignored": reason })))
+        }
     }
 }

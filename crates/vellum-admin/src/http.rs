@@ -23,16 +23,23 @@ pub fn get_json<T: DeserializeOwned>(
     query: &[(&str, &str)],
 ) -> Result<T> {
     let unavailable = |what: &'static str| {
-        move |e: reqwest::Error| Error::new(ErrorKind::Unavailable, what).with_source(e)
+        move |e: reqwest::Error| {
+            Error::new(ErrorKind::Unavailable, what).with_source(e)
+        }
     };
     let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(30))
         .build()
         .map_err(unavailable("cannot build the HTTP client"))?;
     let mut url =
-        reqwest::Url::parse(&format!("{}{path}", server.trim_end_matches('/'))).map_err(|e| {
-            Error::new(ErrorKind::InvalidInput, "the server URL is not valid").with_source(e)
-        })?;
+        reqwest::Url::parse(&format!("{}{path}", server.trim_end_matches('/')))
+            .map_err(|e| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    "the server URL is not valid",
+                )
+                .with_source(e)
+            })?;
     if !query.is_empty() {
         let mut pairs = url.query_pairs_mut();
         for (key, value) in query {

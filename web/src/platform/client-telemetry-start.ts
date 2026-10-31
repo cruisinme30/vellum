@@ -9,11 +9,17 @@ import {
   type ClientReport,
 } from "./client-telemetry";
 
-/** What {@link startClientTelemetry} needs from the browser; injectable for tests. */
+/**
+ * What {@link startClientTelemetry} needs from the browser; injectable for
+ * tests.
+ */
 export interface TelemetryEnvironment {
   readonly performance: Pick<Performance, "getEntriesByType" | "timeOrigin">;
   readonly location: Pick<Location, "pathname">;
-  readonly document: Pick<Document, "visibilityState" | "addEventListener" | "removeEventListener">;
+  readonly document: Pick<
+    Document,
+    "visibilityState" | "addEventListener" | "removeEventListener"
+  >;
   readonly Observer?: typeof PerformanceObserver | undefined;
   readonly send?: (report: ClientReport) => Promise<boolean>;
 }
@@ -22,8 +28,11 @@ export interface TelemetryEnvironment {
  * Starts reporting: slow API calls as they finish, and the page view with
  * its vitals once the page is hidden. Returns a function that stops it.
  */
-export function startClientTelemetry(environment: TelemetryEnvironment): () => void {
-  const send = environment.send ?? ((report: ClientReport) => sendReport(report));
+export function startClientTelemetry(
+  environment: TelemetryEnvironment,
+): () => void {
+  const send =
+    environment.send ?? ((report: ClientReport) => sendReport(report));
   const origin = environment.performance.timeOrigin;
   const vitals = new VitalsCollector().observe(environment.Observer);
   let navigationSent = false;

@@ -6,7 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useT } from "../i18n/i18n";
 import { Icon } from "../shell/icon";
 
-import { useLoad } from "./context";
+import { messageOf, useCollections, useLoad } from "./context";
 import { useWriter } from "./editing";
 import { RowField } from "./row-fields";
 import type { CollectionInfo } from "./types";
@@ -53,12 +53,20 @@ function BodyField({
  * ones. It is a non-modal dialog: Escape or the close button closes it and
  * focus goes back to what opened it.
  */
-export function RowPanel({ info, rowId, focusTitle, onClose }: RowPanelProperties) {
+export function RowPanel({
+  info,
+  rowId,
+  focusTitle,
+  onClose,
+}: RowPanelProperties) {
   const t = useT();
   const headingId = useId();
   const panel = useRef<HTMLDivElement>(null);
   const write = useWriter(info.id);
+  const store = useCollections();
   const [bodyError, setBodyError] = useState<string>();
+  const [confirming, setConfirming] = useState(false);
+  const [deleteError, setDeleteError] = useState<string>();
   const detail = useLoad(`row:${info.id}:${rowId}`, (store) =>
     store.getRow({ collection_id: info.id, row_id: rowId }),
   );
@@ -135,6 +143,46 @@ export function RowPanel({ info, rowId, focusTitle, onClose }: RowPanelPropertie
           {bodyError !== undefined && (
             <p className="vl-field-error" role="alert">
               {bodyError}
+            </p>
+          )}
+          <div className="vl-panel-actions">
+            {confirming ? (
+              <button
+                type="button"
+                className="vl-text-button vl-danger"
+                onClick={() => {
+                  store
+                    .deleteRow({ collection_id: info.id, row_id: rowId })
+                    .then(
+                      () => {
+                        close.current();
+                      },
+                      (error: unknown) => {
+                        setDeleteError(messageOf(error));
+                      },
+                    );
+                }}
+              >
+                {t("collection-confirm-delete-row", {
+                  title: title === "" ? t("page-untitled") : title,
+                })}
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="vl-text-button vl-danger"
+                onClick={() => {
+                  setConfirming(true);
+                }}
+              >
+                <Icon name="delete" size={20} />
+                {t("collection-delete-row")}
+              </button>
+            )}
+          </div>
+          {deleteError !== undefined && (
+            <p className="vl-field-error" role="alert">
+              {deleteError}
             </p>
           )}
         </div>

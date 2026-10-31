@@ -14,9 +14,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use vellum_kernel::DocId;
 use vellum_mcp::ports::{
-    Actor, Attribution, Block, BlockSelector, ChangePage, CollectionQuery, Document, EditProposal,
-    ExportArtifact, ExportRequest, Issue, IssueUpdate, Listing, ListingPage, NewComment, NewIssue,
-    NewPage, NewTask, OutlineNode, RowPage, RowUpsert, SearchHit, SearchQuery, SiteInfo, Workspace,
+    Actor, Attribution, Block, BlockSelector, ChangePage, CollectionQuery,
+    Document, EditProposal, ExportArtifact, ExportRequest, Issue, IssueUpdate,
+    Listing, ListingPage, NewComment, NewIssue, NewPage, NewTask, OutlineNode,
+    RowPage, RowUpsert, SearchHit, SearchQuery, SiteInfo, Workspace,
     WorkspaceError, WriteMode, WriteReceipt,
 };
 use vellum_private::{PrivateAgent, PrivateDoc};
@@ -25,32 +26,166 @@ use vellum_private::{PrivateAgent, PrivateDoc};
 pub const KEYCHAIN_SERVICE: &str = "dev.vellum.desktop";
 
 /// Why every write is refused.
-const READ_ONLY: &str = "private spaces are read-only for AI tools: the device cannot seal a change for the other members yet";
+const READ_ONLY: &str = "private spaces are read-only for AI tools: the device \
+    cannot seal a change for the other members yet";
 
 /// Subcommands of `vellum private`.
 #[derive(Debug, clap::Subcommand)]
 pub enum PrivateCommand {
     /// Print this device's public key and fingerprint, creating the key in
     /// the OS keychain on first use. Give the key to a space owner to be
-    /// enrolled.
-    Key,
+    /// enrolled, or run `vellum private enrol`.
+    Key {
+        /// Print JSON (`public_key`, `fingerprint`) for the desktop app.
+        #[arg(long)]
+        json: bool,
+    },
+    /// Enrol this device in a private space on a server, so pages are
+    /// sealed to it too. The token comes from `VELLUM_TOKEN`.
+    Enrol {
+        #[command(flatten)]
+        remote: RemoteArgs,
+        /// A name the other members recognise, such as "Dana's laptop".
+        #[arg(long)]
+        label: String,
+    },
+    /// Reseal every page this device can open to the space's current
+    /// keys, after a device was enrolled or revoked. The token comes from
+    /// `VELLUM_TOKEN`.
+    Reseal {
+        #[command(flatten)]
+        remote: RemoteArgs,
+        /// Trust a device key that is new since this device last sealed
+        /// the space, after comparing its fingerprint with its owner.
+        /// Repeat for more keys.
+        #[arg(long, value_parser = parse_fingerprint)]
+        trust: Vec<String>,
+    },
+}
+
+/// Parses a `--trust` fingerprint: 32 hex digits, spaces allowed.
+///
+/// # Errors
+///
+/// Anything else.
+pub fn parse_fingerprint(value: &str) -> Result<String, String> {
+    let clean: String = value
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    if clean.len() == 32 && clean.chars().all(|c| c.is_ascii_hexdigit()) {
+        Ok(clean)
+    } else {
+        Err(format!("`{value}`: a fingerprint is 32 hex digits"))
+    }
+}
+
+/// Which server and space a remote command works on.
+#[derive(Debug, Clone, clap::Args)]
+pub struct RemoteArgs {
+    /// The server, such as `https://vellum.northstar.dev`.
+    #[arg(long, env = crate::private_remote::SERVER_VAR)]
+    pub server: String,
+    /// The private space's ID.
+    #[arg(long)]
+    pub space: vellum_kernel::SpaceId,
+}
+
+impl RemoteArgs {
+    fn client(&self) -> Result<crate::private_remote::E2eClient, String> {
+        let token =
+            std::env::var(crate::private_remote::TOKEN_VAR).unwrap_or_default();
+        crate::private_remote::E2eClient::new(&self.server, &token)
+    }
 }
 
 /// Runs `vellum private …` and returns the lines to print.
 ///
 /// # Errors
 ///
-/// The keychain cannot be opened or holds a damaged key.
+/// The keychain cannot be opened or holds a damaged key, or the server
+/// refused.
 pub fn run(command: &PrivateCommand) -> Result<Vec<String>, String> {
     match command {
-        PrivateCommand::Key => {
+        PrivateCommand::Key { json } => {
             let identity = device_identity()?;
+            if *json {
+                return Ok(vec![
+                    serde_json::json!({
+                        "public_key": identity.public_hex(),
+                        "fingerprint": identity.fingerprint_hex(),
+                    })
+                    .to_string(),
+                ]);
+            }
             Ok(vec![
                 format!("public key:  {}", identity.public_hex()),
                 format!("fingerprint: {}", identity.fingerprint_hex()),
             ])
         }
+        PrivateCommand::Enrol { remote, label } => {
+            let client = remote.client()?;
+            let identity = device_identity()?;
+            let pins = crate::pins::Pins::from_env()?;
+            let enrolled = block_on(crate::private_remote::enrol(
+                &client,
+                &identity,
+                remote.space,
+                label,
+                &pins,
+            ))??;
+            Ok(vec![
+                format!("enrolled \"{}\" in {}", enrolled.label, remote.space),
+                format!("fingerprint: {}", enrolled.fingerprint),
+                "Another member's device must now run `vellum private reseal` \
+                    so existing pages open here."
+                    .to_owned(),
+            ])
+        }
+        PrivateCommand::Reseal { remote, trust } => {
+            let client = remote.client()?;
+            let identity = device_identity()?;
+            let pins = crate::pins::Pins::from_env()?;
+            let report = block_on(crate::private_remote::reseal(
+                &client,
+                &identity,
+                remote.space,
+                &pins,
+                trust,
+            ))??;
+            let mut lines = vec![format!(
+                "{} resealed, {} sealed for the first time, {} already \
+                    current, {} sealed for other devices only",
+                report.resealed,
+                report.converted,
+                report.current,
+                report.not_for_this_device
+            )];
+            if report.first_use {
+                lines.push(
+                    "First reseal on this device: the space's device keys are \
+                        now trusted as found."
+                        .to_owned(),
+                );
+            }
+            if report.changed > 0 {
+                lines.push(format!(
+                    "{} changed during the pass; run it again",
+                    report.changed
+                ));
+            }
+            Ok(lines)
+        }
     }
+}
+
+fn block_on<F: std::future::Future>(future: F) -> Result<F::Output, String> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| format!("cannot start the async runtime: {e}"))?;
+    Ok(runtime.block_on(future))
 }
 
 /// This device's identity, from the OS keychain.
@@ -123,7 +258,7 @@ impl PrivateWorkspace {
     }
 }
 
-fn blocks_of(doc: &PrivateDoc) -> Vec<Block> {
+pub fn blocks_of(doc: &PrivateDoc) -> Vec<Block> {
     doc.blocks
         .iter()
         .map(|b| Block {
@@ -140,7 +275,10 @@ fn blocks_of(doc: &PrivateDoc) -> Vec<Block> {
 
 /// The blocks a selector names: listed IDs, a heading's section, or a
 /// range (the whole page when the selector is empty).
-fn select(blocks: Vec<Block>, selector: BlockSelector) -> Result<Vec<Block>, WorkspaceError> {
+pub fn select(
+    blocks: Vec<Block>,
+    selector: BlockSelector,
+) -> Result<Vec<Block>, WorkspaceError> {
     if !selector.ids.is_empty() {
         return Ok(blocks
             .into_iter()
@@ -157,18 +295,23 @@ fn select(blocks: Vec<Block>, selector: BlockSelector) -> Result<Vec<Block>, Wor
             .into_iter()
             .enumerate()
             .skip(start)
-            .take_while(|(i, b)| *i == start || b.kind != "heading" || b.heading_path.len() > depth)
+            .take_while(|(i, b)| {
+                *i == start
+                    || b.kind != "heading"
+                    || b.heading_path.len() > depth
+            })
             .map(|(_, b)| b)
             .collect());
     }
-    let find = |id: Option<String>, default: usize| -> Result<usize, WorkspaceError> {
-        id.map_or(Ok(default), |id| {
-            blocks
-                .iter()
-                .position(|b| b.id == id)
-                .ok_or(WorkspaceError::NotFound(id))
-        })
-    };
+    let find =
+        |id: Option<String>, default: usize| -> Result<usize, WorkspaceError> {
+            id.map_or(Ok(default), |id| {
+                blocks
+                    .iter()
+                    .position(|b| b.id == id)
+                    .ok_or(WorkspaceError::NotFound(id))
+            })
+        };
     let from = find(selector.from, 0)?;
     let to = find(selector.to, usize::MAX)?;
     Ok(blocks
@@ -227,7 +370,11 @@ impl Workspace for PrivateWorkspace {
             .collect())
     }
 
-    async fn get_doc(&self, _actor: &Actor, id: &str) -> Result<Document, WorkspaceError> {
+    async fn get_doc(
+        &self,
+        _actor: &Actor,
+        id: &str,
+    ) -> Result<Document, WorkspaceError> {
         Ok(self.document(&*self.doc(id).await?))
     }
 
@@ -270,11 +417,19 @@ impl Workspace for PrivateWorkspace {
             .collect())
     }
 
-    async fn get_book(&self, _actor: &Actor, id: &str) -> Result<Document, WorkspaceError> {
+    async fn get_book(
+        &self,
+        _actor: &Actor,
+        id: &str,
+    ) -> Result<Document, WorkspaceError> {
         Err(unsupported(id))
     }
 
-    async fn space_tree(&self, _actor: &Actor, slug: &str) -> Result<Document, WorkspaceError> {
+    async fn space_tree(
+        &self,
+        _actor: &Actor,
+        slug: &str,
+    ) -> Result<Document, WorkspaceError> {
         let space = self
             .agent
             .space(slug)
@@ -321,7 +476,11 @@ impl Workspace for PrivateWorkspace {
         Err(read_only())
     }
 
-    async fn get_issue(&self, _actor: &Actor, key: &str) -> Result<Issue, WorkspaceError> {
+    async fn get_issue(
+        &self,
+        _actor: &Actor,
+        key: &str,
+    ) -> Result<Issue, WorkspaceError> {
         Err(unsupported(key))
     }
 
@@ -395,7 +554,9 @@ impl Workspace for PrivateWorkspace {
     ) -> Result<ExportArtifact, WorkspaceError> {
         // An export would write the plaintext to a file.
         Err(WorkspaceError::Forbidden(
-            "private pages are not exported: that would write them to disk unsealed".to_owned(),
+            "private pages are not exported: that would write them to disk \
+                unsealed"
+                .to_owned(),
         ))
     }
 
@@ -451,15 +612,21 @@ impl Workspace for PrivateWorkspace {
         })
     }
 
-    async fn get_template(&self, _actor: &Actor, name: &str) -> Result<String, WorkspaceError> {
+    async fn get_template(
+        &self,
+        _actor: &Actor,
+        name: &str,
+    ) -> Result<String, WorkspaceError> {
         Err(unsupported(name))
     }
 
     async fn site_info(&self) -> Result<SiteInfo, WorkspaceError> {
         Ok(SiteInfo {
             name: "Private spaces on this device".to_owned(),
-            summary: "End-to-end encrypted spaces, opened on this device only. Read-only."
-                .to_owned(),
+            summary:
+                "End-to-end encrypted spaces, opened on this device only. \
+                Read-only."
+                    .to_owned(),
             base_url: "vellum://".to_owned(),
         })
     }

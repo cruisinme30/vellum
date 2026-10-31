@@ -11,6 +11,24 @@ from: your own task lists, tasks assigned to you in pages and comments,
 issues assigned to you, review requests and things you captured from
 email or Slack.
 
+```image
+src: assets/mywork.jpg
+alt: My Work showing Today's tasks from pages, issues and review requests in one list
+caption: Everything assigned to you, from every page, issue and review, in one list.
+```
+
+```mermaid
+flowchart LR
+  P[Tasks in pages] --> MW((My Work))
+  C[Tasks in comments] --> MW
+  I[Issues assigned to you] --> MW
+  R[Review requests] --> MW
+  Q[Quick-add, email and Slack] --> MW
+  MW --> T[Today]
+  MW --> U[Upcoming]
+  MW --> IN[Inbox]
+```
+
 ## Buckets {#buckets}
 
 ::: facts
@@ -23,6 +41,10 @@ email or Slack.
 - Done: completed tasks, newest first
 
 :::
+
+To reschedule a task, drag it onto a section, or onto the bar of days and
+buckets that shows while you drag. From the keyboard, use the task's
+**Move** menu. Moving a task changes its start date; its due date stays.
 
 ## Task lists are files {#lists}
 
@@ -53,8 +75,30 @@ that person and shows in their My Work:
 - [ ] Send the launch checklist to legal @priya 2026-11-12
 ````
 
-Select text and press `T` to turn it into a task. Issues assigned to you
-appear in My Work too, without being copied.
+Select text and press `⌘⌥↵` (or the task button in the toolbar) to turn it into
+a task. On a page you can only read, press `T`. Issues assigned to you appear in
+My Work too, without being copied.
+
+## Your day and time zone {#settings}
+
+The **Time zone and reminders** section at the foot of My Work holds
+three settings, all yours alone:
+
+- **Time zone**: what "today", reminders and the digest follow. The form
+  suggests your browser's zone; leave it empty to use the server's.
+- **Day starts at**: when Today rolls over. A reminder on a date without
+  a time counts from here.
+- **Morning digest**: when the daily digest arrives; clear it to stop
+  the digest.
+
+Travelling? Change the zone and every relative reminder moves with you.
+
+## Mentions you haven't answered {#mentions}
+
+When someone mentions you in a comment on an issue or a page, the thread
+lands in your **Inbox** bucket with who mentioned you. It leaves when you
+reply, when the thread is resolved, or when you dismiss it. A thread
+assigned to you shows once, as an assignment.
 
 ## Fields {#fields}
 
@@ -64,5 +108,9 @@ subtasks; reminders; and a recurrence.
 
 ## Shared lists {#shared}
 
-Share a task list like any page. Everyone with access sees the same
+Open **Lists** under My Work to make a list or share one: type a
+person's handle and press **Share**. Everyone with access sees the same
 list, and tasks can be assigned to any member.
+
+On an issue, fill in **Assign to** when you comment to give that person
+the comment as a task in their My Work.

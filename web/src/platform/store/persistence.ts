@@ -56,9 +56,13 @@ export async function openLocalDatabase(name: string): Promise<LocalDatabase> {
       database.createObjectStore("records", { keyPath: ["collection", "key"] });
       database.createObjectStore("outbox", { keyPath: "id" });
       database.createObjectStore("meta");
-      const updates = database.createObjectStore("documentUpdates", { autoIncrement: true });
+      const updates = database.createObjectStore("documentUpdates", {
+        autoIncrement: true,
+      });
       updates.createIndex("byDoc", "documentId");
-      const documents = database.createObjectStore("documents", { keyPath: "documentId" });
+      const documents = database.createObjectStore("documents", {
+        keyPath: "documentId",
+      });
       documents.createIndex("byAccess", "lastAccess");
       documents.createIndex("bySpace", "spaceId");
       database.createObjectStore("pins", { keyPath: "spaceId" });
@@ -83,7 +87,8 @@ export async function readSnapshot(database: LocalDatabase): Promise<Snapshot> {
     tx.objectStore("meta").getAll(),
   ]);
   const meta = new Map<string, string>();
-  for (const [index, key] of metaKeys.entries()) meta.set(key, metaValues[index] ?? "");
+  for (const [index, key] of metaKeys.entries())
+    meta.set(key, metaValues[index] ?? "");
   const patches = records.map((row): Patch => ({
     op: "put",
     collection: row.collection,
@@ -94,7 +99,10 @@ export async function readSnapshot(database: LocalDatabase): Promise<Snapshot> {
 }
 
 /** Appends a mutation to the outbox. */
-export async function enqueue(database: LocalDatabase, mutation: PendingMutation): Promise<void> {
+export async function enqueue(
+  database: LocalDatabase,
+  mutation: PendingMutation,
+): Promise<void> {
   await database.put("outbox", mutation);
 }
 
@@ -116,7 +124,11 @@ export async function writeMeta(
  */
 export async function commitPull(
   database: LocalDatabase,
-  pull: { readonly patches: readonly Patch[]; readonly reset: boolean; readonly cursor: string },
+  pull: {
+    readonly patches: readonly Patch[];
+    readonly reset: boolean;
+    readonly cursor: string;
+  },
   confirmedThrough: number,
 ): Promise<void> {
   const tx = database.transaction(["records", "outbox", "meta"], "readwrite");
@@ -126,7 +138,11 @@ export async function commitPull(
   for (const patch of pull.patches) {
     writes.push(
       patch.op === "put"
-        ? records.put({ collection: patch.collection, key: patch.key, value: patch.value })
+        ? records.put({
+            collection: patch.collection,
+            key: patch.key,
+            value: patch.value,
+          })
         : records.delete([patch.collection, patch.key]),
     );
   }

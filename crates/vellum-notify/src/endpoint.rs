@@ -104,7 +104,10 @@ fn refused(error: &reqwest::Error) -> Option<String> {
 }
 
 impl HttpTransport for SafeTransport {
-    async fn post(&self, request: &OutboundRequest) -> Result<HttpResponse, TransportError> {
+    async fn post(
+        &self,
+        request: &OutboundRequest,
+    ) -> Result<HttpResponse, TransportError> {
         let _ = check_url(request.url.as_str(), &self.policy)
             .map_err(|e| TransportError::Refused(e.to_string()))?;
         let mut builder = self
@@ -144,8 +147,12 @@ mod tests {
     #[test]
     fn strict_policy() {
         let strict = policy(&[]);
-        assert!(check_url("https://hooks.northstar.dev/vellum", &strict).is_ok());
-        assert!(check_url("https://hooks.northstar.dev:8443/v", &strict).is_ok());
+        assert!(
+            check_url("https://hooks.northstar.dev/vellum", &strict).is_ok()
+        );
+        assert!(
+            check_url("https://hooks.northstar.dev:8443/v", &strict).is_ok()
+        );
         for bad in [
             "http://hooks.northstar.dev",
             "https://hooks.northstar.dev:22/",

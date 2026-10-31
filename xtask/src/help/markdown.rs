@@ -98,8 +98,9 @@ pub fn fences(text: &str) -> Vec<Fence> {
                 }
             }
             Some((marker, count, start, info)) => {
-                let closes = fence_marker(line)
-                    .is_some_and(|(m, c, rest)| m == *marker && c >= *count && rest.is_empty());
+                let closes = fence_marker(line).is_some_and(|(m, c, rest)| {
+                    m == *marker && c >= *count && rest.is_empty()
+                });
                 if closes {
                     found.push(Fence {
                         open_line: *start,
@@ -125,7 +126,11 @@ pub fn anchors(text: &str) -> Vec<String> {
         if let Some((marker, count, rest)) = fence_marker(line) {
             match in_fence {
                 None => in_fence = Some((marker, count)),
-                Some((m, c)) if m == marker && count >= c && rest.is_empty() => in_fence = None,
+                Some((m, c))
+                    if m == marker && count >= c && rest.is_empty() =>
+                {
+                    in_fence = None;
+                }
                 Some(_) => {}
             }
             continue;
@@ -134,7 +139,9 @@ pub fn anchors(text: &str) -> Vec<String> {
             continue;
         }
         let hashes = line.chars().take_while(|c| *c == '#').count();
-        let Some(heading) = line.get(hashes..).and_then(|h| h.strip_prefix(' ')) else {
+        let Some(heading) =
+            line.get(hashes..).and_then(|h| h.strip_prefix(' '))
+        else {
             continue;
         };
         if hashes == 0 || hashes > 6 {
@@ -198,8 +205,8 @@ mod tests {
 
     #[test]
     fn finds_top_level_fences_only() {
-        let page =
-            "a\n\n````markdown {corpus=\"x/y\"}\n```chart\nbody\n```\n````\n\n```bash\nls\n```\n";
+        let page = "a\n\n````markdown {corpus=\"x/y\"}\n```chart\nbody\n```\n\
+            ````\n\n```bash\nls\n```\n";
         let found = fences(page);
         assert_eq!(found.len(), 2);
         assert_eq!(
@@ -215,7 +222,8 @@ mod tests {
 
     #[test]
     fn headings_give_custom_ids_and_slugs() {
-        let page = "# Page\n\n## Share the page {#share}\n\n```text\n## not a heading\n```\n\n## Math blocks\n";
+        let page = "# Page\n\n## Share the page {#share}\n\n```text\n\
+            ## not a heading\n```\n\n## Math blocks\n";
         let found = anchors(page);
         assert!(found.contains(&"share".to_owned()));
         assert!(found.contains(&"share-the-page".to_owned()));

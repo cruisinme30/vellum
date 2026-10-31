@@ -22,8 +22,8 @@ use serde::{Deserialize, Serialize};
 /// latency target in brief §12 (50, 120, 150, 200, 300 ms and 3 s) so SLOs
 /// can count good events exactly.
 pub const BUCKETS_MS: [u64; 18] = [
-    5, 10, 25, 50, 75, 100, 120, 150, 200, 300, 500, 750, 1_000, 2_000, 3_000, 5_000, 10_000,
-    30_000,
+    5, 10, 25, 50, 75, 100, 120, 150, 200, 300, 500, 750, 1_000, 2_000, 3_000,
+    5_000, 10_000, 30_000,
 ];
 
 const SLOTS: usize = 60;
@@ -98,7 +98,9 @@ impl Counts {
                     return Some(lower as f64);
                 };
                 let into = (rank - seen) as f64 / (*count).max(1) as f64;
-                return Some(((upper - lower) as f64).mul_add(into, lower as f64));
+                return Some(
+                    ((upper - lower) as f64).mul_add(into, lower as f64),
+                );
             }
             seen += count;
             lower = upper.unwrap_or(lower);
@@ -112,7 +114,10 @@ fn bucket_of(duration: Duration) -> usize {
     BUCKETS_MS
         .iter()
         .position(|b| {
-            #[expect(clippy::cast_precision_loss, reason = "bounds are small integers")]
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "bounds are small integers"
+            )]
             let bound = *b as f64;
             ms <= bound
         })
@@ -165,7 +170,10 @@ impl RouteWindow {
         let oldest = now_minute.saturating_sub(minutes.saturating_sub(1));
         let mut total = Counts::empty();
         for slot in &self.slots {
-            if slot.minute != u64::MAX && slot.minute >= oldest && slot.minute <= now_minute {
+            if slot.minute != u64::MAX
+                && slot.minute >= oldest
+                && slot.minute <= now_minute
+            {
                 total.add(&slot.counts);
             }
         }
@@ -266,7 +274,10 @@ impl RouteMetrics {
         let boundaries = BUCKETS_MS
             .iter()
             .map(|ms| {
-                #[expect(clippy::cast_precision_loss, reason = "bounds are small integers")]
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "bounds are small integers"
+                )]
                 let s = *ms as f64 / 1000.0;
                 s
             })
@@ -319,11 +330,26 @@ impl RouteMetrics {
     }
 
     /// Records one finished request.
-    pub fn record(&self, method: &str, route: &str, status: u16, duration: Duration) {
+    pub fn record(
+        &self,
+        method: &str,
+        route: &str,
+        status: u16,
+        duration: Duration,
+    ) {
         self.record_at(now_minute(), method, route, status, duration);
     }
 
-    fn record_at(&self, minute: u64, method: &str, route: &str, status: u16, duration: Duration) {
+    /// Like [`Self::record`], filed under `minute` (minutes since the Unix
+    /// epoch) instead of the current one, so tests need no clock.
+    pub fn record_at(
+        &self,
+        minute: u64,
+        method: &str,
+        route: &str,
+        status: u16,
+        duration: Duration,
+    ) {
         let error = status >= 500;
         self.instruments.duration.record(
             duration.as_secs_f64(),
@@ -360,8 +386,11 @@ impl RouteMetrics {
         total
     }
 
+    /// Like [`Self::snapshot`], as if `now` (minutes since the Unix epoch)
+    /// were the current minute.
+    #[must_use]
     #[expect(clippy::cast_precision_loss, reason = "counts are far below 2^52")]
-    fn snapshot_at(&self, now: u64, minutes: u64) -> Vec<RouteStat> {
+    pub fn snapshot_at(&self, now: u64, minutes: u64) -> Vec<RouteStat> {
         let minutes = minutes.clamp(1, WINDOW_MINUTES);
         let mut stats: Vec<RouteStat> = self
             .lock()
@@ -448,7 +477,13 @@ mod tests {
     fn records_and_windows() {
         let m = RouteMetrics::new();
         for i in 0..10 {
-            m.record_at(100, "GET", "/a", if i == 0 { 500 } else { 200 }, ms(20));
+            m.record_at(
+                100,
+                "GET",
+                "/a",
+                if i == 0 { 500 } else { 200 },
+                ms(20),
+            );
         }
         m.record_at(101, "POST", "/b", 201, ms(200));
         m.record_at(50, "GET", "/a", 200, ms(1));

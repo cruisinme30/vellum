@@ -10,8 +10,8 @@
 use std::collections::HashSet;
 
 use tantivy::tokenizer::{
-    AsciiFoldingFilter, Language, LowerCaser, RemoveLongFilter, SimpleTokenizer, Stemmer,
-    TextAnalyzer, TokenStream,
+    AsciiFoldingFilter, Language, LowerCaser, RemoveLongFilter,
+    SimpleTokenizer, Stemmer, TextAnalyzer, TokenStream,
 };
 
 use crate::model::Fragment;
@@ -211,7 +211,8 @@ mod tests {
     #[test]
     fn snippets_mark_stemmed_matches() {
         let terms = query_terms("deploy");
-        let snippet = snippet("We deployed the gateway; deploys are weekly.", &terms);
+        let snippet =
+            snippet("We deployed the gateway; deploys are weekly.", &terms);
         assert_eq!(
             render(&snippet),
             "We [deployed] the gateway; [deploys] are weekly."
@@ -220,7 +221,8 @@ mod tests {
 
     #[test]
     fn long_text_is_windowed_around_the_first_match() {
-        let text = format!("{} needle {}", "hay ".repeat(50), "straw ".repeat(80));
+        let text =
+            format!("{} needle {}", "hay ".repeat(50), "straw ".repeat(80));
         let rendered = render(&snippet(&text, &query_terms("needle")));
         assert!(rendered.starts_with('…'));
         assert!(rendered.ends_with('…'));

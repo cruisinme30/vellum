@@ -13,7 +13,11 @@ import { Fragment, type ReactNode } from "react";
 type Block =
   | { readonly kind: "heading"; readonly level: number; readonly text: string }
   | { readonly kind: "paragraph" | "quote"; readonly text: string }
-  | { readonly kind: "list"; readonly ordered: boolean; readonly items: readonly string[] }
+  | {
+      readonly kind: "list";
+      readonly ordered: boolean;
+      readonly items: readonly string[];
+    }
   | { readonly kind: "code"; readonly text: string }
   | { readonly kind: "rule" };
 
@@ -24,7 +28,11 @@ const RULE = /^(?:-{3,}|\*{3,}|_{3,})$/;
 const FENCE = /^\s*(```|~~~)/;
 
 /** Collects lines while `test` holds, starting at `start`. */
-function run(lines: readonly string[], start: number, test: (line: string) => boolean): number {
+function run(
+  lines: readonly string[],
+  start: number,
+  test: (line: string) => boolean,
+): number {
   let end = start;
   while (end < lines.length && test(lines[end] ?? "")) end += 1;
   return end;
@@ -35,14 +43,24 @@ function blockAt(lines: readonly string[], index: number): [Block, number] {
   const line = lines[index] ?? "";
   const fence = FENCE.exec(line);
   if (fence) {
-    const close = run(lines, index + 1, (each) => !each.trimStart().startsWith(fence[1] ?? ""));
-    return [{ kind: "code", text: lines.slice(index + 1, close).join("\n") }, close + 1];
+    const close = run(
+      lines,
+      index + 1,
+      (each) => !each.trimStart().startsWith(fence[1] ?? ""),
+    );
+    return [
+      { kind: "code", text: lines.slice(index + 1, close).join("\n") },
+      close + 1,
+    ];
   }
   const heading = HEADING.exec(line);
   if (heading) {
     // A closing run of hashes is decoration: "## Title ##".
     const text = (heading[2] ?? "").replace(/ #+$/, "").trim();
-    return [{ kind: "heading", level: heading[1]?.length ?? 1, text }, index + 1];
+    return [
+      { kind: "heading", level: heading[1]?.length ?? 1, text },
+      index + 1,
+    ];
   }
   if (RULE.test(line.replaceAll(" ", ""))) return [{ kind: "rule" }, index + 1];
   for (const [pattern, ordered] of [
@@ -51,7 +69,9 @@ function blockAt(lines: readonly string[], index: number): [Block, number] {
   ] as const) {
     if (pattern.test(line)) {
       const end = run(lines, index, (each) => pattern.test(each));
-      const items = lines.slice(index, end).map((each) => pattern.exec(each)?.[1] ?? "");
+      const items = lines
+        .slice(index, end)
+        .map((each) => pattern.exec(each)?.[1] ?? "");
       return [{ kind: "list", ordered, items }, end];
     }
   }
@@ -74,7 +94,10 @@ function blockAt(lines: readonly string[], index: number): [Block, number] {
       !NUMBERED.test(each) &&
       !each.startsWith(">"),
   );
-  return [{ kind: "paragraph", text: lines.slice(index, end).join(" ") }, Math.max(end, index + 1)];
+  return [
+    { kind: "paragraph", text: lines.slice(index, end).join(" ") },
+    Math.max(end, index + 1),
+  ];
 }
 
 /** Splits Markdown into blocks. */
@@ -99,13 +122,22 @@ const INLINE: readonly {
   readonly pattern: RegExp;
   readonly node: (parts: readonly string[], key: string) => ReactNode;
 }[] = [
-  { pattern: /`([^`]+)`/, node: ([text], key) => <code key={key}>{text}</code> },
+  {
+    pattern: /`([^`]+)`/,
+    node: ([text], key) => <code key={key}>{text}</code>,
+  },
   {
     pattern: /\*\*([^*]+)\*\*/,
     node: ([text = ""], key) => <strong key={key}>{inline(text)}</strong>,
   },
-  { pattern: /\*([^*]+)\*/, node: ([text = ""], key) => <em key={key}>{inline(text)}</em> },
-  { pattern: /_([^_]+)_/, node: ([text = ""], key) => <em key={key}>{inline(text)}</em> },
+  {
+    pattern: /\*([^*]+)\*/,
+    node: ([text = ""], key) => <em key={key}>{inline(text)}</em>,
+  },
+  {
+    pattern: /_([^_]+)_/,
+    node: ([text = ""], key) => <em key={key}>{inline(text)}</em>,
+  },
   {
     pattern: /\[([^\]]{1,300})\]\(([^)\s]{1,2000})\)/,
     node: ([label = "", href = ""], key) => link(label, href, key),
@@ -113,7 +145,8 @@ const INLINE: readonly {
 ];
 
 /** Only web and mail links open; anything else reads as text. */
-const safeHref = (href: string) => (/^(https?:|mailto:|\/|#)/i.test(href) ? href : undefined);
+const safeHref = (href: string) =>
+  /^(https?:|mailto:|\/|#)/i.test(href) ? href : undefined;
 
 function link(label: string, href: string, key: string): ReactNode {
   const safe = safeHref(href);
@@ -131,9 +164,14 @@ function nextMark(text: string) {
   let best: { at: number; length: number; node: ReactNode } | undefined;
   for (const rule of INLINE) {
     const match = rule.pattern.exec(text);
-    if (match === null || (best !== undefined && match.index >= best.at)) continue;
+    if (match === null || (best !== undefined && match.index >= best.at))
+      continue;
     const key = String(match.index);
-    best = { at: match.index, length: match[0].length, node: rule.node(match.slice(1), key) };
+    best = {
+      at: match.index,
+      length: match[0].length,
+      node: rule.node(match.slice(1), key),
+    };
   }
   return best;
 }
@@ -177,13 +215,22 @@ function renderBlock(block: Block, key: number): ReactNode {
       return <hr key={key} />;
     }
     case "list": {
-      const items = block.items.map((item, index) => <li key={index}>{inline(item)}</li>);
-      return block.ordered ? <ol key={key}>{items}</ol> : <ul key={key}>{items}</ul>;
+      const items = block.items.map((item, index) => (
+        <li key={index}>{inline(item)}</li>
+      ));
+      return block.ordered ? (
+        <ol key={key}>{items}</ol>
+      ) : (
+        <ul key={key}>{items}</ul>
+      );
     }
   }
 }
 
-/** A section's Markdown, read-only, without a first heading that repeats `title`. */
+/**
+ * A section's Markdown, read-only, without a first heading that repeats
+ * `title`.
+ */
 export function MarkdownReader({
   markdown,
   title,
@@ -194,8 +241,12 @@ export function MarkdownReader({
   const blocks = parseBlocks(markdown);
   const [first] = blocks;
   const shown =
-    first?.kind === "heading" && first.text.trim() === title?.trim() ? blocks.slice(1) : blocks;
+    first?.kind === "heading" && first.text.trim() === title?.trim()
+      ? blocks.slice(1)
+      : blocks;
   return (
-    <div className="vl-markdown">{shown.map((block, index) => renderBlock(block, index))}</div>
+    <div className="vl-markdown">
+      {shown.map((block, index) => renderBlock(block, index))}
+    </div>
   );
 }

@@ -39,7 +39,11 @@
       "properties": {
         "title": { "type": "string" },
         "description": { "type": "string" },
-        "keywords": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
+        },
         "section": { "type": "string" },
         "icon": { "type": "string" },
         "attrs": { "type": "object" },

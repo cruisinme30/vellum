@@ -25,14 +25,18 @@ function item(title: string, overrides: Partial<SlashItem> = {}): SlashItem {
 
 describe("SLASH_ITEMS", () => {
   it("has unique ids and is grouped in section order", () => {
-    expect(new Set(SLASH_ITEMS.map((entry) => entry.id)).size).toBe(SLASH_ITEMS.length);
+    expect(new Set(SLASH_ITEMS.map((entry) => entry.id)).size).toBe(
+      SLASH_ITEMS.length,
+    );
     const sections: readonly string[] = SECTIONS;
     const order = SLASH_ITEMS.map((entry) => sections.indexOf(entry.section));
     expect(order).toEqual(order.toSorted((a, b) => a - b));
   });
 
   it("names the node each entry inserts", () => {
-    expect(SLASH_ITEMS.find((entry) => entry.title === "Heading 2")).toMatchObject({
+    expect(
+      SLASH_ITEMS.find((entry) => entry.title === "Heading 2"),
+    ).toMatchObject({
       node: "heading",
       attrs: { level: 2 },
     });
@@ -64,7 +68,9 @@ describe("filterSlashItems", () => {
   });
 
   it("matches inside a title", () => {
-    expect(titles(filterSlashItems("ble", [item("Table"), item("Text")]))).toEqual(["Table"]);
+    expect(
+      titles(filterSlashItems("ble", [item("Table"), item("Text")])),
+    ).toEqual(["Table"]);
   });
 
   it("keeps schema order between equal ranks", () => {

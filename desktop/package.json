@@ -54,6 +54,11 @@
     "ignoredBuiltDependencies": [
       "electron-winstaller",
       "unrs-resolver"
-    ]
+    ],
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-g3hv-75wg-m249"
+      ]
+    }
   }
 }

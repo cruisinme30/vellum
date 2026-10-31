@@ -62,7 +62,12 @@ pub async fn if_match(store: &dyn BlobStore) -> Outcome {
         .await;
     ensure!(
         C,
-        matches!(&stale, Err(StoreError::PreconditionFailed { current: Some(e), .. }) if *e == v2.etag),
+        matches!(
+            &stale,
+            Err(
+                StoreError::PreconditionFailed { current: Some(e), .. }
+            ) if *e == v2.etag
+        ),
         "stale write: {stale:?}"
     );
     ensure!(

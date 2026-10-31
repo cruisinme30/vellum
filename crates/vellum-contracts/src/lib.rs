@@ -14,8 +14,11 @@ pub mod principal;
 pub mod problem;
 pub mod service;
 
-pub use principal::{CredentialKind, Principal, REAUTHENTICATION_REQUIRED, Scope, ScopeSet};
+pub use principal::{
+    CredentialKind, Principal, REAUTHENTICATION_REQUIRED, Scope, ScopeSet,
+};
 pub use problem::ApiError;
 pub use service::{
-    BoxFuture, Handler, HttpMethod, Operation, OperationKind, Readiness, RequestContext, Service,
+    BoxFuture, Handler, HttpMethod, Operation, OperationKind, Readiness,
+    RequestContext, Service,
 };

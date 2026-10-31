@@ -14,33 +14,115 @@
   font-family: "Google Sans Flex";
   font-style: normal;
   font-weight: 400 700;
-  font-display: optional;
+  font-display: swap;
   src: url("fonts/google-sans-flex-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "Google Sans Flex";
   font-style: normal;
   font-weight: 400 700;
-  font-display: optional;
+  font-display: swap;
   src: url("fonts/google-sans-flex-latin-ext.woff2") format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
   font-family: "Google Sans Code";
   font-style: normal;
   font-weight: 400 600;
-  font-display: optional;
+  font-display: swap;
   src: url("fonts/google-sans-code-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "Google Sans Code";
   font-style: normal;
   font-weight: 400 600;
-  font-display: optional;
+  font-display: swap;
   src: url("fonts/google-sans-code-latin-ext.woff2") format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Until the web fonts arrive, text is set in Arial (Liberation Sans or
+   Arimo on Linux, which share its widths), scaled and given Google Sans's
+   line heights, so lines wrap and stand as they will in Google Sans. With
+   an unmatched fallback (DejaVu Sans on Linux, which system-ui picks), the
+   swap rewrapped every paragraph and the landing page moved by a CLS of
+   0.12 on a phone over slow 4G. Sizes are measured in Chromium against the
+   landing page's text, one face per weight the site uses.
+   WebKit on Linux looks local() fonts up by family name only, so the
+   bold faces end with the family names too: it then picks the family's
+   bold member by the face's weight, where other browsers have already
+   matched the full name. */
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 400;
+  src:
+    local("Arial"), local("ArialMT"), local("Liberation Sans"),
+    local("LiberationSans"), local("Arimo"), local("Arimo-Regular");
+  size-adjust: 100.1%;
+  ascent-override: 96.5%;
+  descent-override: 28.6%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 500;
+  src:
+    local("Arial"), local("ArialMT"), local("Liberation Sans"),
+    local("LiberationSans"), local("Arimo"), local("Arimo-Regular");
+  size-adjust: 103%;
+  ascent-override: 93.8%;
+  descent-override: 27.8%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 600;
+  src:
+    local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
+    local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold"),
+    local("Liberation Sans"), local("Arimo");
+  size-adjust: 98.6%;
+  ascent-override: 98%;
+  descent-override: 29%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 700;
+  src:
+    local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
+    local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold"),
+    local("Liberation Sans"), local("Arimo");
+  size-adjust: 101.2%;
+  ascent-override: 95.5%;
+  descent-override: 28.3%;
+  line-gap-override: 0%;
+}
+/* Courier New (Liberation Mono, Cousine) already matches Google Sans
+   Code's widths; only its line heights differ. */
+@font-face {
+  font-family: "Vellum Code Fallback";
+  font-weight: 400 600;
+  src:
+    local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono"),
+    local("LiberationMono"), local("Cousine"), local("Cousine-Regular");
+  ascent-override: 96.6%;
+  descent-override: 28.6%;
+  line-gap-override: 0%;
 }
 
 :root {
@@ -67,13 +149,50 @@
   --no: #5f6368;
   --night: #131314;
   --night-2: #1e1f20;
-  --shadow: 0 1px 3px rgba(60, 64, 67, 0.15), 0 24px 48px -24px rgba(60, 64, 67, 0.35);
-  --sans: "Google Sans Flex", "Google Sans", Roboto, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
-  --mono: "Google Sans Code", "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
+  --shadow:
+    0 1px 3px rgba(60, 64, 67, 0.15), 0 24px 48px -24px rgba(60, 64, 67, 0.35);
+  --sans:
+    "Google Sans Flex", "Vellum Sans Fallback", "Google Sans", Roboto,
+    system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --mono:
+    "Google Sans Code", "Vellum Code Fallback", "Roboto Mono", ui-monospace,
+    Menlo, Consolas, monospace;
 }
 
+/* Dark: the reader's choice from the theme toggle (theme.js, D308), or
+   the system setting until they make one. */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #131314;
+  --surface: #1b1c1d;
+  --surface-2: #1e1f20;
+  --surface-3: #282a2c;
+  --ink: #e3e3e3;
+  --ink-2: #c4c7c5;
+  --ink-3: #a8abaf;
+  --line: #333537;
+  --line-strong: #444746;
+  --primary: #a8c7fa;
+  --on-primary: #062e6f;
+  --container: #0842a0;
+  --on-container: #d3e3fd;
+  --blue: #8ab4f8;
+  --red: #f28b82;
+  --yellow: #fdd663;
+  --green: #81c995;
+  --yes: #81c995;
+  --part: #fdd663;
+  --no: #a8abaf;
+  --night: #0e0e0f;
+  --night-2: #1e1f20;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 24px 48px -24px rgba(0, 0, 0, 0.8);
+}
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --bg: #131314;
     --surface: #1b1c1d;
     --surface-2: #1e1f20;
@@ -96,7 +215,8 @@
     --no: #a8abaf;
     --night: #0e0e0f;
     --night-2: #1e1f20;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 24px 48px -24px rgba(0, 0, 0, 0.8);
+    --shadow:
+      0 1px 3px rgba(0, 0, 0, 0.5), 0 24px 48px -24px rgba(0, 0, 0, 0.8);
   }
 }
 
@@ -183,7 +303,8 @@ kbd {
   position: absolute;
   top: 8px;
   inset-inline-start: 8px;
-  z-index: 50;
+  /* Above the site bar (bar.css, z-index 200). */
+  z-index: 300;
   padding: 10px 16px;
   border-radius: 999px;
   background: var(--primary);
@@ -244,14 +365,18 @@ kbd {
   border-radius: 999px;
   font: 500 1rem/1.2 var(--sans);
   text-decoration: none;
-  transition: background-color 0.15s, box-shadow 0.15s;
+  transition:
+    background-color 0.15s,
+    box-shadow 0.15s;
 }
 .btn.pri {
   background: var(--primary);
   color: var(--on-primary);
 }
 .btn.pri:hover {
-  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  box-shadow:
+    0 1px 3px rgba(60, 64, 67, 0.3),
+    0 4px 8px 3px rgba(60, 64, 67, 0.15);
 }
 .btn.ton {
   background: var(--container);
@@ -284,23 +409,7 @@ kbd {
   gap: 12px;
 }
 
-/* Top bar. The links wrap instead of pushing off screen (#248). */
-header.top {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  border-bottom: 1px solid var(--line);
-  background: color-mix(in srgb, var(--bg) 88%, transparent);
-  backdrop-filter: saturate(1.4) blur(12px);
-}
-.bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 28px;
-  min-height: 64px;
-  padding-block: 8px;
-}
+/* The brand mark in the footer. The site bar is in bar.css (ADR 0071, D310). */
 .brand {
   display: inline-flex;
   align-items: center;
@@ -319,41 +428,6 @@ header.top {
   color: var(--ink-3);
   font-size: 1rem;
   font-weight: 400;
-}
-.nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 20px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 0.9375rem;
-}
-.nav a {
-  color: var(--ink-2);
-  text-decoration: none;
-}
-.nav a:hover,
-.nav a[aria-current] {
-  color: var(--primary);
-}
-.bar .end {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-inline-start: auto;
-}
-.bar .btn {
-  min-height: 40px;
-  padding: 8px 18px;
-  font-size: 0.9375rem;
-}
-@media (max-width: 860px) {
-  .nav {
-    order: 3;
-    width: 100%;
-    padding-bottom: 4px;
-  }
 }
 
 /* Status note under the bar: Vellum is not released yet. */
@@ -375,14 +449,22 @@ header.top {
   text-align: center;
 }
 .hero h1 {
-  max-width: 15ch;
+  /* 15ch in Google Sans Flex, in em so the fallback font shown before
+     it arrives does not narrow the heading and wrap it a line lower. */
+  max-width: 9.765em;
   margin: 0 auto 24px;
   font-size: clamp(2.75rem, 7vw, 5.5rem);
   line-height: 1.02;
   letter-spacing: -0.035em;
 }
 .hero h1 .grad {
-  background: linear-gradient(90deg, #4285f4, #9b72cb 45%, #d96570 80%, #f9ab00);
+  background: linear-gradient(
+    90deg,
+    #4285f4,
+    #9b72cb 45%,
+    #d96570 80%,
+    #f9ab00
+  );
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -435,10 +517,26 @@ header.top {
   inset: 10% 2% -4%;
   z-index: 0;
   background:
-    radial-gradient(40% 50% at 20% 40%, color-mix(in srgb, #4285f4 30%, transparent), transparent 70%),
-    radial-gradient(35% 45% at 80% 30%, color-mix(in srgb, #ea4335 16%, transparent), transparent 70%),
-    radial-gradient(40% 50% at 70% 85%, color-mix(in srgb, #34a853 18%, transparent), transparent 70%),
-    radial-gradient(30% 40% at 35% 90%, color-mix(in srgb, #fbbc04 20%, transparent), transparent 70%);
+    radial-gradient(
+      40% 50% at 20% 40%,
+      color-mix(in srgb, #4285f4 30%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      35% 45% at 80% 30%,
+      color-mix(in srgb, #ea4335 16%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      40% 50% at 70% 85%,
+      color-mix(in srgb, #34a853 18%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      30% 40% at 35% 90%,
+      color-mix(in srgb, #fbbc04 20%, transparent),
+      transparent 70%
+    );
   filter: blur(40px);
 }
 .browser {
@@ -1252,7 +1350,9 @@ pre.code {
   border-radius: 28px;
   color: var(--ink);
   text-decoration: none;
-  transition: background-color 0.15s, border-color 0.15s;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
 }
 .lc:hover {
   border-color: var(--primary);

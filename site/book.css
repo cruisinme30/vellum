@@ -4,43 +4,141 @@
  *
  * The look of the help books on the website (ADR 0027): Google Sans and
  * Google's Material 3 colours, matching the landing page. "light" is the
- * default theme and "navy" the dark one; both are recoloured. The fonts
- * are the site's own copies, three folders up from each book's theme/.
+ * default theme and "navy" the dark one; both are recoloured, and the
+ * site's light and dark toggle switches between them (D308). The fonts are
+ * the site's own copies; build-site.sh puts their path in for @FONTS@.
+ *
+ * mdBook sets html { font-size: 62.5% }, so 1rem is 10 px inside a book:
+ * sizes here are in those rems (1.7rem is 17 px), never in 16 px rems (D307).
  */
 
 @font-face {
   font-family: "Google Sans Flex";
   font-weight: 400 700;
-  font-display: optional;
-  src: url("../../../fonts/google-sans-flex-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  font-display: swap;
+  src: url("@FONTS@google-sans-flex-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
   font-family: "Google Sans Flex";
   font-weight: 400 700;
-  font-display: optional;
-  src: url("../../../fonts/google-sans-flex-latin-ext.woff2") format("woff2");
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  font-display: swap;
+  src: url("@FONTS@google-sans-flex-latin-ext.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
+/* The code font is only fetched once the page lays out code, so with
+   "swap" it nearly always arrived after first paint and the code, and
+   every line below it, moved (ADR 0071, D309). It is preloaded with the
+   text font, and "optional" keeps the fallback rather than swap late. */
 @font-face {
   font-family: "Google Sans Code";
   font-weight: 400 600;
   font-display: optional;
-  src: url("../../../fonts/google-sans-code-latin.woff2") format("woff2");
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  src: url("@FONTS@google-sans-code-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+/* Until the web fonts arrive, text is set in Arial (Liberation Sans or
+   Arimo on Linux, which share its widths), scaled and given Google Sans's
+   line heights, so lines wrap and stand as they will in Google Sans. With
+   an unmatched fallback (DejaVu Sans on Linux, which system-ui picks), the
+   swap rewrapped every paragraph and the landing page moved by a CLS of
+   0.12 on a phone over slow 4G. Sizes are measured in Chromium against the
+   landing page's text, one face per weight the site uses.
+   WebKit on Linux looks local() fonts up by family name only, so the
+   bold faces end with the family names too: it then picks the family's
+   bold member by the face's weight, where other browsers have already
+   matched the full name. */
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 400;
+  src:
+    local("Arial"), local("ArialMT"), local("Liberation Sans"),
+    local("LiberationSans"), local("Arimo"), local("Arimo-Regular");
+  size-adjust: 100.1%;
+  ascent-override: 96.5%;
+  descent-override: 28.6%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 500;
+  src:
+    local("Arial"), local("ArialMT"), local("Liberation Sans"),
+    local("LiberationSans"), local("Arimo"), local("Arimo-Regular");
+  size-adjust: 103%;
+  ascent-override: 93.8%;
+  descent-override: 27.8%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 600;
+  src:
+    local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
+    local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold"),
+    local("Liberation Sans"), local("Arimo");
+  size-adjust: 98.6%;
+  ascent-override: 98%;
+  descent-override: 29%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Vellum Sans Fallback";
+  font-weight: 700;
+  src:
+    local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
+    local("LiberationSans-Bold"), local("Arimo Bold"), local("Arimo-Bold"),
+    local("Liberation Sans"), local("Arimo");
+  size-adjust: 101.2%;
+  ascent-override: 95.5%;
+  descent-override: 28.3%;
+  line-gap-override: 0%;
+}
+/* Courier New (Liberation Mono, Cousine) already matches Google Sans
+   Code's widths; only its line heights differ. */
+@font-face {
+  font-family: "Vellum Code Fallback";
+  font-weight: 400 600;
+  src:
+    local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono"),
+    local("LiberationMono"), local("Cousine"), local("Cousine-Regular");
+  ascent-override: 96.6%;
+  descent-override: 28.6%;
+  line-gap-override: 0%;
 }
 
 :root {
-  --mono-font: "Google Sans Code", "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
+  --mono-font:
+    "Google Sans Code", "Vellum Code Fallback", "Roboto Mono", ui-monospace,
+    Menlo, Consolas, monospace;
   --content-max-width: 780px;
 }
 
 html {
-  font-family: "Google Sans Flex", "Google Sans", Roboto, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  font-family:
+    "Google Sans Flex",
+    "Vellum Sans Fallback",
+    "Google Sans",
+    Roboto,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Arial,
+    sans-serif;
 }
 
 body {
-  font-size: 1.0625rem;
+  font-size: 1.7rem;
   line-height: 1.65;
   overflow-wrap: anywhere;
 }
@@ -54,7 +152,7 @@ body {
 }
 
 .content h1 {
-  font-size: 2.4rem;
+  font-size: 3.6rem;
   line-height: 1.15;
 }
 
@@ -142,45 +240,61 @@ body {
   background: var(--quote-bg);
 }
 
-/* The site bar from theme/header.hbs. It wraps on small screens. mdBook
-   pulls .page up by the menu bar's height to hide an invisible hover strip
-   that sits above the menu bar; the site bar takes that strip's place, so
-   it pushes back down and the strip is turned off. The menu bar still
-   comes back when the reader scrolls up. */
-.vellum-site + #mdbook-menu-bar-hover-placeholder {
+/* The site bar (site/bar.html, styled by bar.css) runs across the top of
+   every page, over the sidebar, as on the landing page and the docs home
+   (ADR 0071, D310). It is fixed, so the sidebar, the page and mdBook's own
+   menu bar start below it, at --vb-height, which theme.js keeps at the
+   bar's real height when its links wrap.
+   mdBook's invisible hover strip above the menu bar is turned off, and the
+   page no longer pulls itself up over it. */
+header.vellum-site {
+  position: fixed;
+  inset: 0 0 auto 0;
+}
+/* A chart's data table for screen readers is visually hidden; as a table
+   it ignores the 1 px width and would widen the page, so it is a block.
+   Card grids never ask for a column wider than the page, so they fit a
+   phone with large text. */
+.vl-render.vl-site-block table.vl-sr-only {
+  display: block;
+}
+.vl-render.vl-site-block :is(.vl-cards, .vl-pages) {
+  grid-template-columns: repeat(auto-fill, minmax(min(14em, 100%), 1fr));
+}
+/* Diagram labels may run a little past their box when the reader's font
+   is wider than the one the layout measured; show them whole. */
+.vl-site-block foreignObject {
+  overflow: visible;
+}
+.vellum-site ~ #mdbook-menu-bar-hover-placeholder {
   display: none;
 }
-.vellum-site {
-  margin-block-start: var(--menu-bar-height);
-  margin-inline: calc(0px - var(--page-padding));
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 20px;
-  padding: 10px var(--page-padding);
-  border-bottom: 1px solid var(--sidebar-spacer);
-  background: var(--sidebar-bg);
-  font-size: 0.875rem;
+.page-wrapper {
+  padding-block-start: var(--vb-height);
 }
-.vellum-site a {
-  color: var(--sidebar-fg);
-  text-decoration: none;
+.page {
+  margin-block-start: 0;
 }
-.vellum-site a:hover {
-  color: var(--links);
-  text-decoration: underline;
+.sidebar {
+  top: var(--vb-height);
 }
-.vellum-site .vellum-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-inline-end: 8px;
-  color: var(--fg);
-  font-size: 1rem;
-  font-weight: 500;
+#mdbook-menu-bar.sticky,
+#mdbook-menu-bar:hover,
+html.sidebar-visible #mdbook-menu-bar {
+  top: var(--vb-height) !important;
 }
-.vellum-site img {
-  display: block;
+html {
+  scroll-padding-top: calc(var(--vb-height) + var(--menu-bar-height));
+}
+/* The bar's own colours follow mdBook's theme class too, so a book that
+   mdBook shows in navy never gets a light bar. */
+.navy {
+  --vb-bg: #131314;
+  --vb-ink: #e3e3e3;
+  --vb-ink-2: #c4c7c5;
+  --vb-line: #333537;
+  --vb-line-strong: #444746;
+  --vb-primary: #a8c7fa;
 }
 
 /* WCAG 2.2 AA fixes for mdBook's default theme (#249). */
@@ -192,14 +306,39 @@ body {
   --links: #a8c7fa;
 }
 
-/* Syntax colours below 4.5:1 in the dark code theme. */
-.navy .hljs-attr,
-.coal .hljs-attr,
-.ayu .hljs-attr {
+/* Syntax colours below 4.5:1 in the dark code themes. */
+.navy
+  :is(
+    .hljs-attr,
+    .hljs-variable,
+    .hljs-template-variable,
+    .hljs-tag,
+    .hljs-name,
+    .hljs-regexp
+  ),
+.coal
+  :is(
+    .hljs-attr,
+    .hljs-variable,
+    .hljs-template-variable,
+    .hljs-tag,
+    .hljs-name,
+    .hljs-regexp
+  ),
+.ayu
+  :is(
+    .hljs-attr,
+    .hljs-variable,
+    .hljs-template-variable,
+    .hljs-tag,
+    .hljs-name,
+    .hljs-regexp
+  ) {
   color: #e48a8a;
 }
 
-/* Links in running text are underlined, not told apart by colour alone (SC 1.4.1). */
+/* Links in running text are underlined, not told apart by colour alone (SC
+   1.4.1). */
 .content main a:not(.header) {
   text-decoration: underline;
   text-underline-offset: 0.15em;
@@ -217,28 +356,155 @@ body {
 
 /* Site bar and sidebar links are at least 24 px tall, so stacked links
    keep the minimum target size (SC 2.5.8). */
-.vellum-site a,
-.chapter li a {
+.vellum-site a {
   display: inline-flex;
   align-items: center;
   min-height: 24px;
 }
 
-/* Long titles and code wrap instead of spilling over the page or the next cell. */
+/* A chapter link is the number and the title side by side. As a flex box
+   it would drop the space between them ("1.1.The editor"), so the gap
+   puts it back. */
+.chapter li a {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  min-height: 24px;
+}
+
+/* A link that fills a table cell is a target of its own, not a link in a
+   sentence, so it gets the 24 px minimum height too (SC 2.5.8). */
+td > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+/* Long titles and code wrap instead of spilling over the page or the next
+   cell. Table cells break a word only when it cannot fit on its own line,
+   so short words such as "single" are never split across lines. */
 .chapter li a,
-td,
-th,
 td code {
   overflow-wrap: anywhere;
+}
+td,
+th {
+  overflow-wrap: break-word;
 }
 
 td code {
   white-space: normal;
 }
 
-/* Scrolling code blocks and tables take keyboard focus (build-site.sh adds tabindex). */
+/* Scrolling code blocks and tables take keyboard focus (build-site.sh adds
+   tabindex). */
 pre > code:focus-visible,
-.table-wrapper:focus-visible {
+.table-wrapper:focus-visible,
+.vl-table-wrap:focus-visible,
+.vl-board:focus-visible {
   outline: 3px solid var(--links);
   outline-offset: 2px;
+}
+
+/* The feedback line at the end of every page (ADR 0024, D257). */
+.vellum-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin-block: 3em 1em;
+  padding-block-start: 1em;
+  border-top: 1px solid var(--sidebar-spacer);
+  font-size: 1.4rem;
+}
+.vellum-feedback .vellum-edit {
+  margin-inline-start: auto;
+}
+
+/* The book title in the menu bar: mdBook's weight 200 is too faint in
+   Google Sans Flex (D307). */
+.menu-title {
+  font-weight: 500;
+}
+
+/* One light and dark toggle for the whole site (D308), in the site bar,
+   replaces mdBook's menu of five themes, three of which were never
+   recoloured. */
+#mdbook-menu-bar #mdbook-theme-toggle {
+  display: none;
+}
+
+/* Rendered rich blocks (ADR 0071, D309, D311): diagrams, callouts, cards
+   and tabs drawn by vellum-render, themed by render.css. blocks.js turns
+   each tabs block into a row of tabs; printed, every tab shows. */
+.vl-render.vl-site-block {
+  font-size: 1.6rem;
+}
+/* Diagram labels: the renderer sized each box for 16 px text at a line
+   height of 1.5 with no paragraph margins; the book's own paragraph and
+   line-height rules must not reach inside. */
+.vl-site-block foreignObject {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.vl-site-block foreignObject p {
+  margin: 0;
+}
+/* mdBook re-indents the HTML it passes through, so the white space between
+   a label's tags would show as an empty first line in labels that keep
+   white space; collapsing it keeps the label in its box. */
+.vl-site-block foreignObject div[style*="break-spaces"] {
+  white-space: normal !important;
+}
+.vl-site-tablist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: -0.5em -1em 0.75em;
+  padding: 0 0.5em;
+  border-bottom: 1px solid var(--vl-outline-variant);
+}
+.vl-site-tab {
+  min-height: 40px;
+  padding: 8px 16px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--vl-on-surface-variant, var(--fg));
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.vl-site-tab[aria-selected="true"] {
+  border-bottom-color: var(--vl-primary);
+  color: var(--vl-primary);
+}
+.vl-site-tab:hover {
+  background: color-mix(in srgb, var(--vl-primary) 8%, transparent);
+}
+.vl-site-tab:focus-visible {
+  outline: 3px solid var(--vl-primary);
+  outline-offset: -3px;
+}
+.vl-site-tabs .vl-site-tab-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media print {
+  .vl-site-tablist {
+    display: none;
+  }
+  .vl-site-tabs .vl-tab[hidden] {
+    display: block;
+  }
+  .vl-site-tabs .vl-site-tab-heading {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+  }
 }

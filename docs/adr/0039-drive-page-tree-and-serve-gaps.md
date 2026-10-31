@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D168, D169, D170, D171
-- Issue: #448, #449, #450, #451
-- Pull requests: to be linked when merged
+- Decisions: D168, D169, D170, D171, D211, D212, D213
+- Issue: #448, #449, #450, #451, #502
+- Pull requests: #466; the uploads change to be linked when merged
 
 :::
 
@@ -25,7 +25,8 @@ for siblings, the tree took one request per folder, and a new account
 had no My Drive until a client made one. Search in `vellum serve`, the
 fifth gap, is #429 and lands in #465. The drive's rule from ADR 0012
 still holds: what you see is the disk, and the index can be rebuilt
-from the files alone.
+from the files alone. Red team round 4 (#495) then found that serve took
+no file uploads at all (#502), though its upload check was ready.
 
 ## Decisions
 
@@ -72,6 +73,36 @@ from the files alone.
 - `vellum serve` makes the missing drives at startup and every 30
   seconds after. `GET /v1/drive/my-drive` makes one on a first visit.
 
+### D211: a page's files live in its directory
+
+- A page `Plan.md` keeps its uploaded files in `Plan/.attachments/`, so
+  rename, move, copy, trash and restore carry them with the page.
+- Anything under `.attachments/` is an asset: an uploaded `notes.md` is
+  never indexed as a page, and the watcher ignores changes there.
+- Pages link to a file as `vellum://attachment/<page id>/<name>`, and a
+  copy re-points that link at the copy. A taken name gets a number, as
+  in `chart (2).png`.
+- Files count toward the space quota, and a page holds at most 1,000.
+
+### D212: uploads go through one checked route
+
+- `vellum serve` mounts `/api/v1/attachments/{page_id}`: `POST` (with
+  `?name=`) uploads, `GET` lists, `GET` and `DELETE` on `/{name}`.
+- Rights are checked before the body is read: edit and `write:direct`
+  to change, view and `read` to read. Share links get nothing.
+- Every upload must say its `Content-Length`, at most 100 MiB, and then
+  passes `vellum_security::upload::check`, scan included.
+- Downloads get the sniffed type, `nosniff` and a sandbox CSP. Only
+  raster images and PDF show inline; the rest download.
+
+### D213: an upload gets time for its size
+
+- The upload mount has its own body limit, 100 MiB, in place of the
+  API's 10 MiB.
+- A body sent to the upload prefix gets the 2 minutes of D198 plus its
+  declared length at 512 KiB a second, at most 30 minutes more. Gaps
+  between chunks are still bounded at 15 seconds.
+
 ## Alternatives
 
 - **A page with children becomes `Plan/index.md`**: its path would
@@ -83,6 +114,10 @@ from the files alone.
 - **An identity hook on user creation**: it would touch every way an
   account is made. A periodic check plus making the drive on first visit
   covers them all.
+- **Uploads as typed operations with base64 bodies**: a third larger,
+  and the gateway would read the body before checking rights.
+- **One shared `attachments/` folder per space**: files would not move,
+  copy or trash with their page.
 
 ## Consequences
 
@@ -91,3 +126,6 @@ from the files alone.
 - A tree for a large space checks permission item by item.
 - With more than one replica each one checks for missing My Drives; a
   race is safe, and running it once per cluster is #439's work.
+- The web app and renderer turn `vellum://attachment/` links into the
+  download URL; the upload response gives both.
+- A space with a quota lists its files on each upload to count them.

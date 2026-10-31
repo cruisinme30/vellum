@@ -1,0 +1,96 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+/* Templates and recurring issues (issue 144). */
+
+.vl-tpl-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-tpl-row,
+.vl-tpl-recurring {
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 8px;
+}
+
+.vl-tpl-row-head,
+.vl-tpl-actions,
+.vl-tpl-confirm,
+.vl-tpl-recurring {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.vl-tpl-row-head {
+  justify-content: space-between;
+}
+
+.vl-tpl-row-head h3 {
+  min-width: 0;
+  margin: 0;
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.vl-tpl-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 4px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+}
+
+.vl-tpl-body {
+  margin: 4px 0 0;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vl-tpl-editor {
+  min-width: 0;
+  margin: 8px 0;
+}
+
+.vl-tpl-editor textarea,
+.vl-tpl-recurring select {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: 4px;
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  font: inherit;
+}
+
+.vl-tpl-editor .vl-settings-field:has(textarea) {
+  max-width: 720px;
+}
+
+.vl-tpl-recurring-title {
+  flex: 1 1 240px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.vl-tpl-recurring .vl-field-error {
+  flex-basis: 100%;
+  margin: 0;
+}

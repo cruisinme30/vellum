@@ -45,7 +45,10 @@ import { NODES } from "./schema/blocks.gen";
 const NODE_NAMES = new Set<string>(NODES.map((node) => node.name));
 
 function types(node: JSONContent): string[] {
-  return [node.type ?? "", ...(node.content ?? []).flatMap((child) => types(child))];
+  return [
+    node.type ?? "",
+    ...(node.content ?? []).flatMap((child) => types(child)),
+  ];
 }
 
 describe("inline builders", () => {
@@ -65,8 +68,14 @@ describe("inline builders", () => {
   });
 
   it("builds inline atoms", () => {
-    expect(mention("sam")).toEqual({ type: "mention", attrs: { handle: "sam" } });
-    expect(wiki("Home")).toEqual({ type: "wikiLink", attrs: { target: "Home", label: "" } });
+    expect(mention("sam")).toEqual({
+      type: "mention",
+      attrs: { handle: "sam" },
+    });
+    expect(wiki("Home")).toEqual({
+      type: "wikiLink",
+      attrs: { target: "Home", label: "" },
+    });
     expect(issue("ENG-1").attrs).toEqual({ key: "ENG-1" });
     expect(date("2026-01-01").attrs).toEqual({ date: "2026-01-01" });
     expect(math("x^2").attrs).toEqual({ literal: "x^2" });
@@ -98,7 +107,9 @@ describe("block builders", () => {
       "text",
     ]);
     expect(ol("a").attrs).toEqual({ start: 1 });
-    expect(tasks([true, "done"]).content?.[0]?.attrs).toEqual({ checked: true });
+    expect(tasks([true, "done"]).content?.[0]?.attrs).toEqual({
+      checked: true,
+    });
     expect(listBlock("steps", "one").content?.[0]?.type).toBe("orderedList");
     expect(listBlock("facts", "k: v").content?.[0]?.type).toBe("bulletList");
   });
@@ -106,10 +117,9 @@ describe("block builders", () => {
   it("builds containers", () => {
     expect(callout("warn", p("x")).attrs).toEqual({ kind: "warn" });
     expect(details("More", p("x")).attrs).toEqual({ summary: "More" });
-    expect(columns([p("a")], [p("b")]).content?.map((column) => column.type)).toEqual([
-      "column",
-      "column",
-    ]);
+    expect(
+      columns([p("a")], [p("b")]).content?.map((column) => column.type),
+    ).toEqual(["column", "column"]);
     expect(tabs(["One", p("x")]).content?.[0]).toMatchObject({
       type: "tab",
       attrs: { title: "One" },
@@ -120,21 +130,34 @@ describe("block builders", () => {
   it("builds leaf blocks", () => {
     expect(hr()).toEqual({ type: "horizontalRule" });
     expect(toc()).toEqual({ type: "toc" });
-    expect(fence("chart", "values: 1").attrs).toEqual({ lang: "chart", args: "" });
-    expect(fence("table", "a", "sortable").attrs).toEqual({ lang: "table", args: "sortable" });
+    expect(fence("chart", "values: 1").attrs).toEqual({
+      lang: "chart",
+      args: "",
+    });
+    expect(fence("table", "a", "sortable").attrs).toEqual({
+      lang: "table",
+      args: "sortable",
+    });
     expect(codeBlock("ts", "let x").attrs).toEqual({ language: "ts" });
     expect(mathBlock("x").content).toEqual([{ type: "text", text: "x" }]);
     expect(linkCard("https://a.example", "A").attrs).toEqual({
       url: "https://a.example",
       title: "A",
     });
-    expect(embed("https://a.example").attrs).toEqual({ url: "https://a.example" });
-    expect(image("a.png", "Alt").attrs).toMatchObject({ src: "a.png", alt: "Alt" });
+    expect(embed("https://a.example").attrs).toEqual({
+      url: "https://a.example",
+    });
+    expect(image("a.png", "Alt").attrs).toMatchObject({
+      src: "a.png",
+      alt: "Alt",
+    });
   });
 
   it("builds tables with a header row", () => {
     const built = table(["A", "B"], ["1", "2"]);
-    expect(built.content?.map((row) => row.content?.map((cell) => cell.type))).toEqual([
+    expect(
+      built.content?.map((row) => row.content?.map((cell) => cell.type)),
+    ).toEqual([
       ["tableHeader", "tableHeader"],
       ["tableCell", "tableCell"],
     ]);
@@ -163,7 +186,9 @@ describe("block builders", () => {
       hr(),
       p(mention("a"), wiki("w"), issue("I-1"), date("d"), math("m")),
     );
-    const unknown = types(document_).filter((type) => type !== "text" && !NODE_NAMES.has(type));
+    const unknown = types(document_).filter(
+      (type) => type !== "text" && !NODE_NAMES.has(type),
+    );
     expect(unknown).toEqual([]);
   });
 });
@@ -174,9 +199,11 @@ describe("withIds", () => {
     const first = withIds("page", document_);
     const again = withIds("page", document_);
     expect(again).toEqual(first);
-    const ids = [first.content?.[0], first.content?.[1]?.content?.[0], first.content?.[2]].map(
-      (node): unknown => node?.attrs?.["blockId"],
-    );
+    const ids = [
+      first.content?.[0],
+      first.content?.[1]?.content?.[0],
+      first.content?.[2],
+    ].map((node): unknown => node?.attrs?.["blockId"]);
     expect(ids.every((id) => isBlockId(id))).toBe(true);
     expect(new Set(ids).size).toBe(3);
     expect(first.attrs).toBeUndefined();

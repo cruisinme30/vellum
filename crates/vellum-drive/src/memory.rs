@@ -22,8 +22,8 @@ use vellum_kernel::{ObjectId, SpaceId, Timestamp, UserId, VersionId};
 use vellum_store::BlobPath;
 
 use crate::error::DriveResult;
-use crate::model::{Activity, Node, Space, VersionRecord};
-use crate::ports::{Access, DriveIndex, Permission};
+use crate::model::{Activity, DriveTotals, Node, Space, VersionRecord};
+use crate::ports::{Access, DriveIndex, Member, Permission, SpaceRole};
 
 #[derive(Debug, Default)]
 struct State {
@@ -101,7 +101,11 @@ impl DriveIndex for MemoryIndex {
         Ok(self.lock().nodes.get(&id).cloned())
     }
 
-    async fn node_at(&self, space: SpaceId, path: &BlobPath) -> DriveResult<Option<Node>> {
+    async fn node_at(
+        &self,
+        space: SpaceId,
+        path: &BlobPath,
+    ) -> DriveResult<Option<Node>> {
         Ok(self
             .lock()
             .nodes
@@ -110,7 +114,11 @@ impl DriveIndex for MemoryIndex {
             .cloned())
     }
 
-    async fn children(&self, space: SpaceId, parent: Option<ObjectId>) -> DriveResult<Vec<Node>> {
+    async fn children(
+        &self,
+        space: SpaceId,
+        parent: Option<ObjectId>,
+    ) -> DriveResult<Vec<Node>> {
         let mut out: Vec<Node> = self
             .lock()
             .nodes
@@ -134,7 +142,11 @@ impl DriveIndex for MemoryIndex {
         Ok(out)
     }
 
-    async fn by_title(&self, space: SpaceId, title: &str) -> DriveResult<Vec<Node>> {
+    async fn by_title(
+        &self,
+        space: SpaceId,
+        title: &str,
+    ) -> DriveResult<Vec<Node>> {
         Ok(self
             .lock()
             .nodes
@@ -188,7 +200,12 @@ impl DriveIndex for MemoryIndex {
         Ok(out.into_iter().map(|(id, _)| id).collect())
     }
 
-    async fn touch(&self, user: UserId, node: ObjectId, at: Timestamp) -> DriveResult<()> {
+    async fn touch(
+        &self,
+        user: UserId,
+        node: ObjectId,
+        at: Timestamp,
+    ) -> DriveResult<()> {
         let _ = self
             .lock()
             .recents
@@ -198,7 +215,11 @@ impl DriveIndex for MemoryIndex {
         Ok(())
     }
 
-    async fn recent(&self, user: UserId, limit: usize) -> DriveResult<Vec<(ObjectId, Timestamp)>> {
+    async fn recent(
+        &self,
+        user: UserId,
+        limit: usize,
+    ) -> DriveResult<Vec<(ObjectId, Timestamp)>> {
         let state = self.lock();
         let mut out: Vec<(ObjectId, Timestamp)> = state
             .recents
@@ -215,7 +236,11 @@ impl DriveIndex for MemoryIndex {
         Ok(())
     }
 
-    async fn activity(&self, node: ObjectId, limit: usize) -> DriveResult<Vec<Activity>> {
+    async fn activity(
+        &self,
+        node: ObjectId,
+        limit: usize,
+    ) -> DriveResult<Vec<Activity>> {
         Ok(self
             .lock()
             .activity
@@ -227,7 +252,11 @@ impl DriveIndex for MemoryIndex {
             .collect())
     }
 
-    async fn set_links(&self, source: ObjectId, targets: &[ObjectId]) -> DriveResult<()> {
+    async fn set_links(
+        &self,
+        source: ObjectId,
+        targets: &[ObjectId],
+    ) -> DriveResult<()> {
         let mut unique: Vec<ObjectId> = targets.to_vec();
         unique.sort_unstable();
         unique.dedup();
@@ -240,7 +269,9 @@ impl DriveIndex for MemoryIndex {
             .lock()
             .links
             .iter()
-            .filter(|(source, targets)| **source != target && targets.contains(&target))
+            .filter(|(source, targets)| {
+                **source != target && targets.contains(&target)
+            })
             .map(|(source, _)| *source)
             .collect();
         out.sort_unstable();
@@ -284,6 +315,33 @@ impl DriveIndex for MemoryIndex {
             .sum();
         Ok(nodes.saturating_add(versions))
     }
+
+    async fn totals(&self, now: Timestamp) -> DriveResult<DriveTotals> {
+        let state = self.lock();
+        let mut totals = DriveTotals {
+            spaces: count(state.spaces.len()),
+            versions: count(state.versions.len()),
+            version_bytes: state.versions.values().map(|v| v.size).sum(),
+            ..DriveTotals::default()
+        };
+        for node in state.nodes.values() {
+            totals.add_node(node.kind, node.is_live(), node.size);
+        }
+        let day = DAY_MS;
+        let ago = |a: &Activity| now.unix_ms().saturating_sub(a.at.unix_ms());
+        totals.events_1d =
+            count(state.activity.iter().filter(|a| ago(a) <= day).count());
+        totals.events_7d =
+            count(state.activity.iter().filter(|a| ago(a) <= 7 * day).count());
+        Ok(totals)
+    }
+}
+
+/// A day in milliseconds.
+const DAY_MS: i64 = 86_400_000;
+
+fn count(n: usize) -> u64 {
+    u64::try_from(n).unwrap_or(u64::MAX)
 }
 
 /// A role a person holds on a space or node.
@@ -371,7 +429,11 @@ impl MemoryAccess {
         Ok(chain)
     }
 
-    async fn role(&self, user: UserId, node: ObjectId) -> DriveResult<Option<Role>> {
+    async fn role(
+        &self,
+        user: UserId,
+        node: ObjectId,
+    ) -> DriveResult<Option<Role>> {
         let chain = self.chain(node).await?;
         let grants = self.lock();
         Ok(chain
@@ -416,7 +478,11 @@ impl Access for MemoryAccess {
         Ok(out)
     }
 
-    async fn accessible(&self, user: UserId, space: SpaceId) -> DriveResult<Vec<ObjectId>> {
+    async fn accessible(
+        &self,
+        user: UserId,
+        space: SpaceId,
+    ) -> DriveResult<Vec<ObjectId>> {
         let mut out = Vec::new();
         for node in self.index.nodes(space).await? {
             if self.role(user, node.id).await?.is_some() {
@@ -426,13 +492,61 @@ impl Access for MemoryAccess {
         Ok(out)
     }
 
-    async fn tree_changed(&self, _space: SpaceId, _nodes: &[ObjectId]) -> DriveResult<()> {
+    async fn tree_changed(
+        &self,
+        _space: SpaceId,
+        _nodes: &[ObjectId],
+    ) -> DriveResult<()> {
         // Inheritance is computed on every check from the live tree.
         Ok(())
     }
 
-    async fn grant_owner(&self, user: UserId, _space: SpaceId, node: ObjectId) -> DriveResult<()> {
+    async fn grant_owner(
+        &self,
+        user: UserId,
+        _space: SpaceId,
+        node: ObjectId,
+    ) -> DriveResult<()> {
         self.grant(user, node, Role::Manager);
+        Ok(())
+    }
+
+    async fn members(&self, space: SpaceId) -> DriveResult<Vec<Member>> {
+        let root = ObjectId::from(space);
+        let mut out: Vec<Member> = self
+            .lock()
+            .iter()
+            .filter(|((node, _), _)| *node == root)
+            .map(|((_, user), role)| Member {
+                user: *user,
+                role: match role {
+                    Role::Viewer => SpaceRole::Viewer,
+                    Role::Editor => SpaceRole::Editor,
+                    Role::Manager => SpaceRole::Manager,
+                },
+            })
+            .collect();
+        out.sort_by_key(|m| m.user);
+        Ok(out)
+    }
+
+    async fn set_member(
+        &self,
+        space: SpaceId,
+        user: UserId,
+        role: Option<SpaceRole>,
+    ) -> DriveResult<()> {
+        let root = ObjectId::from(space);
+        match role {
+            None => self.revoke(user, root),
+            Some(SpaceRole::Viewer | SpaceRole::Commenter) => {
+                self.grant(user, root, Role::Viewer);
+            }
+            Some(SpaceRole::Editor) => self.grant(user, root, Role::Editor),
+            Some(SpaceRole::Manager | SpaceRole::Owner) => {
+                self.grant(user, root, Role::Manager);
+            }
+        }
         Ok(())
     }
 

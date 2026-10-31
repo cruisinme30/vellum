@@ -2,15 +2,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { useId, useState, type ComponentProps } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 
 import { failureText } from "../data/failure";
 import { Ready, ServerScreen } from "../data/server-apis";
 import { useLoaded } from "../data/use-loaded";
+import { useServices, useWorkspace } from "../data/workspace-context";
 import { useT } from "../i18n/i18n";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
 
 import type { CommentOut, IssueOut, TeamOut, WorkApi } from "./api";
 import { stateName } from "./issues-page";
+import { RepeatSettings } from "./planning/repeat-settings";
+import { TriageSuggestion } from "./planning/suggestion";
 
 import "./work.css";
 
@@ -28,7 +32,10 @@ interface Loaded {
 }
 
 async function loadIssue(api: WorkApi, key: string): Promise<Loaded> {
-  const [issue, teams] = await Promise.all([api.issue(key), api.teams()]);
+  const [issue, teams] = await Promise.all([
+    api.issue(key),
+    api.teams({ includeArchived: true }),
+  ]);
   return { issue, team: teams.find((team) => team.key === issue.team) };
 }
 
@@ -65,18 +72,38 @@ function StatePicker({
   );
 }
 
-function Comments({ api, issueKey }: { readonly api: WorkApi; readonly issueKey: string }) {
+function Comments({
+  api,
+  issueKey,
+}: {
+  readonly api: WorkApi;
+  readonly issueKey: string;
+}) {
   const t = useT();
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<string>();
-  const loaded = useLoaded(() => api.comments(issueKey), [api, issueKey, version], failureText);
+  const loaded = useLoaded(
+    () => api.comments(issueKey),
+    [api, issueKey, version],
+    failureText,
+  );
   const submit: NonNullable<ComponentProps<"form">["onSubmit"]> = (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const body = new FormData(form).get("body");
+    const data = new FormData(form);
+    const body = data.get("body");
+    const assign = data.get("assign");
     if (typeof body !== "string" || body.trim() === "") return;
     setError(undefined);
-    api.addComment(issueKey, body.trim()).then(
+    const assignTo =
+      typeof assign === "string" && assign.trim() !== ""
+        ? assign.trim()
+        : undefined;
+    const sent =
+      assignTo === undefined
+        ? api.addComment(issueKey, body.trim())
+        : api.addComment(issueKey, body.trim(), assignTo);
+    sent.then(
       () => {
         form.reset();
         setVersion((v) => v + 1);
@@ -89,11 +116,17 @@ function Comments({ api, issueKey }: { readonly api: WorkApi; readonly issueKey:
   return (
     <section aria-labelledby="issue-comments">
       <h2 id="issue-comments">{t("issue-comments")}</h2>
-      <Ready loaded={loaded}>{(comments) => <CommentList comments={comments} />}</Ready>
+      <Ready loaded={loaded}>
+        {(comments) => <CommentList comments={comments} />}
+      </Ready>
       <form className="vl-work-comment" onSubmit={submit}>
         <label>
           {t("issue-comment-add")}
           <textarea name="body" rows={3} required />
+        </label>
+        <label className="vl-comment-assign">
+          {t("issue-comment-assign")}
+          <input name="assign" autoComplete="off" placeholder="@handle" />
         </label>
         <button type="submit" className="vl-filled-button">
           {t("issue-comment-send")}
@@ -102,15 +135,21 @@ function Comments({ api, issueKey }: { readonly api: WorkApi; readonly issueKey:
       {error !== undefined && (
         <p className="vl-field-error" role="alert">
           {error}
+          <CopyDiagnostic message={error} />
         </p>
       )}
     </section>
   );
 }
 
-function CommentList({ comments }: { readonly comments: readonly CommentOut[] }) {
+function CommentList({
+  comments,
+}: {
+  readonly comments: readonly CommentOut[];
+}) {
   const t = useT();
-  if (comments.length === 0) return <p className="vl-muted">{t("issue-no-comments")}</p>;
+  if (comments.length === 0)
+    return <p className="vl-muted">{t("issue-no-comments")}</p>;
   return (
     <ol className="vl-comment-list">
       {comments.map((comment) => (
@@ -128,11 +167,72 @@ function CommentList({ comments }: { readonly comments: readonly CommentOut[] })
   );
 }
 
-function Issue({ api, issueKey }: { readonly api: WorkApi; readonly issueKey: string }) {
+/**
+ * The Markdown a doc started from an issue begins with: a link back and the
+ * description.
+ */
+function pageBodyFromIssue(issue: IssueOut): string {
+  const description = issue.description?.trim() ?? "";
+  return description === ""
+    ? `Issue: ${issue.key}\n`
+    : `Issue: ${issue.key}\n\n${description}\n`;
+}
+
+/**
+ * "Create doc" (R-WK-7): a page in the person's first space, titled after
+ * the issue, that starts with the issue's chip and description.
+ */
+function CreatePageFromIssue({ issue }: { readonly issue: IssueOut }) {
+  const t = useT();
+  const navigate = useNavigate();
+  const { store } = useServices();
+  const workspace = useWorkspace();
+  const [busy, setBusy] = useState(false);
+  const space = workspace.spaces[0];
+  // While the spaces are still on their way the button waits, disabled, so
+  // it does not appear late and push the rest of the issue down.
+  if (space === undefined && workspace.loading !== true) return;
+  return (
+    <button
+      type="button"
+      className="vl-text-button"
+      disabled={busy || space === undefined}
+      onClick={() => {
+        if (space === undefined) return;
+        setBusy(true);
+        void store
+          .createPage({
+            spaceId: space.id,
+            parentId: undefined,
+            title: `${issue.key} ${issue.title}`,
+            body: pageBodyFromIssue(issue),
+          })
+          .then((page) => {
+            setBusy(false);
+            if (page) void navigate(`/p/${page.id}`);
+          });
+      }}
+    >
+      {t("issue-create-doc")}
+    </button>
+  );
+}
+
+function Issue({
+  api,
+  issueKey,
+}: {
+  readonly api: WorkApi;
+  readonly issueKey: string;
+}) {
   const t = useT();
   const [version, setVersion] = useState(0);
   const [error, setError] = useState<string>();
-  const loaded = useLoaded(() => loadIssue(api, issueKey), [api, issueKey, version], failureText);
+  const loaded = useLoaded(
+    () => loadIssue(api, issueKey),
+    [api, issueKey, version],
+    failureText,
+  );
   const setState = (state: string) => {
     setError(undefined);
     api.setState(issueKey, state).then(
@@ -156,12 +256,27 @@ function Issue({ api, issueKey }: { readonly api: WorkApi; readonly issueKey: st
           </p>
           <h1>{found.issue.title}</h1>
           <StatePicker loaded={found} onChange={setState} />
+          <CreatePageFromIssue issue={found.issue} />
+          <RepeatSettings
+            issue={found.issue}
+            onSaved={() => {
+              setVersion((v) => v + 1);
+            }}
+          />
+          <TriageSuggestion
+            issueKey={found.issue.key}
+            onApplied={() => {
+              setVersion((v) => v + 1);
+            }}
+          />
           {error !== undefined && (
             <p className="vl-field-error" role="alert">
               {error}
+              <CopyDiagnostic message={error} />
             </p>
           )}
-          {found.issue.description != undefined && found.issue.description !== "" ? (
+          {found.issue.description != undefined &&
+          found.issue.description !== "" ? (
             <p className="vl-issue-description">{found.issue.description}</p>
           ) : (
             <p className="vl-muted">{t("issue-no-description")}</p>

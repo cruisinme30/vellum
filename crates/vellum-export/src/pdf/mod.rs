@@ -16,6 +16,8 @@
 //! Build one [`PdfEngine`] per process: loading the fonts is the slow
 //! part, and the engine is shareable across threads.
 
+mod themed;
+
 use std::collections::HashMap;
 use std::time::Instant;
 
@@ -41,7 +43,8 @@ const TEMPLATE: &str = include_str!("print.typ");
 const MATH_TEMPLATE: &str = concat!(
     "#set page(width: auto, height: auto, margin: 3pt)\n",
     "#set text(size: 13pt)\n",
-    "#math.equation(block: false, eval(json(\"/flow.json\").math, mode: \"math\"))\n",
+    "#math.equation(block: false, eval(json(\"/flow.json\").math, mode: \
+        \"math\"))\n",
 );
 
 /// Paper sizes.
@@ -219,42 +222,36 @@ impl PdfEngine {
     /// [`ExportError::Typeset`] when the typesetter rejects the document
     /// (a bug: content never reaches Typst as code), and
     /// [`ExportError::Write`] when PDF writing fails.
-    #[tracing::instrument(name = "export.pdf", skip_all, fields(blocks = flow.blocks.len(), assets = flow.assets.len(), pages))]
-    pub fn render(&self, flow: &Flow, theme: &PrintTheme) -> Result<PdfOutput, ExportError> {
+    #[tracing::instrument(
+        name = "export.pdf",
+        skip_all,
+        fields(blocks = flow.blocks.len(), assets = flow.assets.len(), pages)
+    )]
+    pub fn render(
+        &self,
+        flow: &Flow,
+        theme: &PrintTheme,
+    ) -> Result<PdfOutput, ExportError> {
         let started = Instant::now();
         let result = self.render_inner(flow, theme);
         if let Ok(output) = &result {
-            let _ = tracing::Span::current().record("pages", output.pages.len());
+            let _ =
+                tracing::Span::current().record("pages", output.pages.len());
         }
-        metrics::export_done("pdf", started, result.as_ref().map(|o| o.bytes.len()));
+        metrics::export_done(
+            "pdf",
+            started,
+            result.as_ref().map(|o| o.bytes.len()),
+        );
         result
     }
 
-    fn render_inner(&self, flow: &Flow, theme: &PrintTheme) -> Result<PdfOutput, ExportError> {
-        let mut files = HashMap::new();
-        let _ = files.insert(file_id("/flow.json")?, Bytes::new(json(flow)?));
-        let _ = files.insert(file_id("/theme.json")?, Bytes::new(json(theme)?));
-        for asset in &flow.assets {
-            let _ = files.insert(
-                file_id(&format!("/{}", asset.name))?,
-                Bytes::new(asset.bytes.clone()),
-            );
-        }
-        let main = file_id("/print.typ")?;
-        let job = Job {
-            engine: self,
-            main,
-            source: Source::new(main, TEMPLATE.to_owned()),
-            files,
-        };
-        let warned = typst::compile::<PagedDocument>(&job);
-        // Drop memoised results older than a few compilations so a long
-        // running server keeps a flat memory profile.
-        typst::comemo::evict(4);
-        for warning in &warned.warnings {
-            tracing::debug!(message = %warning.message, "typst warning");
-        }
-        let document = warned.output.map_err(|errors| typeset_error(&errors))?;
+    fn render_inner(
+        &self,
+        flow: &Flow,
+        theme: &PrintTheme,
+    ) -> Result<PdfOutput, ExportError> {
+        let document = self.compile(flow, theme)?;
         let options = typst_pdf::PdfOptions {
             ident: Smart::Auto,
             ..typst_pdf::PdfOptions::default()
@@ -278,6 +275,85 @@ impl PdfEngine {
 }
 
 impl PdfEngine {
+    /// Typesets `flow` like [`Self::render`] and draws its first
+    /// `max_pages` pages as standalone SVG, for a preview the app shows as
+    /// images (the app's CSP allows no frames or plugins). Returns the
+    /// pages and the page count.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::render`].
+    #[tracing::instrument(
+        name = "export.pdf_preview",
+        skip_all,
+        fields(blocks = flow.blocks.len())
+    )]
+    pub fn preview(
+        &self,
+        flow: &Flow,
+        theme: &PrintTheme,
+        max_pages: usize,
+    ) -> Result<(Vec<String>, usize), ExportError> {
+        let started = Instant::now();
+        let result = self.compile(flow, theme).map(|document| {
+            let pages = document
+                .pages()
+                .iter()
+                .take(max_pages)
+                .map(|page| {
+                    typst_svg::svg(
+                        page,
+                        &typst_svg::SvgOptions {
+                            render_bleed: false,
+                            pretty: false,
+                        },
+                    )
+                })
+                .collect::<Vec<_>>();
+            (pages, document.pages().len())
+        });
+        metrics::export_done(
+            "pdf_preview",
+            started,
+            result
+                .as_ref()
+                .map(|(pages, _)| pages.iter().map(String::len).sum()),
+        );
+        result
+    }
+
+    /// Lays `flow` out as pages.
+    fn compile(
+        &self,
+        flow: &Flow,
+        theme: &PrintTheme,
+    ) -> Result<PagedDocument, ExportError> {
+        let mut files = HashMap::new();
+        let _ = files.insert(file_id("/flow.json")?, Bytes::new(json(flow)?));
+        let _ = files.insert(file_id("/theme.json")?, Bytes::new(json(theme)?));
+        for asset in &flow.assets {
+            let _ = files.insert(
+                file_id(&format!("/{}", asset.name))?,
+                Bytes::new(asset.bytes.clone()),
+            );
+        }
+        let main = file_id("/print.typ")?;
+        let job = Job {
+            engine: self,
+            main,
+            source: Source::new(main, TEMPLATE.to_owned()),
+            files,
+        };
+        let warned = typst::compile::<PagedDocument>(&job);
+        // Drop memoised results older than a few compilations so a long
+        // running server keeps a flat memory profile.
+        typst::comemo::evict(4);
+        for warning in &warned.warnings {
+            tracing::debug!(message = %warning.message, "typst warning");
+        }
+        warned.output.map_err(|errors| typeset_error(&errors))
+    }
+
     /// Typesets one formula, given in Typst maths syntax (see
     /// [`crate::math::to_typst`]), as a standalone SVG.
     ///
@@ -297,11 +373,11 @@ impl PdfEngine {
         };
         let warned = typst::compile::<PagedDocument>(&job);
         typst::comemo::evict(4);
-        let document = warned.output.map_err(|errors| typeset_error(&errors))?;
-        let page = document
-            .pages()
-            .first()
-            .ok_or_else(|| ExportError::Typeset("the formula produced no page".into()))?;
+        let document =
+            warned.output.map_err(|errors| typeset_error(&errors))?;
+        let page = document.pages().first().ok_or_else(|| {
+            ExportError::Typeset("the formula produced no page".into())
+        })?;
         Ok(typst_svg::svg(
             page,
             &typst_svg::SvgOptions {
@@ -317,7 +393,8 @@ fn typeset_error(errors: &[SourceDiagnostic]) -> ExportError {
         errors
             .iter()
             .map(|e| {
-                let hints: Vec<_> = e.hints.iter().map(|h| h.v.to_string()).collect();
+                let hints: Vec<_> =
+                    e.hints.iter().map(|h| h.v.to_string()).collect();
                 if hints.is_empty() {
                     e.message.to_string()
                 } else {
@@ -330,16 +407,18 @@ fn typeset_error(errors: &[SourceDiagnostic]) -> ExportError {
 }
 
 fn json<T: Serialize>(value: &T) -> Result<Vec<u8>, ExportError> {
-    serde_json::to_vec(value)
-        .map_err(|e| ExportError::Typeset(format!("cannot encode the flow: {e}")))
+    serde_json::to_vec(value).map_err(|e| {
+        ExportError::Typeset(format!("cannot encode the flow: {e}"))
+    })
 }
 
 /// Typst interns file IDs for the life of the process, so the names used
 /// here come from a bounded set: three fixed files plus `a<n>.<ext>` for
 /// `n` below [`crate::lower::MAX_ASSETS`].
 fn file_id(path: &str) -> Result<FileId, ExportError> {
-    let vpath = VirtualPath::new(path)
-        .map_err(|e| ExportError::Typeset(format!("bad internal path {path}: {e:?}")))?;
+    let vpath = VirtualPath::new(path).map_err(|e| {
+        ExportError::Typeset(format!("bad internal path {path}: {e:?}"))
+    })?;
     Ok(RootedPath::new(VirtualRoot::Project, vpath).intern())
 }
 
@@ -380,7 +459,10 @@ impl World for Job<'_> {
         self.engine.fonts.get(index).cloned()
     }
 
-    fn today(&self, _offset: Option<typst::foundations::Duration>) -> Option<Datetime> {
+    fn today(
+        &self,
+        _offset: Option<typst::foundations::Duration>,
+    ) -> Option<Datetime> {
         None
     }
 }
@@ -433,7 +515,8 @@ fn collect_runs(frame: &Frame, origin: Point, out: &mut Vec<Run>) {
         let at = origin + *pos;
         match item {
             FrameItem::Group(group) => {
-                let shifted = at + Point::new(group.transform.tx, group.transform.ty);
+                let shifted =
+                    at + Point::new(group.transform.tx, group.transform.ty);
                 collect_runs(&group.frame, shifted, out);
             }
             FrameItem::Text(text) => out.push(Run {

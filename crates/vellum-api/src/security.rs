@@ -63,10 +63,11 @@ pub fn app_csp(config: &GatewayConfig) -> String {
     let connect = socket_origin(&config.app_origin)
         .map_or_else(|| "'self'".to_owned(), |ws| format!("'self' {ws}"));
     let mut csp = format!(
-        "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; \
-         font-src 'self'; connect-src {connect}; media-src 'self' blob:; worker-src 'self'; \
-         manifest-src 'self'; frame-src {frames}; frame-ancestors 'none'; base-uri 'none'; \
-         form-action 'self'; object-src 'none'"
+        "default-src 'none'; script-src 'self'; style-src 'self'; img-src \
+         'self' data: blob:; font-src 'self'; connect-src {connect}; media-src \
+         'self' blob:; worker-src 'self'; manifest-src 'self'; frame-src \
+         {frames}; frame-ancestors 'none'; base-uri 'none'; form-action \
+         'self'; object-src 'none'"
     );
     if config.https {
         csp.push_str("; upgrade-insecure-requests");
@@ -77,9 +78,10 @@ pub fn app_csp(config: &GatewayConfig) -> String {
 /// The public origin's policy: no scripts at all, and sandboxed.
 #[must_use]
 pub const fn public_csp() -> &'static str {
-    "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src 'self'; \
-     frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'; \
-     sandbox allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+    "default-src 'none'; style-src 'self'; img-src 'self' data:; font-src \
+     'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; \
+     object-src 'none'; sandbox allow-forms allow-same-origin allow-popups \
+     allow-popups-to-escape-sandbox"
 }
 
 fn set(headers: &mut HeaderMap, name: HeaderName, value: &str) {
@@ -90,7 +92,11 @@ fn set(headers: &mut HeaderMap, name: HeaderName, value: &str) {
 
 /// Adds the security headers to a response. Headers a handler already set
 /// (a download's own CSP, say) are kept.
-pub fn apply_headers(headers: &mut HeaderMap, surface: Surface, config: &GatewayConfig) {
+pub fn apply_headers(
+    headers: &mut HeaderMap,
+    surface: Surface,
+    config: &GatewayConfig,
+) {
     let defaults: [(HeaderName, String); 8] = [
         (
             http::header::CONTENT_SECURITY_POLICY,
@@ -107,7 +113,8 @@ pub fn apply_headers(headers: &mut HeaderMap, surface: Surface, config: &Gateway
         (http::header::X_FRAME_OPTIONS, "DENY".into()),
         (
             HeaderName::from_static("permissions-policy"),
-            "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()"
+            "camera=(), microphone=(), geolocation=(), payment=(), usb=(), \
+                interest-cohort=()"
                 .into(),
         ),
         (
@@ -179,18 +186,23 @@ pub fn check_csrf(
     if !is_unsafe(method) {
         return Ok(());
     }
-    let deny = |why: &'static str| Err(Error::new(ErrorKind::PermissionDenied, why));
+    let deny =
+        |why: &'static str| Err(Error::new(ErrorKind::PermissionDenied, why));
     let header = |name: &str| headers.get(name).and_then(|v| v.to_str().ok());
     if header("sec-fetch-site") == Some("cross-site") {
         return deny("cross-site requests are not allowed");
     }
-    if header("origin").is_some_and(|origin| !origin.eq_ignore_ascii_case(&config.app_origin)) {
+    if header("origin")
+        .is_some_and(|origin| !origin.eq_ignore_ascii_case(&config.app_origin))
+    {
         return deny("cross-origin requests are not allowed");
     }
     if let Some(binding) = binding {
         let expected = csrf_token(&config.csrf_key, binding);
         let given = header(CSRF_HEADER.as_str()).unwrap_or_default();
-        if expected.is_empty() || !bool::from(expected.as_bytes().ct_eq(given.as_bytes())) {
+        if expected.is_empty()
+            || !bool::from(expected.as_bytes().ct_eq(given.as_bytes()))
+        {
             return deny("missing or invalid CSRF token; reload the page");
         }
     }
@@ -259,8 +271,24 @@ mod tests {
             .is_ok()
         );
         assert!(check_csrf(&post, &headers(&[]), Some(&b), &c).is_err());
-        assert!(check_csrf(&post, &headers(&[("x-csrf-token", "nope")]), Some(&b), &c).is_err());
-        assert!(check_csrf(&post, &headers(&[("x-csrf-token", &token)]), Some(&b), &c).is_ok());
+        assert!(
+            check_csrf(
+                &post,
+                &headers(&[("x-csrf-token", "nope")]),
+                Some(&b),
+                &c
+            )
+            .is_err()
+        );
+        assert!(
+            check_csrf(
+                &post,
+                &headers(&[("x-csrf-token", &token)]),
+                Some(&b),
+                &c
+            )
+            .is_ok()
+        );
         assert_ne!(csrf_token(&c.csrf_key, &[4; 32]), token);
     }
 
@@ -302,7 +330,9 @@ mod tests {
         let csp = app_csp(&config());
         assert!(csp.contains("connect-src 'self' wss://vellum.northstar.dev;"));
         let plain = GatewayConfig::new("http://localhost:8080", vec![7; 32]);
-        assert!(app_csp(&plain).contains("connect-src 'self' ws://localhost:8080;"));
+        assert!(
+            app_csp(&plain).contains("connect-src 'self' ws://localhost:8080;")
+        );
         assert_eq!(socket_origin("localhost"), None);
     }
 }

@@ -34,28 +34,32 @@ pub fn templates() -> Value {
             "uriTemplate": "vellum://book/{id}",
             "name": "book",
             "title": "Book",
-            "description": "A book: its manifest, numbered table of contents and section ids.",
+            "description": "A book: its manifest, numbered table of contents \
+                and section ids.",
             "mimeType": "text/markdown"
         },
         {
             "uriTemplate": "vellum://issue/{key}",
             "name": "issue",
             "title": "Issue",
-            "description": "An issue such as ENG-142, with its front matter and description.",
+            "description": "An issue such as ENG-142, with its front matter \
+                and description.",
             "mimeType": "text/markdown"
         },
         {
             "uriTemplate": "vellum://collection/{id}{?view}",
             "name": "collection",
             "title": "Collection view",
-            "description": "A collection's rows as a Markdown table, optionally through a saved view.",
+            "description": "A collection's rows as a Markdown table, \
+                optionally through a saved view.",
             "mimeType": "text/markdown"
         },
         {
             "uriTemplate": "vellum://space/{slug}/tree",
             "name": "space-tree",
             "title": "Space tree",
-            "description": "Every page, book and collection in a space as a nested list of links.",
+            "description": "Every page, book and collection in a space as a \
+                nested list of links.",
             "mimeType": "text/markdown"
         }
     ])
@@ -130,7 +134,9 @@ impl VellumUri {
         let (path, query) = rest.split_once('?').unwrap_or((rest, ""));
         let parts: Vec<&str> = path.split('/').collect();
         match parts.as_slice() {
-            ["doc", id] if segment_ok(id) && query.is_empty() => Some(Self::Doc((*id).to_owned())),
+            ["doc", id] if segment_ok(id) && query.is_empty() => {
+                Some(Self::Doc((*id).to_owned()))
+            }
             ["book", id] if segment_ok(id) && query.is_empty() => {
                 Some(Self::Book((*id).to_owned()))
             }
@@ -185,20 +191,26 @@ pub async fn read(
     let doc: Result<Document, WorkspaceError> = match &parsed {
         VellumUri::Doc(id) => ws.get_doc(actor, id).await,
         VellumUri::Book(id) => ws.get_book(actor, id).await,
-        VellumUri::Issue(key) => ws.get_issue(actor, key).await.map(|i| Document {
-            id: i.key.clone(),
-            title: i.title,
-            markdown: i.markdown,
-            url: i.url,
-            space: String::new(),
-            version: String::new(),
-            updated_at: String::new(),
-        }),
-        VellumUri::Collection { id, view } => ws.get_collection(actor, id, view.as_deref()).await,
+        VellumUri::Issue(key) => {
+            ws.get_issue(actor, key).await.map(|i| Document {
+                id: i.key.clone(),
+                title: i.title,
+                markdown: i.markdown,
+                url: i.url,
+                space: String::new(),
+                version: String::new(),
+                updated_at: String::new(),
+            })
+        }
+        VellumUri::Collection { id, view } => {
+            ws.get_collection(actor, id, view.as_deref()).await
+        }
         VellumUri::SpaceTree(slug) => ws.space_tree(actor, slug).await,
     };
     let doc = doc.map_err(|e| match e {
-        WorkspaceError::NotFound(_) | WorkspaceError::Forbidden(_) => not_found(uri),
+        WorkspaceError::NotFound(_) | WorkspaceError::Forbidden(_) => {
+            not_found(uri)
+        }
         WorkspaceError::Unavailable(m) => RpcError::new(
             crate::protocol::code::INTERNAL_ERROR,
             format!("temporarily unavailable: {m}"),
@@ -206,7 +218,11 @@ pub async fn read(
         other => RpcError::invalid_params(other.to_string()),
     })?;
     let guarded = safety::guard(&doc.markdown);
-    let mut content = json!({ "uri": uri, "mimeType": "text/markdown", "text": guarded.text });
+    let mut content = json!({
+        "uri": uri,
+        "mimeType": "text/markdown",
+        "text": guarded.text
+    });
     let mut meta = Map::new();
     if !doc.url.is_empty() {
         let _ = meta.insert("dev.vellum/url".into(), json!(doc.url));
@@ -215,7 +231,8 @@ pub async fn read(
         let _ = meta.insert("dev.vellum/version".into(), json!(doc.version));
     }
     if !guarded.warnings.is_empty() {
-        let _ = meta.insert("dev.vellum/warnings".into(), json!(guarded.warnings));
+        let _ =
+            meta.insert("dev.vellum/warnings".into(), json!(guarded.warnings));
     }
     if !meta.is_empty()
         && let Some(o) = content.as_object_mut()
@@ -230,7 +247,8 @@ pub async fn read(
 }
 
 fn not_found(uri: &str) -> RpcError {
-    RpcError::invalid_params("Resource not found").with_data(json!({ "uri": uri }))
+    RpcError::invalid_params("Resource not found")
+        .with_data(json!({ "uri": uri }))
 }
 
 #[cfg(test)]

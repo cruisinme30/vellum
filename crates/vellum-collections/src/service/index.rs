@@ -113,7 +113,9 @@ pub(super) fn row_document(
         .filter(|p| !matches!(p.kind, PropertyType::Title))
         .filter_map(|p| {
             let cell = values.cells.get(&p.key)?;
-            if cell.as_ref().is_ok_and(crate::value::Value::is_empty) || cell.is_err() {
+            if cell.as_ref().is_ok_and(crate::value::Value::is_empty)
+                || cell.is_err()
+            {
                 return None;
             }
             Some(IndexField {

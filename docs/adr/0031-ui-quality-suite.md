@@ -11,8 +11,8 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D123, D124, D125
-- Issue: #222
+- Decisions: D123, D124, D125, D285
+- Issue: #222, #521
 - Pull requests: #313, #288, #289
 
 :::
@@ -52,8 +52,9 @@ owner asked for the UI to be red-teamed and kept fixed as features land
   and 400 %, text at 200 %, WCAG text spacing with a dyslexia font, RTL,
   reduced motion, and a stress mode that lengthens every text with long
   words, CJK, Arabic, emoji and an unbroken URL.
-- Themes are selected by `<html data-theme="light|dark|high-contrast|sepia|dim">`;
-  the app must read that attribute at start so the suite can set it.
+- Themes are selected by `<html
+  data-theme="light|dark|high-contrast|sepia|dim">`; the app must read that
+  attribute at start so the suite can set it.
 - Targets: app routes listed in `targets.ts`, plus every HTML page of the
   built website and help books, found on disk.
 - Fast suite: Chromium at phone and laptop on a quick subset. Full suite:
@@ -72,10 +73,25 @@ owner asked for the UI to be red-teamed and kept fixed as features land
   and exporters land. Pages whose words change weekly rely on the audit.
 - `scripts/ci/ui-baselines.sh` refreshes the baselines in Docker.
 
+### `D285`: server screens against a signed-in Northstar stand-in
+
+- The screens that need `vellum serve` (Work, My Work, Books, admin,
+  settings) are opened signed in as an administrator against a stand-in
+  that answers every read API with Northstar data
+  (`web/e2e/ui/northstar-*.ts`), with the clock fixed, instead of showing
+  "needs a Vellum server". An unknown API answers 404, so a screen that
+  starts calling a new one fails the audit until the fixture learns it.
+- `UI_MODES` narrows the modes, so a theme sweep runs the five themes
+  in all three browsers at phone, tablet and laptop sizes.
+- A few of these screens are in the fast suite with pixel baselines; the
+  full suite opens them all.
+
 ## Alternatives
 
-- **Visual diffs of every page**: fail on every copy edit; the audit finds the real bugs.
-- **A hosted visual service (Percy, Chromatic)**: a third party sees unreleased UI, and costs money.
+- **Visual diffs of every page**: fail on every copy edit; the audit finds the
+  real bugs.
+- **A hosted visual service (Percy, Chromatic)**: a third party sees unreleased
+  UI, and costs money.
 - **axe only**: misses overlap, overflow, loading and focus problems.
 - **Chromium only**: WebKit and Firefox differ in flex, grid and font metrics.
 

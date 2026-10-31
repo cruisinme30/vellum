@@ -24,7 +24,8 @@ instream() {
     printf 'zINSTREAM\0'
     # One chunk: a 4-byte big-endian length, the bytes, then a zero length.
     printf '%b' "$(printf '\\x%02x\\x%02x\\x%02x\\x%02x' \
-      $(((size >> 24) & 255)) $(((size >> 16) & 255)) $(((size >> 8) & 255)) $((size & 255)))"
+      $(((size >> 24) & 255)) $(((size >> 16) & 255)) \
+      $(((size >> 8) & 255)) $((size & 255)))"
     cat "$1"
     printf '\0\0\0\0'
   } >&3 2>/dev/null || true # clamd hangs up early on an oversized stream
@@ -39,7 +40,8 @@ head -c $((30 * 1024 * 1024)) /dev/zero | tr '\0' 'a' >"${work}/clean.bin"
 reply="$(instream "${work}/clean.bin")"
 echo "30 MB clean file: ${reply}"
 if [[ "${reply}" != "stream: OK" ]]; then
-  echo "::error::clamd did not scan a 30 MB file; set StreamMaxLength to at least 100M." >&2
+  echo "::error::clamd did not scan a 30 MB file; set StreamMaxLength to at" \
+    "least 100M." >&2
   exit 1
 fi
 

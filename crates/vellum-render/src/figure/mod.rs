@@ -220,8 +220,12 @@ fn builtin(fence: &Fence) -> Result<Figure, FigureError> {
         return Err(FigureError::Unsupported);
     };
     let d = match read.data {
-        Data::Chart(c) => chart::draw(&model::chart(&c).map_err(FigureError::source)?),
-        Data::Roadmap(r) => plan::roadmap(&model::roadmap(&r).map_err(FigureError::source)?),
+        Data::Chart(c) => {
+            chart::draw(&model::chart(&c).map_err(FigureError::source)?)
+        }
+        Data::Roadmap(r) => {
+            plan::roadmap(&model::roadmap(&r).map_err(FigureError::source)?)
+        }
         Data::RiskMatrix(m) if m.risks.is_empty() => {
             return Err(FigureError::source("risk matrix has no risks"));
         }
@@ -304,7 +308,10 @@ impl Figures {
     /// # Errors
     ///
     /// Returns a message when the Kroki client cannot be built.
-    pub fn with_cache(config: FigureConfig, cache: Arc<dyn SvgCache>) -> Result<Self, String> {
+    pub fn with_cache(
+        config: FigureConfig,
+        cache: Arc<dyn SvgCache>,
+    ) -> Result<Self, String> {
         let kroki = match &config.kroki_url {
             Some(url) => Some(Kroki::new(url, config.timeout)?),
             None => None,
@@ -321,7 +328,10 @@ impl Figures {
     /// Draws anything that needs no network: built-ins, Mermaid and draw.io.
     /// Returns `None` for Kroki diagrams.
     #[must_use]
-    pub(crate) fn draw_local(&self, fence: &Fence) -> Option<Result<Figure, FigureError>> {
+    pub(crate) fn draw_local(
+        &self,
+        fence: &Fence,
+    ) -> Option<Result<Figure, FigureError>> {
         let started = Instant::now();
         let result = match engine(fence)? {
             Engine::Builtin => builtin(fence),
@@ -329,9 +339,12 @@ impl Figures {
                 let key = content_key(fence);
                 match self.inner.cache.get(&key) {
                     Some(svg) => Ok(svg),
-                    None => mermaid::render(&fence.literal, self.inner.config.mermaid_deadline)
-                        .inspect(|svg| self.inner.cache.put(&key, None, svg))
-                        .map_err(FigureError::source),
+                    None => mermaid::render(
+                        &fence.literal,
+                        self.inner.config.mermaid_deadline,
+                    )
+                    .inspect(|svg| self.inner.cache.put(&key, None, svg))
+                    .map_err(FigureError::source),
                 }
                 .map(|svg| {
                     let (width, height) = svg_size(&svg);
@@ -364,7 +377,8 @@ impl Figures {
             Engine::Kroki(_) => return None,
         };
         tracing::debug!(
-            histogram.vellum_render_figure_ms = started.elapsed().as_secs_f64() * 1e3,
+            histogram.vellum_render_figure_ms =
+                started.elapsed().as_secs_f64() * 1e3,
             lang = fence.lang.as_str(),
             ok = result.is_ok(),
             "figure drawn"
@@ -449,7 +463,9 @@ impl Figures {
                     stale: false,
                 })
             }
-            Err(KrokiError::Source(message)) => Err(FigureError::Source { message }),
+            Err(KrokiError::Source(message)) => {
+                Err(FigureError::Source { message })
+            }
             Err(KrokiError::Unavailable(message)) => {
                 tracing::warn!(
                     error = message.as_str(),
@@ -466,7 +482,11 @@ impl Figures {
     /// # Errors
     ///
     /// See [`FigureError`].
-    pub async fn render(&self, fence: &Fence, theme: &Theme) -> Result<Figure, FigureError> {
+    pub async fn render(
+        &self,
+        fence: &Fence,
+        theme: &Theme,
+    ) -> Result<Figure, FigureError> {
         let figure = match self.draw_local(fence) {
             Some(result) => result?,
             None => self.kroki(fence, None).await?,
@@ -480,7 +500,11 @@ impl Figures {
     /// # Errors
     ///
     /// See [`FigureError`].
-    pub fn render_cached(&self, fence: &Fence, theme: &Theme) -> Result<Figure, FigureError> {
+    pub fn render_cached(
+        &self,
+        fence: &Fence,
+        theme: &Theme,
+    ) -> Result<Figure, FigureError> {
         let figure = match self.draw_local(fence) {
             Some(result) => result?,
             None => self.kroki_cached(fence, None)?,
@@ -489,7 +513,11 @@ impl Figures {
     }
 }
 
-fn standalone(mut figure: Figure, fence: &Fence, theme: &Theme) -> Result<Figure, FigureError> {
+fn standalone(
+    mut figure: Figure,
+    fence: &Fence,
+    theme: &Theme,
+) -> Result<Figure, FigureError> {
     let prefix = format!("v{}", content_key(fence).get(..8).unwrap_or("0"));
     let clean = sanitize_island(&figure.svg, &prefix)
         .map_err(|e| FigureError::source(format!("invalid SVG: {e}")))?;
@@ -519,7 +547,10 @@ mod tests {
         let theme = Theme::builtin(BuiltinTheme::Light);
         let f = figures
             .render(
-                &fence("chart", "title: T\ntype: bar\nlabels: [A]\nvalues: [1]\n"),
+                &fence(
+                    "chart",
+                    "title: T\ntype: bar\nlabels: [A]\nvalues: [1]\n",
+                ),
                 &theme,
             )
             .await

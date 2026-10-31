@@ -7,7 +7,10 @@ import * as Y from "yjs";
 import { createLocalConnector, type ChannelFactory } from "./local-connector";
 import type { CollabSession, UpdateCache } from "./provider";
 
-/** An in-memory BroadcastChannel: delivers to the other channels of the same name. */
+/**
+ * An in-memory BroadcastChannel: delivers to the other channels of the same
+ * name.
+ */
 function createBus() {
   const rooms = new Map<string, Set<FakeChannel>>();
   const posted: unknown[] = [];
@@ -125,7 +128,10 @@ describe("createLocalConnector", () => {
     const first = track(connector.open("page-1", "space-1"));
     const second = connector.open("page-1", "space-1");
     await Promise.all([first.ready, second.ready]);
-    second.awareness.setLocalStateField("user", { name: "Sam", color: "#123456" });
+    second.awareness.setLocalStateField("user", {
+      name: "Sam",
+      color: "#123456",
+    });
     await settle();
     expect(first.awareness.getStates().get(second.doc.clientID)).toEqual({
       user: { name: "Sam", color: "#123456" },
@@ -135,29 +141,45 @@ describe("createLocalConnector", () => {
     expect(first.awareness.getStates().has(second.doc.clientID)).toBe(false);
   });
 
-  it("loads cached updates before announcing itself, and appends new ones", async () => {
-    const source = new Y.Doc();
-    source.getText("t").insert(0, "cached");
-    const { cache, stored, append } = memoryCache({ "page-1": [Y.encodeStateAsUpdate(source)] });
-    const bus = createBus();
-    const session = track(
-      createLocalConnector({ cache, channel: bus.factory }).open("page-1", "space-1"),
-    );
-    await session.ready;
-    expect(text(session)).toBe("cached");
-    expect(append).not.toHaveBeenCalled();
-    expect(bus.posted.at(-1)).toMatchObject({ kind: "hello", from: session.doc.clientID });
-    session.doc.getText("t").insert(0, "new ");
-    expect(append).toHaveBeenCalledTimes(1);
-    expect(stored.get("page-1")).toHaveLength(2);
-  });
+  it(
+    "loads cached updates before announcing itself, and appends new " + "ones",
+    async () => {
+      const source = new Y.Doc();
+      source.getText("t").insert(0, "cached");
+      const { cache, stored, append } = memoryCache({
+        "page-1": [Y.encodeStateAsUpdate(source)],
+      });
+      const bus = createBus();
+      const session = track(
+        createLocalConnector({ cache, channel: bus.factory }).open(
+          "page-1",
+          "space-1",
+        ),
+      );
+      await session.ready;
+      expect(text(session)).toBe("cached");
+      expect(append).not.toHaveBeenCalled();
+      expect(bus.posted.at(-1)).toMatchObject({
+        kind: "hello",
+        from: session.doc.clientID,
+      });
+      session.doc.getText("t").insert(0, "new ");
+      expect(append).toHaveBeenCalledTimes(1);
+      expect(stored.get("page-1")).toHaveLength(2);
+    },
+  );
 
   it("caches remote updates without echoing them back", async () => {
     const { cache, append } = memoryCache();
     const bus = createBus();
-    const writer = track(createLocalConnector({ channel: bus.factory }).open("page-1", "space-1"));
+    const writer = track(
+      createLocalConnector({ channel: bus.factory }).open("page-1", "space-1"),
+    );
     const reader = track(
-      createLocalConnector({ cache, channel: bus.factory }).open("page-1", "space-1"),
+      createLocalConnector({ cache, channel: bus.factory }).open(
+        "page-1",
+        "space-1",
+      ),
     );
     await Promise.all([writer.ready, reader.ready]);
     await settle();
@@ -171,7 +193,9 @@ describe("createLocalConnector", () => {
 
   it("ignores foreign messages and its own echoes", async () => {
     const bus = createBus();
-    const session = track(createLocalConnector({ channel: bus.factory }).open("page-1", "space-1"));
+    const session = track(
+      createLocalConnector({ channel: bus.factory }).open("page-1", "space-1"),
+    );
     await session.ready;
     const [channel] = bus.channels;
     for (const data of ["text", undefined, { kind: "update" }, 42]) {
@@ -189,7 +213,10 @@ describe("createLocalConnector", () => {
 
   it("closes its channel and stops listening on destroy", async () => {
     const bus = createBus();
-    const session = createLocalConnector({ channel: bus.factory }).open("page-1", "space-1");
+    const session = createLocalConnector({ channel: bus.factory }).open(
+      "page-1",
+      "space-1",
+    );
     await session.ready;
     const [channel] = bus.channels;
     if (!channel) {
@@ -203,7 +230,9 @@ describe("createLocalConnector", () => {
 
   it("uses a real BroadcastChannel by default", async () => {
     const connector = createLocalConnector();
-    const first = track(connector.open(`real-${String(Date.now())}`, "space-1"));
+    const first = track(
+      connector.open(`real-${String(Date.now())}`, "space-1"),
+    );
     await first.ready;
     first.doc.getText("t").insert(0, "over the wire");
     expect(text(first)).toBe("over the wire");

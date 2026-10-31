@@ -139,7 +139,7 @@ static POLICY: LazyLock<Builder<'static>> = LazyLock::new(|| {
         .set_tag_attribute_value(
             "iframe",
             "sandbox",
-            "allow-scripts allow-same-origin allow-presentation allow-popups",
+            "allow-scripts allow-same-origin allow-popups",
         )
         .url_schemes(["http", "https", "mailto", "tel"].into_iter().collect())
         .url_relative(ammonia::UrlRelative::PassThrough)
@@ -150,7 +150,8 @@ static POLICY: LazyLock<Builder<'static>> = LazyLock::new(|| {
             // providers; the renderer only emits those, so anything else
             // was injected.
             if element == "iframe" && attribute == "src" {
-                return crate::embed::is_allowed_frame_src(value).then(|| value.into());
+                return crate::embed::is_allowed_frame_src(value)
+                    .then(|| value.into());
             }
             if element == "img"
                 && attribute == "src"
@@ -197,13 +198,15 @@ fn tag_attributes() -> HashMap<&'static str, HashSet<&'static str>> {
     .collect()
 }
 
-fn tag_attribute_values() -> HashMap<&'static str, HashMap<&'static str, HashSet<&'static str>>> {
+fn tag_attribute_values()
+-> HashMap<&'static str, HashMap<&'static str, HashSet<&'static str>>> {
     let mut input = HashMap::new();
     let _ = input.insert("type", ["checkbox", "range"].into_iter().collect());
     // The writer sets these; only these values survive. `sandbox` is forced
     // (one forced attribute keeps the output order stable).
     let mut iframe = HashMap::new();
-    let _ = iframe.insert("referrerpolicy", std::iter::once("no-referrer").collect());
+    let _ = iframe
+        .insert("referrerpolicy", std::iter::once("no-referrer").collect());
     let _ = iframe.insert("loading", std::iter::once("lazy").collect());
     [("input", input), ("iframe", iframe)].into_iter().collect()
 }
@@ -219,8 +222,9 @@ pub fn page(html: &str, islands: &[String]) -> String {
     if islands.is_empty() {
         return clean;
     }
-    let mut out =
-        String::with_capacity(clean.len() + islands.iter().map(String::len).sum::<usize>());
+    let mut out = String::with_capacity(
+        clean.len() + islands.iter().map(String::len).sum::<usize>(),
+    );
     let mut rest = clean.as_str();
     while let Some(i) = rest.find(OPEN) {
         out.push_str(rest.get(..i).unwrap_or_default());
@@ -232,7 +236,8 @@ pub fn page(html: &str, islands: &[String]) -> String {
         match parsed.and_then(|(n, end)| Some((islands.get(n)?, end))) {
             Some((island, end)) => {
                 out.push_str(island);
-                rest = after.get(end + "\"></span>".len()..).unwrap_or_default();
+                rest =
+                    after.get(end + "\"></span>".len()..).unwrap_or_default();
             }
             None => {
                 out.push_str(OPEN);
@@ -251,7 +256,10 @@ mod tests {
     #[test]
     fn strips_disallowed_markup() {
         let out = page(
-            r#"<p onclick="x()">a<script>alert(1)</script><a href="javascript:alert(1)">l</a><img src="data:image/png;base64,AA"><input type="text"><style>p{}</style></p>"#,
+            "<p onclick=\"x()\">a<script>alert(1)</script><a \
+                href=\"javascript:alert(1)\">l</a><img \
+                src=\"data:image/png;base64,AA\"><input \
+                type=\"text\"><style>p{}</style></p>",
             &[],
         );
         assert!(!out.contains("onclick"));
@@ -265,7 +273,10 @@ mod tests {
     #[test]
     fn forces_safe_link_and_frame_attributes() {
         let out = page(
-            r#"<a href="https://northstar.dev">x</a><iframe src="https://www.youtube-nocookie.com/embed/abc" sandbox="allow-top-navigation"></iframe><iframe src="https://evil.example/"></iframe>"#,
+            "<a href=\"https://northstar.dev\">x</a><iframe \
+                src=\"https://www.youtube-nocookie.com/embed/abc\" \
+                sandbox=\"allow-top-navigation\"></iframe><iframe \
+                src=\"https://evil.example/\"></iframe>",
             &[],
         );
         assert!(
@@ -273,7 +284,7 @@ mod tests {
             "{out}"
         );
         assert!(
-            out.contains("allow-scripts allow-same-origin allow-presentation allow-popups"),
+            out.contains("allow-scripts allow-same-origin allow-popups"),
             "{out}"
         );
         assert!(!out.contains("allow-top-navigation"), "{out}");
@@ -282,11 +293,14 @@ mod tests {
 
     #[test]
     fn splices_islands_into_placeholders_only() {
-        let html = r#"<figure><span data-vl-island="0"></span></figure><p>&lt;span data-vl-island="0"&gt;&lt;/span&gt;</p>"#;
+        let html = "<figure><span \
+            data-vl-island=\"0\"></span></figure><p>&lt;span \
+            data-vl-island=\"0\"&gt;&lt;/span&gt;</p>";
         let out = page(html, &["<svg></svg>".to_owned()]);
         assert_eq!(
             out,
-            r#"<figure><svg></svg></figure><p>&lt;span data-vl-island="0"&gt;&lt;/span&gt;</p>"#
+            "<figure><svg></svg></figure><p>&lt;span \
+                data-vl-island=\"0\"&gt;&lt;/span&gt;</p>"
         );
         // Out-of-range placeholders are left empty, never panic.
         let out = page(

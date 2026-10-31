@@ -11,7 +11,8 @@ Each import keeps:
 
 - keys, as aliases, so old links and commit messages still resolve
 - titles, descriptions (converted to Vellum Markdown), comments and attachments
-- statuses, mapped to the seven categories; you confirm the mapping before the import runs
+- statuses, mapped to the seven categories; you confirm the mapping before the
+  import runs
 - assignees, matched by email
 - labels, priorities, estimates, cycles or sprints, projects and relations
 

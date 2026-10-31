@@ -3,9 +3,23 @@
 
 import { createContext, use, type ReactNode } from "react";
 
+import type { AccountApi } from "../account/api";
+import type { AssistApi, McpSetupApi } from "../assist/api";
+import type { AttachmentsApi } from "../attachments/api";
 import type { BooksApi } from "../books/api";
+import type { DriveApi } from "../drive/api";
+import { ViewTitle } from "../help/help-link";
+import type { HelpTopic } from "../help/topics.gen";
 import { useT } from "../i18n/i18n";
+import type { DirectoryApi } from "../people/directory";
+import type { PrivateSpacesApi } from "../platform/private/api";
+import type { RenderApi } from "../render/api";
+import type { SharingApi } from "../sharing/api";
+import { CopyDiagnostic } from "../shell/copy-diagnostic";
+import type { TransferApi } from "../transfer/api";
 import type { WorkApi } from "../work/api";
+import type { ConnectionsApi } from "../work/connections-api";
+import type { PlanningApi } from "../work/planning/api";
 
 import type { Loaded } from "./use-loaded";
 
@@ -13,6 +27,26 @@ import type { Loaded } from "./use-loaded";
 export interface ServerApis {
   readonly work?: WorkApi | undefined;
   readonly books?: BooksApi | undefined;
+  readonly drive?: DriveApi | undefined;
+  readonly attachments?: AttachmentsApi | undefined;
+  readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** People (and groups) to pick for access and sharing. */
+  readonly directory?: DirectoryApi | undefined;
+  /** The server's renderer: rendered pages and blocks. */
+  readonly render?: RenderApi | undefined;
+  /** Who has access to an item, and share links. */
+  readonly sharing?: SharingApi | undefined;
+  /** The signed-in person's API tokens and sign-in factors. */
+  readonly account?: AccountApi | undefined;
+  /** The person's own model: summarise, ask, draft (ADR 0056). */
+  readonly assist?: AssistApi | undefined;
+  /** The admin page's MCP client setup. */
+  readonly mcpSetup?: McpSetupApi | undefined;
+  readonly planning?: PlanningApi | undefined;
+  /** My Work's calendar feed, CalDAV, capture and imports. */
+  readonly connections?: ConnectionsApi | undefined;
+  /** Export and import. */
+  readonly transfer?: TransferApi | undefined;
 }
 
 const ServerApisContext = createContext<ServerApis>({});
@@ -23,9 +57,21 @@ export function ServerApisProvider({
   children,
 }: {
   readonly apis: ServerApis;
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
 }) {
   return <ServerApisContext value={apis}>{children}</ServerApisContext>;
+}
+
+/** The server-only APIs; each is `undefined` in demo mode. */
+export function useServerApis(): ServerApis {
+  return use(ServerApisContext);
+}
+
+/** One server API, or `undefined` in demo mode. */
+export function useServerApi<K extends keyof ServerApis>(
+  name: K,
+): ServerApis[K] {
+  return use(ServerApisContext)[name];
 }
 
 /**
@@ -35,26 +81,33 @@ export function ServerApisProvider({
 export function ServerScreen<K extends keyof ServerApis>({
   api,
   title,
+  help,
   className,
   children,
 }: {
   readonly api: K;
   /** The heading; leave it out when the screen names itself once loaded. */
   readonly title?: string;
+  /** The help topic for the heading's `?` link. */
+  readonly help?: HelpTopic | undefined;
   readonly className?: string;
   readonly children: (api: NonNullable<ServerApis[K]>) => ReactNode;
 }) {
   const t = useT();
   const found = use(ServerApisContext)[api];
   return (
-    <section className={className === undefined ? "vl-view" : `vl-view ${className}`}>
-      {title !== undefined && <h1>{title}</h1>}
+    <section
+      className={className === undefined ? "vl-view" : `vl-view ${className}`}
+    >
+      {title !== undefined && <ViewTitle title={title} help={help} />}
       {found === undefined ? <p>{t("needs-server")}</p> : children(found)}
     </section>
   );
 }
 
-/** A load's state: a loading line, the failure, or `children` with the value. */
+/**
+ * A load's state: a loading line, the failure, or `children` with the value.
+ */
 export function Ready<T>({
   loaded,
   children,
@@ -74,6 +127,7 @@ export function Ready<T>({
     return (
       <p className="vl-field-error" role="alert">
         {loaded.message}
+        <CopyDiagnostic message={loaded.message} />
       </p>
     );
   }

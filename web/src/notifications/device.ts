@@ -2,11 +2,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { Http } from "../api/http";
-import { disablePush, enablePush, pushSupported, type PushState } from "../platform/pwa/push";
+import {
+  disablePush,
+  enablePush,
+  pushSupported,
+  type PushState,
+} from "../platform/pwa/push";
 
 /** Push on this browser, as the settings screen sees it. */
 export interface PushDevice {
-  /** False where the browser cannot receive pushes (and on iOS outside the Home Screen). */
+  /**
+   * False where the browser cannot receive pushes (and on iOS outside the Home
+   * Screen).
+   */
   readonly supported: boolean;
   /** Whether this browser has a push subscription. */
   subscribed(): Promise<boolean>;
@@ -38,10 +46,15 @@ export function createBrowserPushDevice(baseUrl = "", http?: Http): PushDevice {
     supported,
     subscribed: async () => {
       if (!supported) return false;
+      // A subscription needs notification permission, so without it there
+      // is none to look up. Asking anyway is not free: WebKit builds with
+      // no push service block the page in getSubscription().
+      if (Notification.permission !== "granted") return false;
       const registration = await navigator.serviceWorker.ready;
       return (await registration.pushManager.getSubscription()) !== null;
     },
-    enable: async () => (supported ? enablePush(await environment()) : "unsupported"),
+    enable: async () =>
+      supported ? enablePush(await environment()) : "unsupported",
     disable: async () => {
       if (supported) await disablePush(await environment());
     },

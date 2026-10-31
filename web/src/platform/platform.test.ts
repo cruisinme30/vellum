@@ -3,7 +3,12 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createPlatform, type DesktopBridge, desktopBridge, startPlatform } from "./platform";
+import {
+  createPlatform,
+  type DesktopBridge,
+  desktopBridge,
+  startPlatform,
+} from "./platform";
 
 function noop(): void {
   // Nothing to unsubscribe in the fake.
@@ -48,7 +53,9 @@ describe("platform", () => {
   });
 
   it("is a browser tab or an installed PWA otherwise", () => {
-    const installed = { matchMedia: () => ({ matches: true }) as MediaQueryList };
+    const installed = {
+      matchMedia: () => ({ matches: true }) as MediaQueryList,
+    };
     expect(createPlatform(installed).kind).toBe("pwa");
     expect(createPlatform({}).kind).toBe("browser");
   });
@@ -57,7 +64,11 @@ describe("platform", () => {
     const open = vi.fn();
     vi.stubGlobal("open", open);
     createPlatform({}).openExternal("https://example.com");
-    expect(open).toHaveBeenCalledWith("https://example.com", "_blank", "noopener,noreferrer");
+    expect(open).toHaveBeenCalledWith(
+      "https://example.com",
+      "_blank",
+      "noopener,noreferrer",
+    );
   });
 
   it("shows web notifications only with permission and a worker", async () => {
@@ -67,7 +78,9 @@ describe("platform", () => {
     const holder: { registration?: object } = {};
     vi.stubGlobal("Notification", { permission: "granted" });
     vi.stubGlobal("navigator", {
-      serviceWorker: { getRegistration: () => Promise.resolve(holder.registration) },
+      serviceWorker: {
+        getRegistration: () => Promise.resolve(holder.registration),
+      },
     });
     expect(await platform.notify(notice)).toBe(false);
     holder.registration = { showNotification };
@@ -78,28 +91,42 @@ describe("platform", () => {
     });
   });
 
-  it("skips the worker in development and registers it in production", async () => {
-    const register = vi.fn(() => Promise.reject(new Error("no")));
-    const persist = vi.fn(() => Promise.resolve(true));
-    vi.stubGlobal("navigator", { serviceWorker: { register }, storage: { persist } });
-    const platform = createPlatform({});
-    expect(await startPlatform(platform, { production: false })).toBeUndefined();
-    expect(register).not.toHaveBeenCalled();
-    await startPlatform(platform, { production: true, onUpdateReady: noop });
-    expect(persist).toHaveBeenCalled();
-    expect(register).toHaveBeenCalled();
-    vi.stubGlobal("navigator", { serviceWorker: { register } });
-    await startPlatform(platform, { production: true });
-    expect(register).toHaveBeenCalledTimes(2);
-  });
+  it(
+    "skips the worker in development and registers it in " + "production",
+    async () => {
+      const register = vi.fn(() => Promise.reject(new Error("no")));
+      const persist = vi.fn(() => Promise.resolve(true));
+      vi.stubGlobal("navigator", {
+        serviceWorker: { register },
+        storage: { persist },
+      });
+      const platform = createPlatform({});
+      expect(
+        await startPlatform(platform, { production: false }),
+      ).toBeUndefined();
+      expect(register).not.toHaveBeenCalled();
+      await startPlatform(platform, { production: true, onUpdateReady: noop });
+      expect(persist).toHaveBeenCalled();
+      expect(register).toHaveBeenCalled();
+      vi.stubGlobal("navigator", { serviceWorker: { register } });
+      await startPlatform(platform, { production: true });
+      expect(register).toHaveBeenCalledTimes(2);
+    },
+  );
 
-  it("registers the worker while the browser still asks to keep storage", async () => {
-    const register = vi.fn(() => Promise.reject(new Error("no")));
-    // Firefox shows a prompt for persist(); this one is never answered.
-    const persist = vi.fn(() => new Promise<boolean>(noop));
-    vi.stubGlobal("navigator", { serviceWorker: { register }, storage: { persist } });
-    await startPlatform(createPlatform({}), { production: true });
-    expect(persist).toHaveBeenCalled();
-    expect(register).toHaveBeenCalled();
-  });
+  it(
+    "registers the worker while the browser still asks to keep " + "storage",
+    async () => {
+      const register = vi.fn(() => Promise.reject(new Error("no")));
+      // Firefox shows a prompt for persist(); this one is never answered.
+      const persist = vi.fn(() => new Promise<boolean>(noop));
+      vi.stubGlobal("navigator", {
+        serviceWorker: { register },
+        storage: { persist },
+      });
+      await startPlatform(createPlatform({}), { production: true });
+      expect(persist).toHaveBeenCalled();
+      expect(register).toHaveBeenCalled();
+    },
+  );
 });

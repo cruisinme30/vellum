@@ -46,26 +46,41 @@ export const CodeBlock = CodeBlockBase.extend({
       language: {
         default: "",
         parseHTML: (element) =>
-          /language-(\S+)/.exec(element.querySelector("code")?.className ?? "")?.[1] ?? "",
+          /language-(\S+)/.exec(
+            element.querySelector("code")?.className ?? "",
+          )?.[1] ?? "",
         renderHTML: (attributes) => {
-          const language = typeof attributes["language"] === "string" ? attributes["language"] : "";
+          const language =
+            typeof attributes["language"] === "string"
+              ? attributes["language"]
+              : "";
           return language === "" ? {} : { "data-language": language };
         },
       },
     };
   },
-}).configure({ HTMLAttributes: { class: "vl-code" }, enableTabIndentation: true });
+}).configure({
+  HTMLAttributes: { class: "vl-code" },
+  enableTabIndentation: true,
+});
 
 /** `$$` display math. */
 export const MathBlock = Node.create({
   ...fromSchema("mathBlock"),
   // Above the default 50, or the code block's `pre` rule takes it.
   parseHTML: () => [
-    { tag: 'pre[data-type="mathBlock"]', preserveWhitespace: "full", priority: 60 },
+    {
+      tag: 'pre[data-type="mathBlock"]',
+      preserveWhitespace: "full",
+      priority: 60,
+    },
   ],
   renderHTML: ({ HTMLAttributes }) => [
     "pre",
-    mergeAttributes(HTMLAttributes, { "data-type": "mathBlock", class: "vl-math" }),
+    mergeAttributes(HTMLAttributes, {
+      "data-type": "mathBlock",
+      class: "vl-math",
+    }),
     ["code", 0],
   ],
   addInputRules() {
@@ -100,7 +115,10 @@ export const Details = Node.create({
   ...fromSchema("details"),
   renderHTML: ({ HTMLAttributes }) => [
     "div",
-    mergeAttributes(HTMLAttributes, { "data-type": "details", class: "vl-block vl-details" }),
+    mergeAttributes(HTMLAttributes, {
+      "data-type": "details",
+      class: "vl-block vl-details",
+    }),
     0,
   ],
   addNodeView: () => ReactNodeViewRenderer(DetailsView),
@@ -111,7 +129,10 @@ export const Tabs = Node.create({
   ...fromSchema("tabs"),
   renderHTML: ({ HTMLAttributes }) => [
     "div",
-    mergeAttributes(HTMLAttributes, { "data-type": "tabs", class: "vl-block vl-tabs" }),
+    mergeAttributes(HTMLAttributes, {
+      "data-type": "tabs",
+      class: "vl-block vl-tabs",
+    }),
     0,
   ],
   addNodeView: () => ReactNodeViewRenderer(TabsView),
@@ -134,7 +155,10 @@ export const Toc = Node.create({
   parseHTML: () => [{ tag: 'nav[data-type="toc"]' }],
   renderHTML: ({ HTMLAttributes }) => [
     "nav",
-    mergeAttributes(HTMLAttributes, { "data-type": "toc", class: "vl-block vl-toc" }),
+    mergeAttributes(HTMLAttributes, {
+      "data-type": "toc",
+      class: "vl-block vl-toc",
+    }),
   ],
   addNodeView: () => ReactNodeViewRenderer(TocView),
 });
@@ -144,7 +168,10 @@ const atomBlock = (name: NodeName, view: ComponentType<ReactNodeViewProps>) =>
     ...fromSchema(name),
     renderHTML: ({ HTMLAttributes }) => [
       "div",
-      mergeAttributes(HTMLAttributes, { "data-type": name, class: `vl-block vl-${name}` }),
+      mergeAttributes(HTMLAttributes, {
+        "data-type": name,
+        class: `vl-block vl-${name}`,
+      }),
     ],
     addNodeView: () => ReactNodeViewRenderer(view),
   });
@@ -159,10 +186,15 @@ export const Image = atomBlock("image", ImageView);
 /** A data fence: chart, plan, diagram, calculator or collection view. */
 export const DataFence = Node.create({
   ...fromSchema("dataFence"),
-  parseHTML: () => [{ tag: 'div[data-type="dataFence"]', contentElement: "code" }],
+  parseHTML: () => [
+    { tag: 'div[data-type="dataFence"]', contentElement: "code" },
+  ],
   renderHTML: ({ HTMLAttributes }) => [
     "div",
-    mergeAttributes(HTMLAttributes, { "data-type": "dataFence", class: "vl-block vl-fence" }),
+    mergeAttributes(HTMLAttributes, {
+      "data-type": "dataFence",
+      class: "vl-block vl-fence",
+    }),
     ["pre", ["code", 0]],
   ],
   addNodeView: () => ReactNodeViewRenderer(DataFenceView),

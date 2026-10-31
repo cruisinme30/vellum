@@ -52,7 +52,9 @@ impl Due {
     pub fn on(self, date: Date) -> Self {
         match self {
             Self::Date(_) => Self::Date(date),
-            Self::DateTime(datetime) => Self::DateTime(date.to_datetime(datetime.time())),
+            Self::DateTime(datetime) => {
+                Self::DateTime(date.to_datetime(datetime.time()))
+            }
         }
     }
 }
@@ -104,7 +106,12 @@ impl fmt::Display for Due {
                 if time.second() == 0 && time.subsec_nanosecond() == 0 {
                     write!(f, "{}T{}", datetime.date(), time.strftime("%H:%M"))
                 } else {
-                    write!(f, "{}T{}", datetime.date(), time.strftime("%H:%M:%S"))
+                    write!(
+                        f,
+                        "{}T{}",
+                        datetime.date(),
+                        time.strftime("%H:%M:%S")
+                    )
                 }
             }
         }
@@ -213,7 +220,9 @@ impl FromStr for Reminder {
         if unsigned.starts_with('P') || unsigned.starts_with('p') {
             text.parse::<Span>()
                 .ok()
-                .and_then(|span| span.to_duration(SpanRelativeTo::days_are_24_hours()).ok())
+                .and_then(|span| {
+                    span.to_duration(SpanRelativeTo::days_are_24_hours()).ok()
+                })
                 .map(Self::Relative)
                 .ok_or_else(|| FieldError::Reminder(text.to_owned()))
         } else {
@@ -364,7 +373,8 @@ impl TaskFields {
                 .filter(|r| r.from == RecurFrom::Completion)
                 .map(|r| r.from.as_str()),
         );
-        let reminders: Vec<String> = self.reminders.iter().map(ToString::to_string).collect();
+        let reminders: Vec<String> =
+            self.reminders.iter().map(ToString::to_string).collect();
         attrs.set("remind", reminders.join(","));
         attrs.set_opt("p", self.priority.map(|p| p.level().to_string()));
         attrs.set("labels", self.labels.join(","));
@@ -448,6 +458,17 @@ pub enum Source {
         /// Whether the comment thread is resolved.
         resolved: bool,
     },
+    /// A comment that mentions the owner and that they have not answered.
+    Mention {
+        /// The comment that mentions them.
+        comment: CommentId,
+        /// The document the thread is on, if it is on one.
+        doc: Option<DocId>,
+        /// The issue key, if the thread is on an issue.
+        issue: Option<String>,
+        /// Who mentioned them, without `@`.
+        by: String,
+    },
     /// A review requested from the owner: a document review or a pull
     /// request linked to an issue.
     Review {
@@ -467,6 +488,7 @@ impl Source {
             Self::Checklist { doc, block, .. } => format!("{doc}.{block}"),
             Self::Issue { issue, .. } => format!("issue.{issue}"),
             Self::Comment { comment, .. } => format!("comment.{comment}"),
+            Self::Mention { comment, .. } => format!("mention.{comment}"),
             Self::Review { reference, .. } => format!("review.{reference}"),
         }
     }
@@ -509,8 +531,9 @@ mod tests {
     #[test]
     fn fields_round_trip_through_attrs() {
         let attrs = Attrs::parse(
-            "{when=evening start=2026-11-01 due=2026-11-03T15:00 rrule=FREQ=WEEKLY \
-             recur_from=completion remind=-PT15M,2026-11-03T09:00 p=1 labels=home,errand \
+            "{when=evening start=2026-11-01 due=2026-11-03T15:00 \
+             rrule=FREQ=WEEKLY recur_from=completion \
+             remind=-PT15M,2026-11-03T09:00 p=1 labels=home,errand \
              done=2026-11-03T10:15:00Z src=todoist:1 extra=kept}",
         )
         .unwrap();
@@ -522,8 +545,9 @@ mod tests {
         fields.write_attrs(&mut written);
         assert_eq!(
             written.to_string(),
-            "{when=evening start=2026-11-01 due=2026-11-03T15:00 rrule=FREQ=WEEKLY \
-             recur_from=completion remind=-PT15M,2026-11-03T09:00 p=1 labels=home,errand \
+            "{when=evening start=2026-11-01 due=2026-11-03T15:00 \
+             rrule=FREQ=WEEKLY recur_from=completion \
+             remind=-PT15M,2026-11-03T09:00 p=1 labels=home,errand \
              done=2026-11-03T10:15:00Z src=todoist:1 extra=kept}"
         );
         assert_eq!(TaskFields::from_attrs(&written).unwrap(), fields);

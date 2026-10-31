@@ -22,7 +22,9 @@ describe("deep links", () => {
   });
 
   it("finds the link in a command line", () => {
-    expect(findDeepLink(["/app/Vellum", "--flag", "vellum://search"])).toBe("/search");
+    expect(findDeepLink(["/app/Vellum", "--flag", "vellum://search"])).toBe(
+      "/search",
+    );
     expect(findDeepLink(["/app/Vellum"])).toBeUndefined();
   });
 });

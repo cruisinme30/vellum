@@ -5,13 +5,15 @@
 //! `write`, regenerates what is derived from them.
 //!
 //! Derived files: the golden corpus inputs in `corpus/guide/` and the page
-//! table that embeds the books in `vellum-help`. `write` also gives new
+//! table that embeds the books in `vellum-help`, and the app's list of
+//! help IDs in `web/src/help/topics.gen.ts`. `write` also gives new
 //! pages an ID and records it in `book.yaml`.
 
 mod book;
 mod coverage;
 mod examples;
 mod generate;
+mod i18n;
 mod markdown;
 mod ulid;
 
@@ -26,6 +28,8 @@ use examples::Example;
 const CORPUS_DIR: &str = "corpus/guide";
 /// The generated page table.
 const PAGES_RS: &str = "crates/vellum-help/src/pages.rs";
+/// The app's list of contextual help IDs.
+const TOPICS_TS: &str = "web/src/help/topics.gen.ts";
 /// The contextual help map.
 const ANCHORS: &str = "docs/help-anchors.yaml";
 
@@ -48,17 +52,21 @@ pub fn run(mode: Option<&str>) -> Result<(), String> {
     let mut errors = Vec::new();
     let examples = check_books(&books, &mut errors);
     let anchors = check_anchors(&root, &books, &mut errors)?;
+    i18n::check(&root, &books, &mut errors)?;
     let mut outputs = generate::corpus(&examples);
     let _ = outputs.insert(
         PathBuf::from(PAGES_RS),
         generate::page_table(&books, &anchors),
     );
+    let _ =
+        outputs.insert(PathBuf::from(TOPICS_TS), generate::topics_ts(&anchors));
     sync_outputs(&root, &outputs, write, &mut errors)?;
     if errors.is_empty() {
         Ok(())
     } else {
         errors.push(String::from(
-            "help books: fix the problems above; `cargo xtask help write` regenerates derived files",
+            "help books: fix the problems above; `cargo xtask help write` \
+                regenerates derived files",
         ));
         Err(errors.join("\n"))
     }
@@ -107,7 +115,9 @@ fn check_books(books: &[Book], errors: &mut Vec<String>) -> Vec<Example> {
             }
         }
         for path in &book.unlisted {
-            errors.push(format!("docs/{name}.book/{path}: not listed in SUMMARY.md"));
+            errors.push(format!(
+                "docs/{name}.book/{path}: not listed in SUMMARY.md"
+            ));
         }
         let mut node_ids = BTreeSet::new();
         for page in &book.pages {
@@ -120,9 +130,12 @@ fn check_books(books: &[Book], errors: &mut Vec<String>) -> Vec<Example> {
             if let Some(id) = id {
                 let _ = node_ids.insert(id.to_owned());
                 let node = book.manifest.nodes.iter().find(|n| n.id == id);
-                if node.and_then(|n| n.path.as_deref()) != Some(page.path.as_str()) {
+                if node.and_then(|n| n.path.as_deref())
+                    != Some(page.path.as_str())
+                {
                     errors.push(format!(
-                        "{location}: book.yaml has no node `{id}` with this path"
+                        "{location}: book.yaml has no node `{id}` with this \
+                            path"
                     ));
                 }
             }
@@ -132,7 +145,8 @@ fn check_books(books: &[Book], errors: &mut Vec<String>) -> Vec<Example> {
         for node in &book.manifest.nodes {
             if !node_ids.contains(&node.id) {
                 errors.push(format!(
-                    "docs/{name}.book/book.yaml: node `{}` is not a page in SUMMARY.md",
+                    "docs/{name}.book/book.yaml: node `{}` is not a page in \
+                        SUMMARY.md",
                     node.id
                 ));
             }
@@ -141,7 +155,10 @@ fn check_books(books: &[Book], errors: &mut Vec<String>) -> Vec<Example> {
     let mut names = BTreeSet::new();
     for example in &found {
         if !names.insert(example.name.as_str()) {
-            errors.push(format!("example `{}` appears more than once", example.name));
+            errors.push(format!(
+                "example `{}` appears more than once",
+                example.name
+            ));
         }
     }
     for required in coverage::REQUIRED {
@@ -223,11 +240,17 @@ fn check_anchors(
                 .and_then(|b| b.page(page))
         });
         match (page, fragment) {
-            (None, _) => errors.push(format!("{location}: `{path}` is not a page of a help book")),
+            (None, _) => errors.push(format!(
+                "{location}: `{path}` is not a page of a help book"
+            )),
             (Some(page), Some(fragment))
-                if !markdown::anchors(&page.text).iter().any(|a| a == fragment) =>
+                if !markdown::anchors(&page.text)
+                    .iter()
+                    .any(|a| a == fragment) =>
             {
-                errors.push(format!("{location}: `{path}` has no heading `#{fragment}`"));
+                errors.push(format!(
+                    "{location}: `{path}` has no heading `#{fragment}`"
+                ));
             }
             _ => {}
         }
@@ -251,8 +274,9 @@ fn sync_outputs(
         }
         if write {
             if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| format!("cannot create {}: {e}", parent.display()))?;
+                fs::create_dir_all(parent).map_err(|e| {
+                    format!("cannot create {}: {e}", parent.display())
+                })?;
             }
             fs::write(&path, expected)
                 .map_err(|e| format!("cannot write {}: {e}", path.display()))?;
@@ -271,7 +295,9 @@ fn sync_outputs(
             continue;
         }
         if write {
-            fs::remove_file(&path).map_err(|e| format!("cannot remove {}: {e}", path.display()))?;
+            fs::remove_file(&path).map_err(|e| {
+                format!("cannot remove {}: {e}", path.display())
+            })?;
         } else {
             errors.push(format!(
                 "{} has no example in the guide",
@@ -305,10 +331,13 @@ fn assign_ids(root: &Path) -> Result<(), String> {
         let mut nodes = Vec::new();
         for page in &book.pages {
             let file = book.dir.join(&page.path);
-            let id = if let Some(id) = page.front.as_ref().and_then(|f| f.id.clone()) {
+            let id = if let Some(id) =
+                page.front.as_ref().and_then(|f| f.id.clone())
+            {
                 id
             } else {
-                let id = ulid::generate(&format!("{}/{}", book.name, page.path));
+                let id =
+                    ulid::generate(&format!("{}/{}", book.name, page.path));
                 let title = book
                     .entries
                     .iter()
@@ -317,14 +346,16 @@ fn assign_ids(root: &Path) -> Result<(), String> {
                 let text = page.text.strip_prefix("---\n").map_or_else(
                     || {
                         format!(
-                            "---\nid: {id}\ntitle: {title}\nvellum: 1\n---\n\n{}",
+                            "---\nid: {id}\ntitle: {title}\nvellum: 1\n---\n\n\
+                                {}",
                             page.text
                         )
                     },
                     |rest| format!("---\nid: {id}\n{rest}"),
                 );
-                fs::write(&file, text)
-                    .map_err(|e| format!("cannot write {}: {e}", file.display()))?;
+                fs::write(&file, text).map_err(|e| {
+                    format!("cannot write {}: {e}", file.display())
+                })?;
                 id
             };
             let old = book.manifest.nodes.iter().find(|n| n.id == id);

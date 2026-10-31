@@ -49,10 +49,15 @@ describe("shellManifest", () => {
       "/icons/a.png",
       "/index.html",
     ]);
-    expect(manifest.entries.every((entry) => /^[\da-f]{16}$/.test(entry.revision ?? ""))).toBe(
-      true,
+    expect(
+      manifest.entries.every((entry) =>
+        /^[\da-f]{16}$/.test(entry.revision ?? ""),
+      ),
+    ).toBe(true);
+    const changed = shellManifest(
+      [{ fileName: "index.html", content: "<html lang>" }],
+      [],
     );
-    const changed = shellManifest([{ fileName: "index.html", content: "<html lang>" }], []);
     expect(changed.version).not.toBe(manifest.version);
   });
 });
@@ -60,11 +65,18 @@ describe("shellManifest", () => {
 describe("vellumServiceWorker", () => {
   it("adds the worker as a second entry named sw.js", () => {
     const { plugin, call } = hooks();
-    const config = call(plugin.config, undefined, { root: "/web" }) as BuildConfig;
+    const config = call(plugin.config, undefined, {
+      root: "/web",
+    }) as BuildConfig;
     const { input, output } = config.build.rolldownOptions;
-    expect(input).toEqual({ index: "/web/index.html", sw: "/web/src/platform/pwa/sw.ts" });
+    expect(input).toEqual({
+      index: "/web/index.html",
+      sw: "/web/src/platform/pwa/sw.ts",
+    });
     expect(output.entryFileNames({ name: "sw" })).toBe("sw.js");
-    expect(output.entryFileNames({ name: "index" })).toBe("assets/[name]-[hash].js");
+    expect(output.entryFileNames({ name: "index" })).toBe(
+      "assets/[name]-[hash].js",
+    );
     const fallback = call(plugin.config, undefined, {}) as BuildConfig;
     expect(fallback.build.rolldownOptions.input["index"]).toBe(
       path.resolve(process.cwd(), "index.html"),
@@ -77,15 +89,24 @@ describe("vellumServiceWorker", () => {
     writeFileSync(path.join(publicDirectory, "icons", "icon.png"), "png");
     writeFileSync(path.join(publicDirectory, "manifest.webmanifest"), "{}");
     const { plugin, call } = hooks();
-    call(plugin.configResolved, undefined, { root: "/web", publicDir: publicDirectory });
+    call(plugin.configResolved, undefined, {
+      root: "/web",
+      publicDir: publicDirectory,
+    });
     const bundle: Bundle = {
-      "sw.js": { type: "chunk", fileName: "sw.js", code: "const m = __VELLUM_SHELL__;" },
+      "sw.js": {
+        type: "chunk",
+        fileName: "sw.js",
+        code: "const m = __VELLUM_SHELL__;",
+      },
       "index.html": { type: "asset", fileName: "index.html", source: "<html>" },
     };
     call(plugin.generateBundle, { error: vi.fn() }, {}, bundle);
     const worker = bundle["sw.js"];
     const code = worker?.type === "chunk" ? worker.code : "";
-    const injected = JSON.parse(code.replace("const m = ", "").replace(/;$/, "")) as {
+    const injected = JSON.parse(
+      code.replace("const m = ", "").replace(/;$/, ""),
+    ) as {
       entries: { url: string }[];
     };
     expect(injected.entries.map((entry) => entry.url)).toEqual([
@@ -97,11 +118,18 @@ describe("vellumServiceWorker", () => {
 
   it("fails the build when the worker did not build", () => {
     const { plugin, call } = hooks();
-    call(plugin.configResolved, undefined, { root: "/web", publicDir: "/does/not/exist" });
+    call(plugin.configResolved, undefined, {
+      root: "/web",
+      publicDir: "/does/not/exist",
+    });
     const error = vi.fn(() => {
       throw new Error("build failed");
     });
-    expect(() => call(plugin.generateBundle, { error }, {}, {})).toThrow("build failed");
-    expect(error).toHaveBeenCalledWith(expect.stringContaining("did not build to sw.js"));
+    expect(() => call(plugin.generateBundle, { error }, {}, {})).toThrow(
+      "build failed",
+    );
+    expect(error).toHaveBeenCalledWith(
+      expect.stringContaining("did not build to sw.js"),
+    );
   });
 });

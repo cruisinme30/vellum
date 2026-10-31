@@ -20,7 +20,9 @@ the page in light and dark mode; colours you set in `classDef` or
 
 ## Flowchart
 
-Boxes and arrows. Direction is `TB`, `LR`, `BT` or `RL`; shapes are `[box]`, `(rounded)`, `{decision}`, `[(database)]` and more. Subgraphs group nodes, and `classDef` styles them.
+Boxes and arrows. Direction is `TB`, `LR`, `BT` or `RL`; shapes are `[box]`,
+`(rounded)`, `{decision}`, `[(database)]` and more. Subgraphs group nodes, and
+`classDef` styles them.
 
 ```mermaid
 flowchart TB
@@ -226,7 +228,8 @@ erDiagram
 
 ## Gantt chart
 
-Tasks on a calendar with dependencies and milestones. For a simpler roadmap, see the [roadmap fence](../writing/plans.md#roadmap).
+Tasks on a calendar with dependencies and milestones. For a simpler roadmap, see
+the [roadmap fence](../writing/plans.md#roadmap).
 
 ```mermaid
 gantt
@@ -446,7 +449,8 @@ gitGraph
 
 ## Pie chart
 
-Shares of a whole. The [chart fence](../writing/charts.md#pie) draws the same with more options.
+Shares of a whole. The [chart fence](../writing/charts.md#pie) draws the same
+with more options.
 
 ```mermaid
 pie showData

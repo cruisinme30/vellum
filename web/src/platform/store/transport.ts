@@ -61,8 +61,15 @@ export function httpTransport(options: HttpTransportOptions): SyncTransport {
     }
     if (!response.ok) {
       const retryable =
-        response.status === 408 || response.status === 429 || response.status >= 500;
-      throw new SyncError(`HTTP ${String(response.status)}`, response.status, retryable, requestId);
+        response.status === 408 ||
+        response.status === 429 ||
+        response.status >= 500;
+      throw new SyncError(
+        `HTTP ${String(response.status)}`,
+        response.status,
+        retryable,
+        requestId,
+      );
     }
     return response.json() as Promise<unknown>;
   };
@@ -77,7 +84,9 @@ export function httpTransport(options: HttpTransportOptions): SyncTransport {
     },
     async pull(clientId, cursor) {
       const query = new URLSearchParams({ clientId, cursor });
-      return parsePull(await call(`/api/v1/sync/pull?${query.toString()}`, { method: "GET" }));
+      return parsePull(
+        await call(`/api/v1/sync/pull?${query.toString()}`, { method: "GET" }),
+      );
     },
   };
 }

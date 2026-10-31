@@ -63,7 +63,8 @@ pub fn to_draft(
     routing: &Routing,
     project_teams: &BTreeMap<String, String>,
 ) -> Result<Option<IssueDraft>, InboundError> {
-    let json: Value = serde_json::from_slice(body).map_err(InboundError::malformed)?;
+    let json: Value =
+        serde_json::from_slice(body).map_err(InboundError::malformed)?;
     let (title, culprit, level, link, issue_id, project, short_id) =
         match (resource, text(&json, "/action")) {
             ("issue", "created") => (
@@ -87,7 +88,9 @@ pub fn to_draft(
             _ => return Ok(None),
         };
     if issue_id.is_empty() || title.is_empty() {
-        return Err(InboundError::malformed("Sentry issue ID or title missing"));
+        return Err(InboundError::malformed(
+            "Sentry issue ID or title missing",
+        ));
     }
     let team = project_teams
         .get(project)
@@ -104,7 +107,10 @@ pub fn to_draft(
     let _ = draft.labels.insert("sentry".to_owned());
     draft.description = Body::new()
         .facts(&[
-            Fact::new("Level", if level.is_empty() { "unknown" } else { level }),
+            Fact::new(
+                "Level",
+                if level.is_empty() { "unknown" } else { level },
+            ),
             Fact::code("Culprit", culprit),
             Fact::new("Project", project),
             Fact::new("Sentry ID", short_id),
@@ -130,7 +136,8 @@ mod tests {
         serde_json::to_vec(&json!({
             "action": "created",
             "data": {"issue": {
-                "id": "1170820242", "shortId": "WEB-3K", "title": "TypeError: Cannot read properties of undefined",
+                "id": "1170820242", "shortId": "WEB-3K", "title": "TypeError: \
+                    Cannot read properties of undefined",
                 "culprit": "checkout/cart.ts in total", "level": "error",
                 "permalink": "https://northstar.sentry.io/issues/1170820242/",
                 "project": {"slug": "web-app"}
@@ -168,11 +175,9 @@ mod tests {
                 .description
                 .contains("- Culprit: `checkout/cart.ts in total`")
         );
-        assert!(
-            draft
-                .description
-                .contains("[Open in Sentry](https://northstar.sentry.io/issues/1170820242/)")
-        );
+        assert!(draft.description.contains(
+            "[Open in Sentry](https://northstar.sentry.io/issues/1170820242/)"
+        ));
         assert_eq!(
             draft.source,
             Source::Sentry {
@@ -186,12 +191,15 @@ mod tests {
     fn alerts_and_ignored_resources() -> Result<(), InboundError> {
         let alert = serde_json::to_vec(&json!({
             "action": "triggered",
-            "data": {"event": {"title": "Out of memory", "level": "fatal", "issue_id": "42",
-                               "web_url": "https://northstar.sentry.io/issues/42/events/x/", "project_slug": "api"}}
+            "data": {"event": {"title": "Out of memory", "level": "fatal",
+                               "issue_id": "42",
+                               "web_url": "https://northstar.sentry.io/issues/4\
+                                   2/events/x/", "project_slug": "api"}}
         }))
         .unwrap_or_default();
-        let draft = to_draft("event_alert", &alert, &routing(), &BTreeMap::new())?
-            .ok_or_else(|| InboundError::malformed("no draft"))?;
+        let draft =
+            to_draft("event_alert", &alert, &routing(), &BTreeMap::new())?
+                .ok_or_else(|| InboundError::malformed("no draft"))?;
         assert_eq!(
             (draft.team.as_str(), draft.priority),
             ("ENG", Some(Priority::Urgent))

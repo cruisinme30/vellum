@@ -164,7 +164,10 @@ struct Svg {
 }
 
 impl Svg {
-    #[expect(clippy::cast_precision_loss, reason = "microsecond totals fit in f64")]
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "microsecond totals fit in f64"
+    )]
     fn frame(&mut self, name: &str, node: &Node, x: f64, depth: usize) {
         let w = node.total as f64 * self.scale;
         if w < 0.5 {
@@ -176,7 +179,9 @@ impl Svg {
         let label = escape(name);
         let _ = write!(
             self.out,
-            r#"<g><title>{label} ({ms:.1} ms, {pct:.2}%)</title><rect x="{x:.1}" y="{y:.1}" width="{w:.1}" height="{h:.1}" rx="2" fill="{fill}"/>"#,
+            "<g><title>{label} ({ms:.1} ms, {pct:.2}%)</title><rect \
+                x=\"{x:.1}\" y=\"{y:.1}\" width=\"{w:.1}\" height=\"{h:.1}\" \
+                rx=\"2\" fill=\"{fill}\"/>",
             h = FRAME - 1.0,
             fill = colour(name),
         );
@@ -190,7 +195,8 @@ impl Svg {
             )]
             let chars = room as usize;
             let shown: String = if name.chars().count() > chars {
-                let mut s: String = name.chars().take(chars.saturating_sub(1)).collect();
+                let mut s: String =
+                    name.chars().take(chars.saturating_sub(1)).collect();
                 s.push('…');
                 s
             } else {
@@ -229,7 +235,12 @@ pub fn svg(folded: &Folded, title: &str) -> String {
     };
     let _ = write!(
         svg.out,
-        r##"<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{height}" viewBox="0 0 {WIDTH} {height}" font-family="Roboto, sans-serif" font-size="12"><rect width="100%" height="100%" fill="#F7F8FC"/><text x="{PAD}" y="22" font-size="16" fill="#1D1B20">{title} — {ms:.1} ms total</text>"##,
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{WIDTH}\" \
+            height=\"{height}\" viewBox=\"0 0 {WIDTH} {height}\" \
+            font-family=\"Roboto, sans-serif\" font-size=\"12\"><rect \
+            width=\"100%\" height=\"100%\" fill=\"#F7F8FC\"/><text x=\"{PAD}\" \
+            y=\"22\" font-size=\"16\" fill=\"#1D1B20\">{title} — {ms:.1} ms \
+            total</text>",
         title = escape(title),
         ms = root.total as f64 / 1000.0,
     );
@@ -262,7 +273,10 @@ mod tests {
         assert_eq!(folded.get("http.request;db_query;db_decode"), Some(&100));
         assert_eq!(folded.len(), 3);
         let text = to_text(&folded);
-        assert_eq!(from_text(&format!("{text}garbage\nx notanumber\n")), folded);
+        assert_eq!(
+            from_text(&format!("{text}garbage\nx notanumber\n")),
+            folded
+        );
     }
 
     #[test]

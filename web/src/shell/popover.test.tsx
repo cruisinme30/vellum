@@ -50,7 +50,9 @@ describe("Popover", () => {
     await user.click(screen.getByRole("button", { name: "Open" }));
     const dialog = screen.getByRole("dialog", { name: "Settings" });
     expect(dialog.className).toBe("vl-popover ");
-    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Inside" }));
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: "Inside" }),
+    );
   });
 
   it("stays open for clicks and keys inside it", async () => {
