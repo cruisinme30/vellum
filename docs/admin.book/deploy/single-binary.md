@@ -11,6 +11,14 @@ renderer, search and background jobs, with an encrypted SQLite index.
 
 ## Install {#install}
 
+::: warn
+No release is tagged yet, so the channels below don't work until the
+first one ships: there is no Homebrew formula, winget package, release
+download or install script yet. Until then, build Vellum from source as
+the [README](https://github.com/cruisinme30/vellum#build-and-test)
+explains, then run it as shown under [Run](#run).
+:::
+
 Pick the channel for your platform. Every one installs the same signed
 release binary, on x86-64 or ARM64 (a Raspberry Pi 3 or later on a
 64-bit OS counts).

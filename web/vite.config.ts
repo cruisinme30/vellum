@@ -8,7 +8,7 @@ import { defineConfig } from "vitest/config";
 import { inlineAsset } from "./src/platform/inline-assets";
 import { vellumServiceWorker } from "./src/platform/pwa/vite-plugin";
 
-// `VELLUM_SERVER=http://127.0.0.1:8080 pnpm dev` runs the app against a
+// `VELLUM_SERVER=http://127.0.0.1:7700 pnpm dev` runs the app against a
 // local `vellum serve`; without it the app runs on the Northstar demo data.
 const server = process.env["VELLUM_SERVER"];
 const proxy =

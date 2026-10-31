@@ -15,19 +15,27 @@ the same signed binary.
 | Team | Vellum, Postgres, MinIO, Kroki, ClamAV | [`compose/`](compose/compose.yaml) |
 | Organisation | two of everything, a Patroni replica per shard, canary releases | [`helm/vellum/`](helm/vellum/values.yaml) |
 
+> No release is tagged yet. Until the first `v*` tag there is no
+> `ghcr.io/cruisinme30/vellum` image, Homebrew formula, winget package or
+> `install.sh` download. Build from source as the
+> [README](../README.md#build-and-test) shows, and build the image locally.
+
 ## Single binary and `docker run`
 
-```sh
-docker run -p 7700:7700 -v vellum-data:/data ghcr.io/cruisinme30/vellum:latest
-```
-
-Build the image yourself from the repository root:
+Build the image from the repository root, then run it:
 
 ```sh
-docker build -f deploy/docker/Dockerfile -t vellum .
+docker build -f deploy/docker/Dockerfile -t vellum:local .
+docker run -p 7700:7700 -v vellum-data:/data vellum:local serve
 ```
+
+After the first release, `ghcr.io/cruisinme30/vellum:<version>` replaces
+`vellum:local`.
 
 ## Team: docker compose
+
+Build `vellum:local` first, as above: `.env.example` points
+`VELLUM_IMAGE` at it.
 
 ```sh
 cp deploy/compose/.env.example deploy/compose/.env    # set every change-me
