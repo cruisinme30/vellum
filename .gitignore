@@ -25,3 +25,6 @@ __pycache__/
 
 # pnpm's package cache, if a container run puts it in the checkout
 .pnpm-store/
+
+# Local-only files kept with the repo: design docs, logs, scratch tooling.
+.local/
