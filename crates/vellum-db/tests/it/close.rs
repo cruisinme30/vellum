@@ -14,7 +14,10 @@ use std::time::{Duration, Instant};
 use sqlx::SqlitePool;
 use vellum_db::{Index, IndexConfig, IndexKey, IndexPool};
 
-/// Far above a real close, far below the 5 s timeout the bug hit.
+/// How long a drop that must not block may take, and how long the tests
+/// wait for a background close. Closing itself is checked by the pool
+/// ending empty, which a close that hit its 5 s timeout leaves it not:
+/// how long a real close takes depends on the machine's disk.
 const QUICK: Duration = Duration::from_secs(1);
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -48,16 +51,11 @@ async fn within_quick(done: impl Fn() -> bool + Sync) -> TestResult {
 }
 
 #[tokio::test]
-async fn closing_on_a_current_thread_runtime_is_quick() {
+async fn closing_on_a_current_thread_runtime_closes_every_connection() {
     let dir = tempfile::tempdir().unwrap();
     let (index, pool) = used_index(dir.path()).await.unwrap();
-    let started = Instant::now();
     index.close().await;
-    assert!(
-        started.elapsed() < QUICK,
-        "close took {:?}",
-        started.elapsed()
-    );
+    // Had the close hit its timeout, the connections would still be out.
     assert_eq!(pool.size(), 0);
 }
 
@@ -82,13 +80,9 @@ async fn dropping_on_a_current_thread_runtime_does_not_block_it() {
 async fn dropping_on_a_multi_thread_runtime_closes_before_returning() {
     let dir = tempfile::tempdir().unwrap();
     let (index, pool) = used_index(dir.path()).await.unwrap();
-    let started = Instant::now();
     drop(index);
-    assert!(
-        started.elapsed() < QUICK,
-        "drop took {:?}",
-        started.elapsed()
-    );
+    // The drop waited for the close. Had it hit the close timeout, the
+    // connections would still be out and the pool not empty.
     assert!(pool.is_closed());
     assert_eq!(pool.size(), 0);
 }
@@ -107,13 +101,9 @@ fn dropping_outside_a_runtime_closes_before_returning() {
             u32::try_from(pool.num_idle()) == Ok(pool.size())
         }))
         .unwrap();
-    let started = Instant::now();
     drop(index);
-    assert!(
-        started.elapsed() < QUICK,
-        "drop took {:?}",
-        started.elapsed()
-    );
+    // The drop waited for the close. Had it hit the close timeout, the
+    // connections would still be out and the pool not empty.
     assert!(pool.is_closed());
     assert_eq!(pool.size(), 0);
 }

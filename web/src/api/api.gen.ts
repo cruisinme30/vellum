@@ -2110,7 +2110,8 @@ export interface ComputedRow {
  */
 export interface ConnectionsView {
   /**
-   * The CalDAV account URL to give a task app (it signs in with an API token).
+   * The CalDAV account URL to give a task app (it signs in with an API
+   * token).
    */
   caldav_url: string;
   /**
@@ -6859,7 +6860,8 @@ export interface PutView {
    */
   filter?: string | null;
   /**
-   * status (default), assignee, priority, project, cycle, label, team or none.
+   * status (default), assignee, priority, project, cycle, label, team or
+   * none.
    */
   group_by?: string | null;
   /**
@@ -7055,7 +7057,8 @@ export interface RedeliverInput {
 export type Region = "prefix" | "numbered" | "suffix";
 
 /**
- * A credential as the browser returns it from `navigator.credentials.create()`.
+ * A credential as the browser returns it from
+ * `navigator.credentials.create()`.
  */
 export interface Registration {
   /**
@@ -7735,7 +7738,8 @@ export interface SearchHit {
    */
   path: string;
   /**
-   * The fused relevance score; higher is better. Only comparable within one response.
+   * The fused relevance score; higher is better. Only comparable within one
+   * response.
    */
   score: number;
   /**
@@ -10633,7 +10637,8 @@ export interface ViewIn {
    */
   filter?: string | null;
   /**
-   * status (default), assignee, priority, project, cycle, label, team or none.
+   * status (default), assignee, priority, project, cycle, label, team or
+   * none.
    */
   group_by?: string | null;
   /**
