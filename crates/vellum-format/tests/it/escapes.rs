@@ -130,3 +130,42 @@ fn wiki_link_targets_and_labels_keep_brackets_bars_and_ampersands() {
         assert_eq!(parse(&canonical).document, doc, "{src:?} as {canonical:?}");
     }
 }
+
+#[test]
+fn a_quoted_line_after_a_vertical_tab_stays_paragraph_text() {
+    // Fuzzer finding (`format_roundtrip`): in `> A\n\u{b}---`, the second
+    // line is a lazy continuation of the quoted paragraph. Written back as
+    // `> \u{b}---` it became a one-column table, because the table
+    // extension trims the vertical tab before a delimiter row.
+    for src in [
+        "> A\n\u{b}---\n",
+        "> A\n\u{c}---\n",
+        "> A\n\u{b}:--\n",
+        "> A\n\u{b}\u{c}- b\n",
+    ] {
+        let doc = parse(src).document;
+        let canonical = serialize(&doc);
+        let again = parse(&canonical).document;
+        assert_eq!(again, doc, "{src:?} as {canonical:?}");
+        assert_eq!(serialize(&again), canonical, "{src:?} is not idempotent");
+    }
+}
+
+#[test]
+fn the_nightly_quote_and_table_crash_round_trips() {
+    // The input the nightly fuzz run of 2026-10-30 failed on.
+    let src = concat!(
+        "> A pnno::: inr\u{0}\u{0}nr\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}",
+        "\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}",
+        "\u{0}\u{0}\u{0}o\u{1}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0} Policy c",
+        "hangzes ship blind.\n\u{b}---\n\n**Outc\nEvery \u{0}\u{0}",
+        "\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}\u{0}",
+        "\u{0}\u{0}\u{0}\u{0}\u{0}o\u{1}\u{0}\u{0}\u{0}\u{0}\u{0}",
+        "\u{0} Policy changzes ship blind.\n\u{b}---```calculator\nun",
+        "its: tUnits = 100 [0..1000 step 10]\nprice: Pric\n\n**Outc\n",
+        "Every change shipe = 12\ntotal: Ts with  sh:::\no",
+    );
+    let doc = parse(src).document;
+    let canonical = serialize(&doc);
+    assert_eq!(parse(&canonical).document, doc, "as {canonical:?}");
+}

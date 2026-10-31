@@ -429,7 +429,23 @@ fn opening_char(inline: &Inline) -> Option<char> {
 /// Which character of a line-leading text must be escaped so it is not
 /// read as a block marker (heading, quote, list, setext line, table
 /// delimiter row, container or math fence).
+///
+/// The table extension trims a vertical tab or form feed before a
+/// delimiter row, where `CommonMark` counts neither as indentation, so
+/// `\u{b}---` under a paragraph line is a one-column table. Inside a
+/// quote such a line can arrive as a lazy continuation of the paragraph;
+/// written back with `> ` in front it would become that table. So the
+/// marker is looked for after any leading vertical tabs and form feeds.
 fn line_start_escape(chars: &[char]) -> Option<usize> {
+    let lead = chars
+        .iter()
+        .take_while(|c| matches!(c, '\u{b}' | '\u{c}'))
+        .count();
+    marker_escape(chars.get(lead..)?).map(|i| i + lead)
+}
+
+/// [`line_start_escape`] for a line whose first character is the marker.
+fn marker_escape(chars: &[char]) -> Option<usize> {
     let first = *chars.first()?;
     match first {
         '#' | '>' | '-' | '+' | '=' => Some(0),
