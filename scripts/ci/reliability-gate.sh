@@ -32,6 +32,9 @@ FUZZ_PREFIX="Fuzz "
 declare -A KNOWN=(
   # Gourav, 2026-10-30 6:38 PM PT: release first, fix after.
   ["Fuzz format_roundtrip"]="#576"
+  # Gourav, 2026-10-30 7:13 PM PT: the same for ZAP and the load test.
+  ["Security scan (ZAP baseline)"]="#578"
+  ["Load test (k6)"]="#578"
 )
 STALE_DAYS="${STALE_DAYS:-8}"
 
