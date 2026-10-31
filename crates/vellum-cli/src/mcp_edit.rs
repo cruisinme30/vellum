@@ -131,7 +131,9 @@ pub fn apply(
                     match plan.replace {
                         None => out.item(item.clone()),
                         Some(blocks) => {
-                            blocks.into_iter().for_each(|b| out.push(b))
+                            for b in blocks {
+                                out.push(b);
+                            }
                         }
                     }
                     plan.after.into_iter().for_each(|b| out.push(b));
@@ -146,7 +148,9 @@ pub fn apply(
                 match plan.replace {
                     None => out.push(block.clone()),
                     Some(blocks) => {
-                        blocks.into_iter().for_each(|b| out.push(b))
+                        for b in blocks {
+                            out.push(b);
+                        }
                     }
                 }
                 plan.after.into_iter().for_each(|b| out.push(b));

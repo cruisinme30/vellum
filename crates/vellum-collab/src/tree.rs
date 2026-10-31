@@ -141,7 +141,7 @@ impl Node {
                 for run in runs.iter().filter(|run| !run.text.is_empty()) {
                     match out.last_mut() {
                         Some(last) if last.marks == run.marks => {
-                            last.text.push_str(&run.text)
+                            last.text.push_str(&run.text);
                         }
                         _ => out.push(run.clone()),
                     }
@@ -196,11 +196,11 @@ fn read_children<T: ReadTxn>(
     for child in parent.children(txn) {
         match child {
             XmlOut::Element(element) => {
-                nodes.push(Node::Element(read_element(txn, &element)))
+                nodes.push(Node::Element(read_element(txn, &element)));
             }
             XmlOut::Text(text) => nodes.push(Node::Text(read_text(txn, &text))),
             XmlOut::Fragment(fragment) => {
-                nodes.extend(read_children(txn, &fragment))
+                nodes.extend(read_children(txn, &fragment));
             }
         }
     }

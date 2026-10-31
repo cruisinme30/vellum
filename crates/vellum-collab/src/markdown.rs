@@ -492,7 +492,7 @@ fn flatten(inlines: &[Inline], marks: &Marks, out: &mut Vec<Piece>) {
     for inline in inlines {
         match inline {
             Inline::Text { text } => {
-                out.push(Piece::Text(text.clone(), marks.clone()))
+                out.push(Piece::Text(text.clone(), marks.clone()));
             }
             Inline::Code { code } => {
                 out.push(Piece::Text(
@@ -501,16 +501,16 @@ fn flatten(inlines: &[Inline], marks: &Marks, out: &mut Vec<Piece>) {
                 ));
             }
             Inline::SoftBreak => {
-                out.push(Piece::Text("\n".to_owned(), marks.clone()))
+                out.push(Piece::Text("\n".to_owned(), marks.clone()));
             }
             Inline::HardBreak => {
-                out.push(atom(node(NodeType::HardBreak, Vec::new())))
+                out.push(atom(node(NodeType::HardBreak, Vec::new())));
             }
             Inline::Emphasis { content } => {
-                flatten(content, &with(MarkType::Italic, empty()), out)
+                flatten(content, &with(MarkType::Italic, empty()), out);
             }
             Inline::Strong { content } => {
-                flatten(content, &with(MarkType::Bold, empty()), out)
+                flatten(content, &with(MarkType::Bold, empty()), out);
             }
             Inline::Strikethrough { content } => {
                 flatten(content, &with(MarkType::Strike, empty()), out);
@@ -734,7 +734,7 @@ fn element_to_blocks(element: &Element, out: &mut Vec<Block>) {
             id: block_id(attrs),
         }),
         NodeType::Table => {
-            out.extend(element_to_table(element).map(Block::Table))
+            out.extend(element_to_table(element).map(Block::Table));
         }
         NodeType::Image => out.push(Block::Paragraph {
             content: vec![image(attrs)],
@@ -911,10 +911,8 @@ fn element_to_table(element: &Element) -> Option<Table> {
 fn cell_inlines(cell: &Element) -> Vec<Inline> {
     let mut out = Vec::new();
     for block in nodes_to_blocks(&cell.children) {
-        let content = match block {
-            Block::Paragraph { content, .. }
-            | Block::Heading { content, .. } => content,
-            _ => continue,
+        let Some(content) = inline_content(block) else {
+            continue;
         };
         if !out.is_empty() && !content.is_empty() {
             out.push(Inline::Text {
@@ -935,11 +933,23 @@ fn nodes_to_literal(nodes: &[Node]) -> String {
     text
 }
 
+/// The inline content of a paragraph or heading; `None` for other blocks.
+fn inline_content(block: Block) -> Option<Vec<Inline>> {
+    match block {
+        Block::Paragraph { content, .. } | Block::Heading { content, .. } => {
+            Some(content)
+        }
+        _ => None,
+    }
+}
+
 fn collect_text(nodes: &[Node], out: &mut String) {
     for node in nodes {
         match node {
             Node::Text(runs) => {
-                runs.iter().for_each(|run| out.push_str(&run.text))
+                for run in runs {
+                    out.push_str(&run.text);
+                }
             }
             Node::Element(element) => collect_text(&element.children, out),
         }
@@ -958,7 +968,7 @@ fn collect_pieces(nodes: &[Node], out: &mut Vec<Piece>) {
             Node::Text(runs) => {
                 out.extend(runs.iter().filter(|run| !run.text.is_empty()).map(
                     |run| Piece::Text(run.text.clone(), run.marks.clone()),
-                ))
+                ));
             }
             Node::Element(element) if is_inline(&element.name) => {
                 let marks = marks_from_any(element.attrs.get("marks"));

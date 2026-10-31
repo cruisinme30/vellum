@@ -377,7 +377,7 @@ impl Room {
         match control {
             Control::Leave(peer) => self.remove_peer(peer, None),
             Control::SetAccess { user, access } => {
-                self.set_access(user, access)
+                self.set_access(user, access);
             }
             Control::Shutdown(ack) => return Some(ack),
         }

@@ -115,7 +115,7 @@ async fn apply(batch: &[Change], services: &Services) {
     match drive.apply_changes(batch).await {
         Ok(report) => tracing::debug!(?report, "applied external changes"),
         Err(error) => {
-            tracing::warn!(%error, "external changes not applied to the drive")
+            tracing::warn!(%error, "external changes not applied to the drive");
         }
     }
     let touched = book_manifests(batch);
@@ -148,7 +148,7 @@ async fn apply(batch: &[Change], services: &Services) {
                     %error,
                     book = %dir,
                     "book access not re-applied"
-                )
+                );
             }
         }
     }

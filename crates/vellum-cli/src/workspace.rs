@@ -388,7 +388,7 @@ fn keep_fresh(
                     match load_spaces(from.as_ref()).await {
                         Ok(list) => reload.replace(list),
                         Err(error) => {
-                            tracing::warn!(%error, "space list not reloaded")
+                            tracing::warn!(%error, "space list not reloaded");
                         }
                     }
                 })
@@ -405,7 +405,7 @@ fn keep_fresh(
             match load_spaces(drive_index.as_ref()).await {
                 Ok(list) => refresh.replace(list),
                 Err(error) => {
-                    tracing::warn!(%error, "space list not refreshed")
+                    tracing::warn!(%error, "space list not refreshed");
                 }
             }
         }
@@ -548,7 +548,7 @@ async fn provision_drives(
         match drive.ensure_my_drive(user.id, Some(&user.handle)).await {
             Ok(_) => made += 1,
             Err(error) => {
-                tracing::warn!(%error, user = %user.id, "My Drive not created")
+                tracing::warn!(%error, user = %user.id, "My Drive not created");
             }
         }
     }
@@ -1080,7 +1080,7 @@ fn drive_jobs(replica: &Replica, drive: &Arc<Drive>) {
                         "deleted versions past retention"
                     ),
                     Err(error) => {
-                        tracing::warn!(%error, "version retention skipped")
+                        tracing::warn!(%error, "version retention skipped");
                     }
                 }
             }

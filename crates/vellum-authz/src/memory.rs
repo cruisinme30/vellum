@@ -174,7 +174,7 @@ impl AuthzStore for MemoryStore {
         match commit.scope {
             Scope::All => s.effective.clear(),
             Scope::Objects(objects) => {
-                s.effective.retain(|(_, o, _), _| !objects.contains(o))
+                s.effective.retain(|(_, o, _), _| !objects.contains(o));
             }
         }
         for row in commit.rows {

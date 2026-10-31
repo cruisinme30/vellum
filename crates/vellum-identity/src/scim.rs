@@ -1164,7 +1164,7 @@ fn patch_group_attribute(
         ("remove", "members") => change.remove.extend(member_ids_any(value)?),
         ("add", "members") => change.add.extend(member_ids(identity, value)?),
         ("replace", "members") => {
-            change.replace = Some(member_ids(identity, value)?)
+            change.replace = Some(member_ids(identity, value)?);
         }
         ("remove", "externalid") => {
             change.set_external_id = true;

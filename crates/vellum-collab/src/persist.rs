@@ -170,11 +170,11 @@ impl Writer {
         .await;
         match &result {
             Ok(()) => {
-                self.deps.metrics.versions.add(1, &label("reason", reason))
+                self.deps.metrics.versions.add(1, &label("reason", reason));
             }
             Err(err) => {
                 error!(room = %self.room, %err, "cannot write the Markdown \
-                    version")
+                    version");
             }
         }
         result

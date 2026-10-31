@@ -63,10 +63,10 @@ impl Drive {
                     Change::Created { path, .. }
                     | Change::Removed { path, .. }
                     | Change::Untracked { path, .. } => {
-                        rescan.extend(space_of(&spaces, path))
+                        rescan.extend(space_of(&spaces, path));
                     }
                     Change::Duplicated { copy, .. } => {
-                        rescan.extend(space_of(&spaces, copy))
+                        rescan.extend(space_of(&spaces, copy));
                     }
                 }
             }

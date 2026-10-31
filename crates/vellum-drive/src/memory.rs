@@ -540,11 +540,11 @@ impl Access for MemoryAccess {
         match role {
             None => self.revoke(user, root),
             Some(SpaceRole::Viewer | SpaceRole::Commenter) => {
-                self.grant(user, root, Role::Viewer)
+                self.grant(user, root, Role::Viewer);
             }
             Some(SpaceRole::Editor) => self.grant(user, root, Role::Editor),
             Some(SpaceRole::Manager | SpaceRole::Owner) => {
-                self.grant(user, root, Role::Manager)
+                self.grant(user, root, Role::Manager);
             }
         }
         Ok(())

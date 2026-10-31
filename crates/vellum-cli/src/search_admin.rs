@@ -168,7 +168,7 @@ impl SearchStatus {
                 self.service.set_hybrid(on);
             }
             Err(error) => {
-                tracing::warn!(%error, "search: admin settings unreadable")
+                tracing::warn!(%error, "search: admin settings unreadable");
             }
         }
     }

@@ -180,7 +180,9 @@ fn close_in_background(
 impl Index {
     /// Connects, unlocks (SQLCipher), and applies every pending migration.
     ///
-    /// # Errors Fails if the database is unreachable, the key is wrong, or a
+    /// # Errors
+    ///
+    /// Fails if the database is unreachable, the key is wrong, or a
     /// migration fails.
     #[tracing::instrument(name = "db.open", skip_all, fields(db.system))]
     pub async fn open(config: &IndexConfig) -> Result<Self> {
@@ -269,7 +271,7 @@ impl Index {
         let system = self.backend().otel_system();
         match &self.pool {
             Pool::Sqlite(pool) => {
-                traced(system, "migrate", SQLITE_MIGRATIONS.run(pool)).await?
+                traced(system, "migrate", SQLITE_MIGRATIONS.run(pool)).await?;
             }
             Pool::Postgres(pool) => {
                 traced(system, "migrate", POSTGRES_MIGRATIONS.run(pool))

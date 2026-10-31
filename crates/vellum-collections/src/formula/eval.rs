@@ -170,30 +170,9 @@ impl<'e> Eval<'e> {
                     ));
                 }
             },
-            Func::Days => match (&first, vals.get(1)) {
-                (Value::Date(a), Some(Value::Date(b))) => {
-                    days_value(a.days_since(*b))
-                }
-                (Value::Empty, _) | (_, Some(Value::Empty) | None) => {
-                    Value::Empty
-                }
-                (Value::Date(_), Some(other)) => {
-                    return Err(type_error(
-                        "days",
-                        "two dates",
-                        other,
-                        arg_span(1),
-                    ));
-                }
-                (other, _) => {
-                    return Err(type_error(
-                        "days",
-                        "two dates",
-                        other,
-                        arg_span(0),
-                    ));
-                }
-            },
+            Func::Days => {
+                days_between(&first, vals.get(1), arg_span(0), arg_span(1))?
+            }
             Func::Format => Value::Text(first.to_string()),
             Func::Percent => {
                 let digits = digits_arg(vals.get(1), arg_span(1))?;
@@ -469,5 +448,24 @@ fn date_shift(d: DateValue, by: &Value, sign: i64, span: Span) -> R {
             format!("dates move by whole days, not {}", other.type_name()),
             span,
         )),
+    }
+}
+
+/// `days(a, b)`: the days from `b` to `a`, empty when either is empty.
+fn days_between(
+    first: &Value,
+    second: Option<&Value>,
+    first_span: Span,
+    second_span: Span,
+) -> R {
+    match (first, second) {
+        (Value::Date(a), Some(Value::Date(b))) => {
+            Ok(days_value(a.days_since(*b)))
+        }
+        (Value::Empty, _) | (_, Some(Value::Empty) | None) => Ok(Value::Empty),
+        (Value::Date(_), Some(other)) => {
+            Err(type_error("days", "two dates", other, second_span))
+        }
+        (other, _) => Err(type_error("days", "two dates", other, first_span)),
     }
 }

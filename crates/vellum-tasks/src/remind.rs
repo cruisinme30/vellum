@@ -133,10 +133,9 @@ pub fn next_digest(now: &Zoned, settings: &Settings) -> Option<Zoned> {
 fn link(task: &Task) -> String {
     let title = task.title.replace(['[', ']'], "");
     match &task.source {
-        Source::Checklist { doc, .. } | Source::Comment { doc, .. } => {
-            format!("[{title}](vellum://doc/{doc})")
-        }
-        Source::Mention { doc: Some(doc), .. } => {
+        Source::Checklist { doc, .. }
+        | Source::Comment { doc, .. }
+        | Source::Mention { doc: Some(doc), .. } => {
             format!("[{title}](vellum://doc/{doc})")
         }
         Source::Issue { key, .. }

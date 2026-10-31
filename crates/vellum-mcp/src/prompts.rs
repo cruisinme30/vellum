@@ -208,36 +208,7 @@ pub async fn get(
                 ),
             ]
         }
-        "write-prd" => {
-            let title = required("title");
-            let parent = required("parent");
-            let template = match ws.get_template(actor, "prd").await {
-                Ok(t) => t,
-                Err(WorkspaceError::NotFound(_)) => String::new(),
-                Err(_) => return Err(not_found("template")),
-            };
-            let context = arg(args, "context").map_or(String::new(), |c| {
-                format!(
-                    " Start from this context, reading each referenced issue \
-                        or page first: {c}."
-                )
-            });
-            let mut m = vec![user(&format!(
-                "Write a PRD titled \"{title}\" in Vellum Markdown, following \
-                    the team's PRD template below section by section.{context} \
-                    Use `search` to find related pages and issues and link \
-                    them (`[[Title]]` or issue keys such as ENG-142). \
-                    Requirements go in a table with ID, requirement and \
-                    priority; every requirement is P0. When done, call \
-                    `create_draft` with parent \"{parent}\" and template \
-                    \"prd\". The page is saved as a Draft for the user to \
-                    review; do not ask for direct writes. {DATA_NOTE}"
-            ))];
-            if !template.is_empty() {
-                m.push(embedded("vellum://template/prd", &template));
-            }
-            m
-        }
+        "write-prd" => prd_messages(ws, actor, args).await?,
         "weekly-status" => {
             let since = arg(args, "since").map_or_else(
                 || format!("seven days before {today}"),
@@ -305,6 +276,43 @@ pub async fn get(
     let _ = body.insert("description".into(), json!(def.description));
     let _ = body.insert("messages".into(), Value::Array(messages));
     Ok(body)
+}
+
+/// The messages of the `write-prd` prompt: the instructions, and the
+/// team's PRD template when it has one.
+async fn prd_messages(
+    ws: &dyn Workspace,
+    actor: &Actor,
+    args: &Map<String, Value>,
+) -> Result<Vec<Value>, RpcError> {
+    let title = arg(args, "title").unwrap_or_default();
+    let parent = arg(args, "parent").unwrap_or_default();
+    let template = match ws.get_template(actor, "prd").await {
+        Ok(t) => t,
+        Err(WorkspaceError::NotFound(_)) => String::new(),
+        Err(_) => return Err(not_found("template")),
+    };
+    let context = arg(args, "context").map_or(String::new(), |c| {
+        format!(
+            " Start from this context, reading each referenced issue \
+                    or page first: {c}."
+        )
+    });
+    let mut m = vec![user(&format!(
+        "Write a PRD titled \"{title}\" in Vellum Markdown, following \
+                the team's PRD template below section by section.{context} \
+                Use `search` to find related pages and issues and link \
+                them (`[[Title]]` or issue keys such as ENG-142). \
+                Requirements go in a table with ID, requirement and \
+                priority; every requirement is P0. When done, call \
+                `create_draft` with parent \"{parent}\" and template \
+                \"prd\". The page is saved as a Draft for the user to \
+                review; do not ask for direct writes. {DATA_NOTE}"
+    ))];
+    if !template.is_empty() {
+        m.push(embedded("vellum://template/prd", &template));
+    }
+    Ok(m)
 }
 
 #[cfg(test)]

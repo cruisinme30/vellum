@@ -317,7 +317,7 @@ pub fn verify_enveloped(
             match transform.attribute("Algorithm") {
                 Some(ENVELOPED) => enveloped = true,
                 Some(EXC_C14N) => {
-                    exclusive = Some(inclusive_prefixes(transform))
+                    exclusive = Some(inclusive_prefixes(transform));
                 }
                 _ => {
                     return Err(refused(
@@ -557,7 +557,7 @@ impl Context<'_, '_> {
                     self.element(child, &now, depth.saturating_add(1), out)?;
                 }
                 NodeType::Text => {
-                    escape_text(child.text().unwrap_or_default(), out)
+                    escape_text(child.text().unwrap_or_default(), out);
                 }
                 NodeType::PI => {
                     if let Some(pi) = child.pi() {

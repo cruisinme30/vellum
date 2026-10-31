@@ -616,7 +616,9 @@ impl Node {
                 .chain(table.rows.iter_mut().flatten())
                 .for_each(|cell| runs(&mut cell.spans, f)),
             Self::Cards { cards } => {
-                cards.iter_mut().for_each(|card| runs(&mut card.spans, f));
+                for card in cards.iter_mut() {
+                    runs(&mut card.spans, f);
+                }
             }
             _ => {}
         }

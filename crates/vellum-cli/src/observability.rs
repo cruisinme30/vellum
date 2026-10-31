@@ -207,7 +207,7 @@ pub fn spawn_sampling(sampler: Arc<UsageSampler>) {
                 Ok(counts) => tracing::debug!(?counts, "usage counted"),
                 Err(error) => {
                     tracing::warn!(%error, "cannot count usage; keeping the \
-                        last counts")
+                        last counts");
                 }
             }
         }
@@ -350,7 +350,7 @@ pub fn spawn_ticks(
                 Ok(report) => tracing::debug!(?report, "admin jobs checked"),
                 Err(error) => {
                     tracing::warn!(%error, "a scheduled backup, drill or \
-                        report failed")
+                        report failed");
                 }
             }
         }

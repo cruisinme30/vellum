@@ -423,7 +423,7 @@ where
                 Ok(Some(()) | None) => {}
                 Err(error) => {
                     tracing::warn!(%error, lease = %name, "cannot take the \
-                        lease")
+                        lease");
                 }
             }
             tokio::time::sleep(ttl / 3).await;

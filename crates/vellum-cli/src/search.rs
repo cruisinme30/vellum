@@ -559,7 +559,7 @@ pub async fn start<S: AuthzStore + 'static>(
                     }
                 }
                 Err(error) => {
-                    tracing::warn!(%error, "collection rows not reindexed")
+                    tracing::warn!(%error, "collection rows not reindexed");
                 }
             }
             Start::CatchUp

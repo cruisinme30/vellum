@@ -341,11 +341,6 @@ mod tests {
     /// a collection row and a space written on A reach B's caches within
     /// a second, through the feed alone.
     #[tokio::test]
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one end-to-end story across two replicas reads best in one \
-            place"
-    )]
     async fn a_write_on_one_replica_reaches_another_within_a_second() {
         use std::sync::atomic::{AtomicUsize, Ordering};
 

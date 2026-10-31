@@ -279,6 +279,13 @@ pub fn styles(body_font: &str, mono_font: &str, primary: &str) -> String {
             indent = (level - 1) * 240
         );
     }
+    named_styles(&mut out, mono_font, primary);
+    out
+}
+
+/// The TOC heading, paragraph, character and table styles after the
+/// headings and TOC levels in `word/styles.xml`.
+fn named_styles(out: &mut String, mono_font: &str, primary: &str) {
     let _ = write!(
         out,
         concat!(
@@ -362,5 +369,4 @@ pub fn styles(body_font: &str, mono_font: &str, primary: &str) -> String {
         mono = xml(mono_font),
         primary = xml(primary.trim_start_matches('#'))
     );
-    out
 }

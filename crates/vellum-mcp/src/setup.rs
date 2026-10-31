@@ -149,10 +149,6 @@ async fn rpc(
 
 /// Runs the connection check for a bearer token, through the same code
 /// path a client uses.
-#[expect(
-    clippy::too_many_lines,
-    reason = "the checks run in sequence and stop at the first failure"
-)]
 pub async fn test_connection(
     state: &McpHttp,
     headers: &HeaderMap,

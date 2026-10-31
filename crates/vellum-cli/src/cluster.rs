@@ -199,7 +199,7 @@ impl Replica {
                         ),
                         Err(error) => {
                             tracing::warn!(%error, "cannot prune the \
-                            page change log")
+                            page change log");
                         }
                     }
                 }

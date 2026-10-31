@@ -313,7 +313,7 @@ pub async fn keys(
                 Ok(()) | Err(StoreError::NotFound(_)) => {}
                 // Best effort: an unreachable store fails later, clearly.
                 Err(error) => {
-                    tracing::warn!(%error, "cannot clear {UPGRADED_PATH}")
+                    tracing::warn!(%error, "cannot clear {UPGRADED_PATH}");
                 }
             }
         }
@@ -478,7 +478,7 @@ pub fn seal<S: BlobStore + 'static>(
     drop(tokio::spawn(async move {
         match upgrade(pass.as_ref()).await {
             Ok(report) if report.done => {
-                tracing::info!(?report, "workspace files sealed")
+                tracing::info!(?report, "workspace files sealed");
             }
             Ok(report) => tracing::warn!(
                 ?report,

@@ -91,7 +91,7 @@ const ROOTS_EVERY: std::time::Duration = std::time::Duration::from_secs(15);
 pub async fn keep_roots_fresh(e2e: Arc<E2e>) {
     match e2e.refresh_roots().await {
         Ok(count) => {
-            tracing::info!(private_spaces = count, "private spaces loaded")
+            tracing::info!(private_spaces = count, "private spaces loaded");
         }
         Err(error) => tracing::warn!(%error, "private spaces not loaded yet"),
     }

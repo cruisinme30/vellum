@@ -119,7 +119,7 @@ impl ClusterLimit {
             }
             Err(error) => {
                 tracing::warn!(%error, "rate counts not shared; limits are per \
-                    replica")
+                    replica");
             }
         }
     }

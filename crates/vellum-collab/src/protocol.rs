@@ -350,7 +350,7 @@ impl Decoder for UpdateGuard<'_> {
                 return Err(ReadError::UnexpectedValue);
             }
             BLOCK_ITEM_DELETED_REF_NUMBER => {
-                self.spend_clock(Some(u64::from(len)))?
+                self.spend_clock(Some(u64::from(len)))?;
             }
             _ => {}
         }

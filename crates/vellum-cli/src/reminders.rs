@@ -176,7 +176,7 @@ impl<T: HttpTransport> Sender<T> {
             match self.tasks.notices(user, after, until).await {
                 Ok(notices) => schedule.plan(user, notices),
                 Err(error) => {
-                    tracing::warn!(%error, %user, "reminders: planning failed")
+                    tracing::warn!(%error, %user, "reminders: planning failed");
                 }
             }
         }

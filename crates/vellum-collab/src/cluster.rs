@@ -254,7 +254,7 @@ impl Cluster {
                         let _ = self.rebalance(&hub).await;
                     }
                     Err(error) => {
-                        warn!(%error, "collab replica list not refreshed")
+                        warn!(%error, "collab replica list not refreshed");
                     }
                 }
             }

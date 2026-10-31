@@ -757,7 +757,7 @@ async fn attempt(
             tracing::warn!(%error, "job attempt failed");
         }
         (_, Ok(false)) => {
-            tracing::warn!("job outcome not recorded: the lease was lost")
+            tracing::warn!("job outcome not recorded: the lease was lost");
         }
         (_, Err(error)) => tracing::warn!(%error, "job outcome not recorded"),
     }

@@ -390,7 +390,7 @@ pub fn materialise(
                 let _ = restricted.insert(n);
             }
             (object, TupleRelation::Role(_)) => {
-                on_object.entry(object).or_default().push(t)
+                on_object.entry(object).or_default().push(t);
             }
             _ => {}
         }

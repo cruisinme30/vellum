@@ -13,6 +13,9 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use serde_json::json;
 use vellum_collections::service::api::CollectionList;
+
+/// A collection list as (title, row count) pairs.
+type Summary = Vec<(String, usize)>;
 use vellum_collections::service::{
     Access, AddPropertyInput, ChartInput, CollectionsService,
     CreateFromCsvInput, CreateRowInput, ExportCsvInput, ImportCsvInput,
@@ -1782,7 +1785,6 @@ async fn refresh_reloads_the_folders_another_replica_changed() {
         f.grants.grant(ana, id, Need::Read);
     }
     let c = ctx(ana);
-    type Summary = Vec<(String, usize)>;
     let summary = |list: CollectionList| -> Summary {
         list.collections
             .into_iter()

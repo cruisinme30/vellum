@@ -3,7 +3,13 @@
 
 //! Shared test helpers: a small Markdown codec and a scripted editor.
 
-#![allow(dead_code, missing_docs, clippy::missing_panics_doc)]
+#![allow(
+    dead_code,
+    missing_docs,
+    clippy::missing_panics_doc,
+    clippy::unwrap_used,
+    clippy::expect_used
+)]
 
 pub mod socket;
 
