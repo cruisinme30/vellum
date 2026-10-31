@@ -169,3 +169,25 @@ fn the_nightly_quote_and_table_crash_round_trips() {
     let canonical = serialize(&doc);
     assert_eq!(parse(&canonical).document, doc, "as {canonical:?}");
 }
+
+#[test]
+fn a_wiki_link_across_setext_heading_lines_round_trips() {
+    // Fuzzer finding (`format_roundtrip`, nightly of 2026-10-30): a wiki
+    // link spanning the lines of a setext heading kept its line breaks,
+    // which ended the ATX heading it was written back as.
+    for src in [
+        "Read [[Run\nbook]] first\n-\n",
+        "Read [[a\n*u \n-- - *]] be\n---\n",
+        "[[Run\nbook|the\nbook]]\n===\n",
+    ] {
+        let doc = parse(src).document;
+        assert!(
+            matches!(&doc.blocks[..], [Block::Heading { .. }]),
+            "{src:?}: {doc:?}"
+        );
+        let canonical = serialize(&doc);
+        let again = parse(&canonical).document;
+        assert_eq!(again, doc, "{src:?} as {canonical:?}");
+        assert_eq!(serialize(&again), canonical, "{src:?} is not idempotent");
+    }
+}

@@ -523,6 +523,12 @@ fn unbreak(inlines: Vec<Inline>) -> Vec<Inline> {
             Inline::SoftBreak | Inline::HardBreak => Inline::Text {
                 text: " ".to_owned(),
             },
+            // A wiki link can span the lines of a setext heading too; its
+            // line breaks would end an ATX heading when written back.
+            Inline::WikiLink { target, label } => Inline::WikiLink {
+                target: target.replace('\n', " "),
+                label: label.map(|l| l.replace('\n', " ")),
+            },
             other => extras::map_children(other, unbreak),
         })
         .collect()
