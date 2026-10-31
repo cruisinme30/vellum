@@ -9,6 +9,18 @@ vellum: 1
 The container image holds the same single binary on a minimal base,
 running as a non-root user.
 
+::: warn
+No release is tagged yet, so there is no image on `ghcr.io` to pull.
+Until the first release, build the image yourself from the repository
+root and use `vellum:local` in place of the release image below.
+:::
+
+```bash
+docker build -f deploy/docker/Dockerfile -t vellum:local .
+```
+
+Then run it:
+
 ```bash
 docker run -d --name vellum \
   -p 7700:7700 \
@@ -16,8 +28,11 @@ docker run -d --name vellum \
   -e VELLUM_DATA_DIR=/data \
   -e VELLUM_BIND=0.0.0.0:7700 \
   -e VELLUM_PUBLIC_URL=https://vellum.northstar.dev \
-  ghcr.io/cruisinme30/vellum:1
+  vellum:local
 ```
+
+After the first release, use `ghcr.io/cruisinme30/vellum:1` instead of
+`vellum:local`.
 
 Put a reverse proxy that terminates TLS in front, or set
 `VELLUM_TLS=acme` and publish port 443 instead.

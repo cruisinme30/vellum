@@ -73,18 +73,63 @@ feature into stacked pull requests.
 
 ## Set up {#setup}
 
+You need Rust (`rust-toolchain.toml` pins the version and installs it),
+Node 22 or newer, pnpm 10 through `corepack enable`, and
+`cargo install cargo-nextest`. On macOS, `xcode-select --install`
+provides the C tools that SQLCipher needs.
+
 ```bash
 git clone https://github.com/cruisinme30/vellum && cd vellum
 git config core.hooksPath .githooks
 git config commit.template .gitmessage
-cargo nextest run --workspace
-cd web && pnpm install && pnpm test
 ```
 
-`vellum serve` embeds the web app from `web/dist` when the binary is
-compiled. Run `pnpm --dir web build` before `cargo build` to include it;
-without it, the binary still builds and its home page says the web app
-was not built.
+## Build {#build}
+
+Build the web app first: the `vellum` binary embeds `web/dist` when it
+compiles. Built the other way round, the binary still works, but its
+home page only says the web app was not built.
+
+```bash
+pnpm --dir web install
+pnpm --dir web build
+CARGO_BUILD_JOBS=3 cargo build -p vellum-cli
+```
+
+If `sqlx-macros` fails to load on macOS, run
+`cargo clean -p sqlx-macros` and build again, and check that
+`which strip` prints `/usr/bin/strip`.
+
+## Run the server {#run}
+
+```bash
+VELLUM_DATA_DIR=~/vellum-local ./target/debug/vellum serve
+```
+
+Open `http://127.0.0.1:7700` and create the first account; it becomes
+the workspace owner. For hot reload of the web app against that server,
+run `VELLUM_SERVER=http://127.0.0.1:7700 pnpm --dir web dev`.
+
+## Demo data {#demo}
+
+A new server starts empty, and no command loads the Northstar demo into
+it. The demo runs without a server in two places:
+`pnpm --dir web dev` serves the web app with Northstar data on
+`http://localhost:5173`, and `./target/debug/vellum mcp --demo` serves
+MCP over stdio against an in-memory Northstar workspace.
+
+## Desktop app {#desktop}
+
+After the build above, `pnpm --dir desktop install` and
+`pnpm --dir desktop start` open the desktop app. It starts
+`target/debug/vellum` itself, with its own data folder.
+
+## Test {#test}
+
+```bash
+cargo nextest run --workspace
+pnpm --dir web test
+```
 
 ## Decisions {#decisions}
 
