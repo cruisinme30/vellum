@@ -80,6 +80,12 @@ COPY --from=web /src/web/dist web/dist
 # uses on x86_64 came out as a PIE with an ELF interpreter that the
 # distroless image does not have (D271).
 #
+# On arm64, Debian's gcc compiles C atomics as calls to libgcc helpers
+# (`__aarch64_ldadd4_sync`, -moutline-atomics). rustc links musl
+# binaries without libgcc, so the vendored libdbus failed to link unless
+# fat LTO happened to drop it; -mno-outline-atomics emits the instructions
+# inline instead.
+#
 # The check after the build fails it if the binary has an ELF interpreter
 # or a shared-library dependency: the runtime image has no loader and no
 # libraries, so such a binary cannot start ("no such file or directory").
@@ -91,6 +97,9 @@ ARG CARGO_BUILD_JOBS
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     triple="$(cat /target)" \
     && export "CC_$(echo "${triple}" | tr - _)=musl-gcc" \
+    && if [ "${triple}" = aarch64-unknown-linux-musl ]; then \
+         export CFLAGS_aarch64_unknown_linux_musl=-mno-outline-atomics; \
+       fi \
     && cargo build --profile "${CARGO_PROFILE}" --locked \
         --package vellum-cli --target "${triple}" \
     && mkdir -p /out \
