@@ -26,6 +26,13 @@ CHECKS=("Load test (k6)" "Virus scanner under hostile uploads (ClamAV)" \
   "Security scan (ZAP baseline)"
   "PDF budget (release build)" "Chaos under load")
 FUZZ_PREFIX="Fuzz "
+# Checks whose failure is a tracked, accepted issue: reported as a warning
+# with its issue instead of failing the gate. Each entry needs the owner's
+# decision and goes when its issue is fixed.
+declare -A KNOWN=(
+  # Gourav, 2026-10-30 6:38 PM PT: release first, fix after.
+  ["Fuzz format_roundtrip"]="#576"
+)
 STALE_DAYS="${STALE_DAYS:-8}"
 
 jobs_from_api() {
@@ -66,6 +73,11 @@ for check in "${checks[@]}"; do
   fi
   conclusion="$(jq -r .conclusion <<<"${latest}")"
   url="$(jq -r .html_url <<<"${latest}")"
+  if [[ "${conclusion}" != "success" && -n "${KNOWN[${check}]:-}" ]]; then
+    echo "::warning::${check} failed in its latest run on develop (${url});" \
+      "known issue ${KNOWN[${check}]}, not blocking."
+    continue
+  fi
   if [[ "${conclusion}" != "success" ]]; then
     echo "::error::${check} failed in its latest run on develop (${url}). Fix" \
         "it, then run" \
