@@ -18,7 +18,10 @@ compose_file="${here}/compose.yaml"
 state="${STACK_STATE:-${RUNNER_TEMP:-/tmp}/vellum-stacks}"
 mkdir -p "${state}"
 
-random() { head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32; }
+# random: 64 hex characters (32 random bytes). Base64 with its symbols
+# removed came out shorter than 32 characters about one time in three,
+# below the 32 bytes VELLUM_CLUSTER_KEY needs.
+random() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 
 # compose PROJECT ARGS...: docker compose for that stack.
 compose() {
