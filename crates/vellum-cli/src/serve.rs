@@ -87,6 +87,32 @@ pub struct Edge {
     pub scanner: Option<Clamd>,
 }
 
+/// The app's origin when no public URL is set: the bind address, or, for
+/// an all-interfaces bind such as Docker's `0.0.0.0:7700`, the loopback
+/// address on the same port. A browser can never send `Origin:
+/// http://0.0.0.0:7700`, so that origin rejected every sign-up as
+/// cross-origin. Any other address needs `VELLUM_PUBLIC_URL`.
+fn default_origin(bind: std::net::SocketAddr) -> String {
+    if !bind.ip().is_unspecified() {
+        return format!("http://{bind}");
+    }
+    let loopback = std::net::SocketAddr::new(
+        match bind.ip() {
+            std::net::IpAddr::V4(_) => std::net::Ipv4Addr::LOCALHOST.into(),
+            std::net::IpAddr::V6(_) => std::net::Ipv6Addr::LOCALHOST.into(),
+        },
+        bind.port(),
+    );
+    tracing::warn!(
+        %bind,
+        origin = %format!("http://{loopback}"),
+        "VELLUM_PUBLIC_URL is not set; the app accepts sign-ins only \
+         from this address. Set VELLUM_PUBLIC_URL to the address \
+         people open."
+    );
+    format!("http://{loopback}")
+}
+
 /// Builds the edge settings from `config` and a variable lookup.
 ///
 /// # Errors
@@ -99,7 +125,7 @@ pub fn edge(
     let app_origin = config
         .public_url
         .clone()
-        .unwrap_or_else(|| format!("http://{}", config.bind));
+        .unwrap_or_else(|| default_origin(config.bind));
     let mut gateway = GatewayConfig::new(app_origin, Vec::new());
     gateway.public_origin = var("VELLUM_PUBLIC_PAGES_URL")
         .map(|u| u.trim_end_matches('/').to_owned());
@@ -470,6 +496,15 @@ mod tests {
         assert!(e.gateway.public_origin.is_none());
         assert!(e.scanner.is_none());
         Ok(())
+    }
+
+    #[test]
+    fn all_interfaces_bind_defaults_to_loopback_origin() {
+        let origin = |bind: &str| default_origin(bind.parse().unwrap());
+        assert_eq!(origin("0.0.0.0:7700"), "http://127.0.0.1:7700");
+        assert_eq!(origin("[::]:7700"), "http://[::1]:7700");
+        assert_eq!(origin("127.0.0.1:7700"), "http://127.0.0.1:7700");
+        assert_eq!(origin("10.0.0.5:80"), "http://10.0.0.5:80");
     }
 
     #[test]
