@@ -12,7 +12,8 @@ seconds: headline numbers, one chart, what changed and what is at risk.
 ## Steps
 
 1. Create a page titled "Gateway status, week 45".
-2. Type `/stats` and add three tiles: a value, a label and a change since last week.
+2. Type `/stats` and add three tiles: a value, a label and a change since last
+   week.
 3. Type `/chart`, choose **Line** and paste the week's p95 latency.
 4. Add a `warn` callout for anything at risk and a `good` callout for wins.
 5. Next week, open **⋯ → Duplicate** and update the numbers.

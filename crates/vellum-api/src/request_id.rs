@@ -36,7 +36,8 @@ mod tests {
                 .unwrap_or_else(|_| HeaderValue::from_static("x")),
         );
         assert_eq!(from_headers(&headers), id);
-        let _ = headers.insert(REQUEST_ID, HeaderValue::from_static("<script>"));
+        let _ =
+            headers.insert(REQUEST_ID, HeaderValue::from_static("<script>"));
         assert_ne!(from_headers(&headers).to_string(), "<script>");
     }
 }

@@ -37,7 +37,9 @@ export class VellumApiError extends Error {
 export interface ClientOptions {
   /** Where the API lives; `/api` on the app's own origin by default. */
   readonly baseUrl?: string;
-  /** A scoped API token or `OAuth` access token; omit to use the session cookie. */
+  /**
+   * A scoped API token or `OAuth` access token; omit to use the session cookie.
+   */
   readonly token?: string;
   /** The fetch to use (tests, service workers). */
   readonly fetch?: typeof fetch;
@@ -45,7 +47,10 @@ export interface ClientOptions {
 
 /** Per-call options. */
 interface CallOptions {
-  /** Makes a retried write safe: the server answers a repeat with the first result. */
+  /**
+   * Makes a retried write safe: the server answers a repeat with the first
+   * result.
+   */
   readonly idempotencyKey?: string;
   readonly signal?: AbortSignal;
 }
@@ -76,9 +81,14 @@ function scalar(name: string, value: unknown): string {
  * Builds the HTTP request for an operation: path parameters filled from
  * the input, the rest as a query string (reads and deletes) or a JSON body.
  */
-export function prepare<K extends OperationId>(id: K, input: Input<K>): PreparedRequest {
+export function prepare<K extends OperationId>(
+  id: K,
+  input: Input<K>,
+): PreparedRequest {
   const operation = OPERATIONS[id];
-  const fields: Record<string, unknown> = { ...(input as Record<string, unknown>) };
+  const fields: Record<string, unknown> = {
+    ...(input as Record<string, unknown>),
+  };
   const inPath = new Set<string>();
   const path = operation.path
     .split("/")
@@ -101,12 +111,17 @@ export function prepare<K extends OperationId>(id: K, input: Input<K>): Prepared
       if (value === undefined || inPath.has(name)) {
         continue;
       }
-      for (const item of Array.isArray(value) ? (value as unknown[]) : [value]) {
+      for (const item of Array.isArray(value)
+        ? (value as unknown[])
+        : [value]) {
         query.append(name, scalar(name, item));
       }
     }
     const search = query.toString();
-    return { method: operation.method, url: search ? `${path}?${search}` : path };
+    return {
+      method: operation.method,
+      url: search ? `${path}?${search}` : path,
+    };
   }
   return { method: operation.method, url: path, body: JSON.stringify(fields) };
 }
@@ -140,23 +155,32 @@ async function failure(response: Response): Promise<VellumApiError> {
 
 /** A client bound to one server. */
 export interface Client {
-  call<K extends OperationId>(id: K, input: Input<K>, options?: CallOptions): Promise<Output<K>>;
+  call<K extends OperationId>(
+    id: K,
+    input: Input<K>,
+    options?: CallOptions,
+  ): Promise<Output<K>>;
 }
 
-/** Creates a client. Browser sessions fetch the CSRF token once, on the first write. */
+/**
+ * Creates a client. Browser sessions fetch the CSRF token once, on the first
+ * write.
+ */
 export function createClient(options: ClientOptions = {}): Client {
   const base = (options.baseUrl ?? "/api").replace(/\/$/, "");
   const send = options.fetch ?? globalThis.fetch.bind(globalThis);
   let csrf: Promise<string> | undefined;
 
   async function csrfToken(): Promise<string> {
-    csrf ??= send(`${base}/csrf`, { credentials: "same-origin" }).then(async (response) => {
-      if (!response.ok) {
-        throw await failure(response);
-      }
-      const body = (await response.json()) as { token: string };
-      return body.token;
-    });
+    csrf ??= send(`${base}/csrf`, { credentials: "same-origin" }).then(
+      async (response) => {
+        if (!response.ok) {
+          throw await failure(response);
+        }
+        const body = (await response.json()) as { token: string };
+        return body.token;
+      },
+    );
     try {
       return await csrf;
     } catch (error) {

@@ -52,7 +52,11 @@ impl PassphraseKdf {
     /// # Errors
     /// [`CryptoError::Kdf`] if the costs are outside Argon2's or our limits,
     /// [`CryptoError::Rng`] if the system random source fails.
-    pub fn with_params(m_kib: u32, t: u32, p: u32) -> Result<Self, CryptoError> {
+    pub fn with_params(
+        m_kib: u32,
+        t: u32,
+        p: u32,
+    ) -> Result<Self, CryptoError> {
         let mut salt = [0_u8; SALT_LEN];
         getrandom::fill(&mut salt).map_err(|_| CryptoError::Rng)?;
         let kdf = Self { m_kib, t, p, salt };
@@ -86,6 +90,13 @@ impl PassphraseKdf {
         Ok(kdf)
     }
 
+    /// The Argon2id memory cost in `KiB`, so callers can refuse KEK ids that
+    /// ask for more than they are willing to spend.
+    #[must_use]
+    pub const fn m_kib(&self) -> u32 {
+        self.m_kib
+    }
+
     /// The KEK id that names this salt and these parameters.
     ///
     /// # Errors
@@ -105,9 +116,14 @@ impl PassphraseKdf {
     ///
     /// # Errors
     /// [`CryptoError::Kdf`] if Argon2 rejects the input.
-    #[tracing::instrument(name = "crypto.kdf.argon2id", skip_all, fields(m_kib = self.m_kib, t = self.t, p = self.p))]
+    #[tracing::instrument(
+        name = "crypto.kdf.argon2id",
+        skip_all,
+        fields(m_kib = self.m_kib, t = self.t, p = self.p)
+    )]
     pub fn derive(&self, passphrase: &[u8]) -> Result<SecretKey, CryptoError> {
-        let argon = Argon2::new(Algorithm::Argon2id, Version::V0x13, self.params()?);
+        let argon =
+            Argon2::new(Algorithm::Argon2id, Version::V0x13, self.params()?);
         let mut out = Zeroizing::new([0_u8; KEY_LEN]);
         argon
             .hash_password_into(passphrase, &self.salt, out.as_mut())
@@ -119,7 +135,8 @@ impl PassphraseKdf {
         if self.m_kib > MAX_M_KIB || self.t > MAX_T || self.p > MAX_P {
             return Err(CryptoError::Kdf);
         }
-        Params::new(self.m_kib, self.t, self.p, Some(KEY_LEN)).map_err(|_| CryptoError::Kdf)
+        Params::new(self.m_kib, self.t, self.p, Some(KEY_LEN))
+            .map_err(|_| CryptoError::Kdf)
     }
 }
 
@@ -136,7 +153,8 @@ pub const PASSPHRASE_FILE_ENV: &str = "VELLUM_KEK_PASSPHRASE_FILE";
 /// # Errors
 /// [`CryptoError::Provider`] if both are set, the passphrase is empty, or the
 /// file cannot be read. Messages name the variable, never its value.
-pub fn passphrase_from_env() -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError> {
+pub fn passphrase_from_env() -> Result<Option<Zeroizing<Vec<u8>>>, CryptoError>
+{
     passphrase_from(|name| std::env::var_os(name), |path| std::fs::read(path))
 }
 
@@ -156,9 +174,13 @@ fn passphrase_from(
         }
         (Some(value), None) => Zeroizing::new(value.into_encoded_bytes()),
         (None, Some(path)) => {
-            let mut bytes = Zeroizing::new(read(std::path::Path::new(&path)).map_err(|e| {
-                CryptoError::Provider(format!("cannot read {PASSPHRASE_FILE_ENV}: {e}"))
-            })?);
+            let mut bytes = Zeroizing::new(
+                read(std::path::Path::new(&path)).map_err(|e| {
+                    CryptoError::Provider(format!(
+                        "cannot read {PASSPHRASE_FILE_ENV}: {e}"
+                    ))
+                })?,
+            );
             if bytes.ends_with(b"\n") {
                 let _ = bytes.pop();
                 if bytes.ends_with(b"\r") {
@@ -169,7 +191,9 @@ fn passphrase_from(
         }
     };
     if secret.is_empty() {
-        return Err(CryptoError::Provider("the KEK passphrase is empty".into()));
+        return Err(CryptoError::Provider(
+            "the KEK passphrase is empty".into(),
+        ));
     }
     Ok(Some(secret))
 }
@@ -201,15 +225,19 @@ mod tests {
         }
     }
 
-    fn file(content: &'static [u8]) -> impl Fn(&std::path::Path) -> std::io::Result<Vec<u8>> {
+    fn file(
+        content: &'static [u8],
+    ) -> impl Fn(&std::path::Path) -> std::io::Result<Vec<u8>> {
         move |_| Ok(content.to_vec())
     }
 
     #[test]
-    fn passphrase_comes_from_the_variable_or_the_file() -> Result<(), CryptoError> {
+    fn passphrase_comes_from_the_variable_or_the_file()
+    -> Result<(), CryptoError> {
         let none = passphrase_from(env(&[]), file(b""))?;
         assert!(none.is_none());
-        let inline = passphrase_from(env(&[(PASSPHRASE_ENV, "hunter2")]), file(b""))?;
+        let inline =
+            passphrase_from(env(&[(PASSPHRASE_ENV, "hunter2")]), file(b""))?;
         assert_eq!(inline.as_deref().map(Vec::as_slice), Some(&b"hunter2"[..]));
         let from_file = passphrase_from(
             env(&[(PASSPHRASE_FILE_ENV, "/run/secrets/kek")]),
@@ -229,12 +257,17 @@ mod tests {
             file(b"b"),
         );
         assert!(matches!(both, Err(CryptoError::Provider(_))));
-        let empty = passphrase_from(env(&[(PASSPHRASE_FILE_ENV, "/x")]), file(b"\n"));
+        let empty =
+            passphrase_from(env(&[(PASSPHRASE_FILE_ENV, "/x")]), file(b"\n"));
         assert!(matches!(empty, Err(CryptoError::Provider(_))));
-        let missing = passphrase_from(env(&[(PASSPHRASE_FILE_ENV, "/x")]), |_| {
-            Err(std::io::Error::from(std::io::ErrorKind::NotFound))
-        });
-        assert!(matches!(missing, Err(CryptoError::Provider(m)) if !m.contains("/x")));
+        let missing =
+            passphrase_from(env(&[(PASSPHRASE_FILE_ENV, "/x")]), |_| {
+                Err(std::io::Error::from(std::io::ErrorKind::NotFound))
+            });
+        assert!(matches!(
+            missing,
+            Err(CryptoError::Provider(m)) if !m.contains("/x")
+        ));
     }
 
     fn cheap() -> Result<PassphraseKdf, CryptoError> {

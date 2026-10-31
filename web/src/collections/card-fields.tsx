@@ -16,7 +16,13 @@ interface CardFieldsProperties {
 }
 
 /** The non-empty values of a row a card shows under its title, labelled. */
-export function CardFields({ info, result, row, skip, limit = 4 }: CardFieldsProperties) {
+export function CardFields({
+  info,
+  result,
+  row,
+  skip,
+  limit = 4,
+}: CardFieldsProperties) {
   const fields = result.columns
     .map((column, index) => ({ column, cell: row.cells[index] }))
     .filter(
@@ -35,7 +41,10 @@ export function CardFields({ info, result, row, skip, limit = 4 }: CardFieldsPro
         <span key={column.key} className="vl-card-field">
           <span className="vl-card-label">{column.name}</span>
           <span className="vl-card-value">
-            <CellContent property={propertyOf(info.properties, column)} cell={cell} />
+            <CellContent
+              property={propertyOf(info.properties, column)}
+              cell={cell}
+            />
           </span>
         </span>
       ))}

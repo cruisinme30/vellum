@@ -9,7 +9,11 @@ import { Channel } from "./channels.js";
 
 describe("channels", () => {
   it("are repeated verbatim in the sandboxed preload", () => {
-    const preload = readFileSync(new URL("../preload/preload.cts", import.meta.url), "utf8");
-    for (const channel of Object.values(Channel)) expect(preload).toContain(`"${channel}"`);
+    const preload = readFileSync(
+      new URL("../preload/preload.cts", import.meta.url),
+      "utf8",
+    );
+    for (const channel of Object.values(Channel))
+      expect(preload).toContain(`"${channel}"`);
   });
 });

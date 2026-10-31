@@ -3,8 +3,16 @@
 
 import type { JSONContent } from "@tiptap/core";
 
+import { filterHits } from "./search";
 import { descendants, movePage } from "./tree";
-import type { MoveTarget, PageMeta, Person, SearchHit, Space } from "./types";
+import type {
+  MoveTarget,
+  PageMeta,
+  Person,
+  SearchFilters,
+  SearchHit,
+  Space,
+} from "./types";
 
 /** Everything the shell renders, as one immutable snapshot. */
 export interface WorkspaceSnapshot {
@@ -50,15 +58,22 @@ export interface WorkspaceStore {
     spaceId: string;
     parentId: string | undefined;
     title?: string;
+    /**
+     * The first body, in Vellum Markdown; the server parses it into the page.
+     */
+    body?: string;
   }): Promise<PageMeta | undefined>;
   renamePage(id: string, title: string): void;
   toggleStar(id: string): void;
   movePage(id: string, target: MoveTarget): void;
   /** Moves a page and its subtree to the trash. */
   trashPage(id: string): void;
-  /** The body a page's collab document starts from, if it has never been opened. */
+  /**
+   * The body a page's collab document starts from, if it has never been opened.
+   */
   seedFor(id: string): JSONContent | undefined;
-  search(query: string): Promise<SearchHit[]>;
+  /** Pages whose title or body match, best first, narrowed by `filters`. */
+  search(query: string, filters?: SearchFilters): Promise<SearchHit[]>;
   /** Pages that mention a handle, newest first: the inbox. */
   mentions(handle: string): Promise<SearchHit[]>;
   /** Clears the snapshot's `problem`. */
@@ -68,6 +83,18 @@ export interface WorkspaceStore {
    * it loads that person's spaces, or empties when nobody is.
    */
   setUser?(user: SignedInUser | undefined): void;
+  /**
+   * Loads the spaces and pages again, after a change made elsewhere (an
+   * import).
+   */
+  refresh?(): void;
+  /**
+   * Fetches a page or folder that is not in the snapshot, such as one
+   * shared with the person on its own, outside any space they can browse
+   * (#567), and adds it to `pages`. `undefined` when there is no such
+   * page or the person may not open it; never rejects.
+   */
+  loadPage?(id: string): Promise<PageMeta | undefined>;
 }
 
 /** Seed data for an in-memory store. */
@@ -81,7 +108,10 @@ export interface WorkspaceSeed {
 }
 
 /** Whether a document mentions a handle anywhere. */
-export function mentionsHandle(node: JSONContent | undefined, handle: string): boolean {
+export function mentionsHandle(
+  node: JSONContent | undefined,
+  handle: string,
+): boolean {
   if (!node) {
     return false;
   }
@@ -105,7 +135,9 @@ export function plainText(node: JSONContent | undefined): string {
     .map((k): unknown => attributes[k])
     .filter((v): v is string => typeof v === "string" && v !== "")
     .join(" ");
-  const children = (node.content ?? []).map((child) => plainText(child)).join(" ");
+  const children = (node.content ?? [])
+    .map((child) => plainText(child))
+    .join(" ");
   return [own, atom, children].filter(Boolean).join(" ");
 }
 
@@ -116,11 +148,16 @@ function snippet(text: string, query: string): string {
   }
   const start = Math.max(0, at - 40);
   const end = Math.min(text.length, at + query.length + 60);
-  return `${start > 0 ? "…" : ""}${text.slice(start, end).trim()}${end < text.length ? "…" : ""}`;
+  const before = start > 0 ? "…" : "";
+  const after = end < text.length ? "…" : "";
+  return `${before}${text.slice(start, end).trim()}${after}`;
 }
 
 /** Makes a page ULID: 48-bit time plus 80 random bits, Crockford base32. */
-export function newPageId(now = Date.now(), random: () => number = Math.random): string {
+export function newPageId(
+  now = Date.now(),
+  random: () => number = Math.random,
+): string {
   const alphabet = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
   let time = "";
   let rest = now;
@@ -136,7 +173,10 @@ export function newPageId(now = Date.now(), random: () => number = Math.random):
 }
 
 /** An in-memory store. Used for the demo workspace and in tests. */
-export function createMemoryStore(seed: WorkspaceSeed, clock: () => Date = () => new Date()) {
+export function createMemoryStore(
+  seed: WorkspaceSeed,
+  clock: () => Date = () => new Date(),
+) {
   let snapshot: WorkspaceSnapshot = {
     name: seed.name,
     me: seed.me,
@@ -164,8 +204,10 @@ export function createMemoryStore(seed: WorkspaceSeed, clock: () => Date = () =>
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
-    createPage({ spaceId, parentId, title = "" }) {
-      const row = snapshot.pages.filter((p) => p.spaceId === spaceId && p.parentId === parentId);
+    createPage({ spaceId, parentId, title = "", body }) {
+      const row = snapshot.pages.filter(
+        (p) => p.spaceId === spaceId && p.parentId === parentId,
+      );
       const page: PageMeta = {
         id: newPageId(clock().getTime()),
         spaceId,
@@ -178,6 +220,7 @@ export function createMemoryStore(seed: WorkspaceSeed, clock: () => Date = () =>
         updatedAt: stamp(),
         starred: false,
       };
+      if (body !== undefined) bodies.set(page.id, paragraphsOf(body));
       setPages([...snapshot.pages, page]);
       return Promise.resolve(page);
     },
@@ -195,7 +238,8 @@ export function createMemoryStore(seed: WorkspaceSeed, clock: () => Date = () =>
       setPages(snapshot.pages.filter((p) => !gone.has(p.id)));
     },
     seedFor: (id) => bodies.get(id),
-    search: (raw) => Promise.resolve(search(raw)),
+    search: (raw, filters) =>
+      Promise.resolve(filterHits(search(raw), filters, snapshot.me.handle)),
     mentions: (handle) => Promise.resolve(mentions(handle)),
     dismissProblem() {
       // The memory store never fails.
@@ -226,7 +270,27 @@ export function createMemoryStore(seed: WorkspaceSeed, clock: () => Date = () =>
     return snapshot.pages
       .filter((page) => mentionsHandle(bodies.get(page.id), handle))
       .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .map((page) => ({ page, snippet: snippet(plainText(bodies.get(page.id)), `@${handle}`) }));
+      .map((page) => ({
+        page,
+        snippet: snippet(plainText(bodies.get(page.id)), `@${handle}`),
+      }));
   }
   return store;
+}
+
+/**
+ * Markdown as plain paragraphs, one per non-empty line: enough for demo pages.
+ */
+function paragraphsOf(markdown: string): JSONContent {
+  return {
+    type: "doc",
+    content: markdown
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line !== "")
+      .map((text) => ({
+        type: "paragraph",
+        content: [{ type: "text", text }],
+      })),
+  };
 }

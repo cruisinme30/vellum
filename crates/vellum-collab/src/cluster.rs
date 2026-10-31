@@ -53,7 +53,8 @@ pub trait Membership: Send + Sync + 'static {
 }
 
 fn db_error(e: vellum_db::Error) -> Error {
-    Error::new(ErrorKind::Unavailable, "the replica list is unavailable").with_source(e)
+    Error::new(ErrorKind::Unavailable, "the replica list is unavailable")
+        .with_source(e)
 }
 
 #[async_trait]
@@ -61,8 +62,12 @@ impl Membership for vellum_db::cluster::Nodes {
     async fn beat(&self, me: &Node) -> Result<()> {
         Self::beat(self, me).await.map_err(db_error)
     }
+    /// Replicas that gave no address cannot be reached, so they own no
+    /// rooms (D278).
     async fn live(&self, window: Duration) -> Result<Vec<Node>> {
-        Self::live(self, window).await.map_err(db_error)
+        let mut nodes = Self::live(self, window).await.map_err(db_error)?;
+        nodes.retain(|node| !node.address.trim().is_empty());
+        Ok(nodes)
     }
     async fn leave(&self, me: &Node) -> Result<()> {
         Self::leave(self, me).await.map_err(db_error)
@@ -208,7 +213,10 @@ impl Cluster {
         if let Ok(mut live) = self.live.write()
             && *live != nodes
         {
-            info!(nodes = ?nodes.iter().map(|n| &n.name).collect::<Vec<_>>(), "collab replicas changed");
+            info!(
+                nodes = ?nodes.iter().map(|n| &n.name).collect::<Vec<_>>(),
+                "collab replicas changed"
+            );
             *live = nodes;
         }
         Ok(())
@@ -236,14 +244,18 @@ impl Cluster {
     pub fn spawn(self: Arc<Self>, hub: Hub) -> JoinHandle<()> {
         tokio::spawn(async move {
             let mut every = tokio::time::interval(self.config.beat_every);
-            every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            every.set_missed_tick_behavior(
+                tokio::time::MissedTickBehavior::Delay,
+            );
             loop {
                 let _ = every.tick().await;
                 match self.tick().await {
                     Ok(()) => {
                         let _ = self.rebalance(&hub).await;
                     }
-                    Err(error) => warn!(%error, "collab replica list not refreshed"),
+                    Err(error) => {
+                        warn!(%error, "collab replica list not refreshed");
+                    }
                 }
             }
         })
@@ -258,10 +270,7 @@ impl Cluster {
     }
 
     fn mac(&self, payload: &str) -> String {
-        let mut mac = Hmac::<Sha256>::new_from_slice(&self.config.key)
-            .unwrap_or_else(|_| unreachable!("HMAC takes any key length"));
-        mac.update(payload.as_bytes());
-        hex::encode(mac.finalize().into_bytes())
+        mac(&self.config.key, payload)
     }
 
     /// The header value that lets the owner trust a join authorized here.
@@ -286,36 +295,82 @@ impl Cluster {
     /// The join a forwarded request carries, if its signature is good, it
     /// has not expired and it is for `room`.
     #[must_use]
-    pub fn verify(&self, header: &str, room: RoomKey) -> Option<(UserId, Access)> {
+    pub fn verify(
+        &self,
+        header: &str,
+        room: RoomKey,
+    ) -> Option<(UserId, Access)> {
         self.verify_at(header, room, now_ms())
     }
 
-    fn verify_at(&self, header: &str, room: RoomKey, now: u64) -> Option<(UserId, Access)> {
-        let (payload, mac) = header.rsplit_once('.')?;
-        let expected = self.mac(payload);
-        if !bool::from(subtle::ConstantTimeEq::ct_eq(
-            expected.as_bytes(),
-            mac.as_bytes(),
-        )) {
-            return None;
-        }
-        let parts: Vec<&str> = payload.split('.').collect();
-        let [version, space, doc, user, access, expires] = parts.as_slice() else {
-            return None;
-        };
-        if *version != "v1" || expires.parse::<u64>().ok()? < now {
-            return None;
-        }
-        if space.parse::<SpaceId>().ok()? != room.space || doc.parse::<DocId>().ok()? != room.doc {
-            return None;
-        }
-        let access = match *access {
-            "w" => Access::Write,
-            "r" => Access::Read,
-            _ => return None,
-        };
-        Some((user.parse().ok()?, access))
+    fn verify_at(
+        &self,
+        header: &str,
+        room: RoomKey,
+        now: u64,
+    ) -> Option<(UserId, Access)> {
+        verify(&self.config.key, header, room, now)
     }
+}
+
+fn mac(key: &[u8], payload: &str) -> String {
+    let mut mac = Hmac::<Sha256>::new_from_slice(key)
+        .unwrap_or_else(|_| unreachable!("HMAC takes any key length"));
+    mac.update(payload.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
+
+/// Whether `header` holds a valid forwarded join for the room `path` names.
+///
+/// `path` ends in `/{space_id}/{doc_id}`, with or without the mount
+/// prefix; the join must be signed with `key` and unexpired. The gateway
+/// uses it to exempt replica-to-replica forwards from
+/// per-address rate limits (ADR 0040).
+#[must_use]
+pub fn is_signed_forward(key: &[u8], header: &str, path: &str) -> bool {
+    let mut parts = path.trim_end_matches('/').rsplit('/');
+    let (Some(doc), Some(space)) = (parts.next(), parts.next()) else {
+        return false;
+    };
+    let (Ok(space), Ok(doc)) = (space.parse::<SpaceId>(), doc.parse::<DocId>())
+    else {
+        return false;
+    };
+    verify(key, header, RoomKey { space, doc }, now_ms()).is_some()
+}
+
+fn verify(
+    key: &[u8],
+    header: &str,
+    room: RoomKey,
+    now: u64,
+) -> Option<(UserId, Access)> {
+    let (payload, mac) = header.rsplit_once('.')?;
+    let expected = self::mac(key, payload);
+    if !bool::from(subtle::ConstantTimeEq::ct_eq(
+        expected.as_bytes(),
+        mac.as_bytes(),
+    )) {
+        return None;
+    }
+    let parts: Vec<&str> = payload.split('.').collect();
+    let [version, space, doc, user, access, expires] = parts.as_slice() else {
+        return None;
+    };
+    if *version != "v1" || expires.parse::<u64>().ok()? < now {
+        return None;
+    }
+    if space.parse::<SpaceId>().ok()? != room.space
+        || doc.parse::<DocId>().ok()? != room.doc
+    {
+        return None;
+    }
+    let access = match *access {
+        "w" => Access::Write,
+        "r" => Access::Read,
+        _ => return None,
+    };
+    Some((user.parse().ok()?, access))
 }
 
 #[cfg(test)]
@@ -364,8 +419,8 @@ mod tests {
     }
 
     fn cluster(name: &str, members: &Arc<Fake>) -> Cluster {
-        let config =
-            ClusterConfig::new(node(name), vec![7; 32]).unwrap_or_else(|e| unreachable!("{e}"));
+        let config = ClusterConfig::new(node(name), vec![7; 32])
+            .unwrap_or_else(|e| unreachable!("{e}"));
         Cluster::new(config, Arc::clone(members) as Arc<dyn Membership>)
     }
 
@@ -430,9 +485,37 @@ mod tests {
         let tampered = header.replacen(".w.", ".r.", 1);
         assert_eq!(a.verify_at(&tampered, room(1), 2_000), None);
         let other = Cluster::new(
-            ClusterConfig::new(node("b"), vec![8; 32]).unwrap_or_else(|e| unreachable!("{e}")),
+            ClusterConfig::new(node("b"), vec![8; 32])
+                .unwrap_or_else(|e| unreachable!("{e}")),
             members,
         );
         assert_eq!(other.verify_at(&header, room(1), 2_000), None);
+    }
+
+    #[test]
+    fn a_signed_forward_is_recognised_from_its_path() {
+        let members = Arc::new(Fake::default());
+        let a = cluster("a", &members);
+        let join = JoinRequest {
+            room: room(1),
+            user: UserId::from_u128(9),
+            access: Access::Read,
+            traceparent: None,
+        };
+        let header = a.sign(&join);
+        let path = format!("/collab/{}/{}", room(1).space, room(1).doc);
+        let key = &a.config.key;
+        assert!(is_signed_forward(key, &header, &path));
+        assert!(is_signed_forward(
+            key,
+            &header,
+            path.trim_start_matches("/collab")
+        ));
+        let other = format!("/collab/{}/{}", room(2).space, room(2).doc);
+        assert!(!is_signed_forward(key, &header, &other));
+        let wrong: Vec<u8> = key.iter().map(|b| b ^ 0xff).collect();
+        assert!(!is_signed_forward(&wrong, &header, &path));
+        assert!(!is_signed_forward(key, "forged", &path));
+        assert!(!is_signed_forward(key, &header, "/collab"));
     }
 }

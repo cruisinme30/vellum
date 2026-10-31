@@ -93,7 +93,9 @@ pub fn verify(
                         .map_err(|_| SignatureError::Malformed)?,
                 );
             }
-            "v1" => candidates.push(unhex(value).ok_or(SignatureError::Malformed)?),
+            "v1" => {
+                candidates.push(unhex(value).ok_or(SignatureError::Malformed)?);
+            }
             // Unknown schemes are ignored so a future v2 can be added.
             _ => {}
         }
@@ -102,7 +104,8 @@ pub fn verify(
     if candidates.is_empty() {
         return Err(SignatureError::Malformed);
     }
-    let signed_at = Timestamp::from_second(t).map_err(|_| SignatureError::Malformed)?;
+    let signed_at =
+        Timestamp::from_second(t).map_err(|_| SignatureError::Malformed)?;
     if now.duration_since(signed_at).abs() > tolerance {
         return Err(SignatureError::Stale);
     }
@@ -133,7 +136,8 @@ mod tests {
         let header = sign(&[&secret], at(1_767_225_600), b"{}");
         assert_eq!(
             header,
-            "t=1767225600,v1=2547b9d90518426b3b657b66b5d2f7e0aeb1200f474ce88c2f4b24e7fd352f31"
+            "t=1767225600,v1=2547b9d90518426b3b657b66b5d2f7e0aeb1200f474ce88c2f\
+                4b24e7fd352f31"
         );
     }
 
@@ -168,7 +172,8 @@ mod tests {
     #[test]
     fn malformed_headers() {
         let secret = WebhookSecret::from_bytes([1; 32]);
-        for header in ["", "t=1", "v1=00", "t=x,v1=00", "t=1,v1=zz", "garbage"] {
+        for header in ["", "t=1", "v1=00", "t=x,v1=00", "t=1,v1=zz", "garbage"]
+        {
             assert_eq!(
                 verify(header, b"", &secret, at(1), DEFAULT_TOLERANCE),
                 Err(SignatureError::Malformed),

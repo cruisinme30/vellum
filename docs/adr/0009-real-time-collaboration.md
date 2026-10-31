@@ -12,8 +12,13 @@ vellum: 1
 - Date: 2026-10-29
 - Status: accepted
 - Decisions: D55, D56, D57
-- Issue: [#97](https://github.com/cruisinme30/vellum/issues/97), [#235](https://github.com/cruisinme30/vellum/issues/235), [#294](https://github.com/cruisinme30/vellum/issues/294), [#414](https://github.com/cruisinme30/vellum/issues/414)
-- Pull requests: [#217](https://github.com/cruisinme30/vellum/pull/217), [#302](https://github.com/cruisinme30/vellum/pull/302), [#380](https://github.com/cruisinme30/vellum/pull/380)
+- Issue: [#97](https://github.com/cruisinme30/vellum/issues/97),
+  [#235](https://github.com/cruisinme30/vellum/issues/235),
+  [#294](https://github.com/cruisinme30/vellum/issues/294),
+  [#414](https://github.com/cruisinme30/vellum/issues/414)
+- Pull requests: [#217](https://github.com/cruisinme30/vellum/pull/217),
+  [#302](https://github.com/cruisinme30/vellum/pull/302),
+  [#380](https://github.com/cruisinme30/vellum/pull/380)
 
 :::
 

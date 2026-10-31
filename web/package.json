@@ -18,10 +18,13 @@
     "knip": "knip",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "tours": "playwright test -c playwright.tours.config.ts"
   },
   "dependencies": {
     "@fluent/bundle": "^0.19.1",
+    "@fontsource/atkinson-hyperlegible": "5.3.0",
+    "@fontsource/opendyslexic": "5.3.0",
     "@fontsource/roboto": "^5.3.0",
     "@material-symbols/svg-400": "^0.48.2",
     "@tiptap/core": "3.32.1",
@@ -81,6 +84,11 @@
   "pnpm": {
     "ignoredBuiltDependencies": [
       "unrs-resolver"
-    ]
+    ],
+    "auditConfig": {
+      "ignoreGhsas": [
+        "GHSA-g3hv-75wg-m249"
+      ]
+    }
   }
 }

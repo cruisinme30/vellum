@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 //! Per-token rate limits, on the shared GCRA limiter from
-//! `vellum-security`.
+//! `vellum-security`, optionally held across every replica through a
+//! [`SharedLimit`] (ADR 0019, D218).
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use vellum_security::rate::{Quota, RateLimiter as Gcra};
@@ -41,15 +43,46 @@ impl RateLimit {
 /// Most tokens tracked at once; idle, drained keys are evicted first.
 const MAX_TOKENS: usize = 100_000;
 
+/// A per-minute allowance counted across replicas.
+///
+/// Each replica still applies its own burst limit first; this one, such
+/// as the server's shared rate-limit table, catches a client spreading
+/// calls over replicas.
+pub trait SharedLimit: Send + Sync {
+    /// Counts one call for `key`. Returns how long to wait when the
+    /// allowance is used up.
+    fn hit(&self, key: &str) -> Option<Duration>;
+}
+
 /// Rate limiter keyed by token id.
-#[derive(Debug)]
-pub struct RateLimiter(Option<Gcra<String>>);
+pub struct RateLimiter {
+    local: Option<Gcra<String>>,
+    shared: Option<Arc<dyn SharedLimit>>,
+}
+
+impl std::fmt::Debug for RateLimiter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RateLimiter")
+            .field("shared", &self.shared.is_some())
+            .finish_non_exhaustive()
+    }
+}
 
 impl RateLimiter {
     /// A limiter applying `limit` to every token.
     #[must_use]
     pub fn new(limit: RateLimit) -> Self {
-        Self(limit.quota().map(|q| Gcra::new(q, MAX_TOKENS)))
+        Self {
+            local: limit.quota().map(|q| Gcra::new(q, MAX_TOKENS)),
+            shared: None,
+        }
+    }
+
+    /// Also holds every token to `shared`, keyed `mcp:<token id>`.
+    #[must_use]
+    pub fn with_shared(mut self, shared: Arc<dyn SharedLimit>) -> Self {
+        self.shared = Some(shared);
+        self
     }
 
     /// Takes one call from the token's allowance.
@@ -66,13 +99,23 @@ impl RateLimiter {
     /// # Errors
     ///
     /// Returns how long to wait before the next call is allowed.
-    pub fn check_at(&self, token_id: &str, now: Instant) -> Result<(), Duration> {
+    pub fn check_at(
+        &self,
+        token_id: &str,
+        now: Instant,
+    ) -> Result<(), Duration> {
         // The quota is always valid (both parts are clamped above zero);
         // if it were not, fail closed.
-        self.0.as_ref().map_or(Err(Duration::from_mins(1)), |g| {
-            g.check(&token_id.to_owned(), now)
-                .map_err(|l| l.retry_after)
-        })
+        self.local
+            .as_ref()
+            .map_or(Err(Duration::from_mins(1)), |g| {
+                g.check(&token_id.to_owned(), now)
+                    .map_err(|l| l.retry_after)
+            })?;
+        self.shared
+            .as_ref()
+            .and_then(|s| s.hit(&format!("mcp:{token_id}")))
+            .map_or(Ok(()), Err)
     }
 }
 
@@ -93,5 +136,48 @@ mod tests {
         assert!(wait.is_some_and(|w| w <= Duration::from_secs(1)));
         assert!(limiter.check_at("b", t0).is_ok(), "tokens are independent");
         assert!(limiter.check_at("a", t0 + Duration::from_secs(1)).is_ok());
+    }
+
+    /// Counts calls per key and refuses past `max`, like the replicas'
+    /// shared table.
+    #[derive(Default)]
+    struct Table {
+        max: u64,
+        seen: std::sync::Mutex<std::collections::HashMap<String, u64>>,
+    }
+
+    impl SharedLimit for Table {
+        fn hit(&self, key: &str) -> Option<Duration> {
+            let mut seen = self.seen.lock().unwrap();
+            let n = seen.entry(key.to_owned()).or_default();
+            *n += 1;
+            let over = *n > self.max;
+            drop(seen);
+            over.then_some(Duration::from_secs(30))
+        }
+    }
+
+    #[test]
+    fn the_shared_allowance_holds_across_replicas() {
+        let table = Arc::new(Table {
+            max: 3,
+            ..Table::default()
+        });
+        let limit = RateLimit {
+            burst: 10,
+            per_minute: 600,
+        };
+        // Two replicas, each with its own burst allowance, one table.
+        let a = RateLimiter::new(limit)
+            .with_shared(Arc::clone(&table) as Arc<dyn SharedLimit>);
+        let b = RateLimiter::new(limit)
+            .with_shared(Arc::clone(&table) as Arc<dyn SharedLimit>);
+        let t0 = Instant::now();
+        assert!(a.check_at("tok", t0).is_ok());
+        assert!(b.check_at("tok", t0).is_ok());
+        assert!(a.check_at("tok", t0).is_ok());
+        assert_eq!(b.check_at("tok", t0), Err(Duration::from_secs(30)));
+        assert!(a.check_at("other", t0).is_ok(), "tokens are independent");
+        assert!(table.seen.lock().unwrap().contains_key("mcp:tok"));
     }
 }

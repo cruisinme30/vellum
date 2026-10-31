@@ -45,3 +45,15 @@ updates:
       default-days: 7
     groups:
       actions: { patterns: ["*"], update-types: [patch, minor] }
+  # The hygiene job's Python linters, pinned by hash in hygiene.txt.
+  - package-ecosystem: pip
+    directory: /.github/requirements
+    target-branch: develop
+    schedule: { interval: weekly, day: monday }
+    open-pull-requests-limit: 5
+    commit-message: { prefix: "ci(deps)" }
+    labels: [type/ci]
+    cooldown:
+      default-days: 7
+    groups:
+      linters: { patterns: ["*"], update-types: [patch, minor] }

@@ -12,7 +12,8 @@ import { BLOCK_ID_TYPES } from "./schema/spec";
 const blockIdKey = new PluginKey("vellumBlockIds");
 
 const isRemote = (tr: Transaction) => {
-  const meta = tr.getMeta(ySyncPluginKey) as { isChangeOrigin?: boolean } | undefined;
+  const meta = tr.getMeta(ySyncPluginKey) as
+    { isChangeOrigin?: boolean } | undefined;
   return meta?.isChangeOrigin === true;
 };
 
@@ -58,7 +59,9 @@ export const BlockIds = Extension.create<{ generate: () => string }>({
       new Plugin({
         key: blockIdKey,
         appendTransaction(transactions, _old, state) {
-          const local = transactions.some((tr) => tr.docChanged && !isRemote(tr));
+          const local = transactions.some(
+            (tr) => tr.docChanged && !isRemote(tr),
+          );
           if (!local) {
             // ProseMirror's "no transaction to append".
             // eslint-disable-next-line unicorn/no-null

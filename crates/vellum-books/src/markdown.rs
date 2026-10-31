@@ -86,7 +86,8 @@ pub fn front_matter(text: &str, key: &str) -> Option<String> {
 
 fn yaml_scalar(value: &str) -> String {
     let flat = value.split_whitespace().collect::<Vec<_>>().join(" ");
-    serde_saphyr::to_string(&flat).map_or_else(|_| format!("{flat:?}"), |s| s.trim_end().to_owned())
+    serde_saphyr::to_string(&flat)
+        .map_or_else(|_| format!("{flat:?}"), |s| s.trim_end().to_owned())
 }
 
 /// Sets a top-level front-matter field to a single-line string, adding
@@ -132,7 +133,12 @@ pub fn set_front_matter(text: &str, key: &str, value: &str) -> String {
 
 /// The text of a new chapter file.
 #[must_use]
-pub fn new_chapter(id: &NodeId, title: &str, status: Option<&str>, body: &str) -> String {
+pub fn new_chapter(
+    id: &NodeId,
+    title: &str,
+    status: Option<&str>,
+    body: &str,
+) -> String {
     let mut text = format!("---\nid: {id}\ntitle: {}\n", yaml_scalar(title));
     if let Some(status) = status {
         text.push_str("status: ");
@@ -193,7 +199,9 @@ pub fn links(text: &str) -> Vec<LinkRef> {
                 ..
             }) => match link_type {
                 LinkType::Inline => (LinkKind::Inline, dest_url.to_string()),
-                LinkType::Autolink => (LinkKind::Autolink, dest_url.to_string()),
+                LinkType::Autolink => {
+                    (LinkKind::Autolink, dest_url.to_string())
+                }
                 _ => continue,
             },
             Event::Start(Tag::Image {
@@ -211,15 +219,22 @@ pub fn links(text: &str) -> Vec<LinkRef> {
             let Some(close) = source.rfind(')') else {
                 continue;
             };
-            let Some(open) = source.get(..close).and_then(|s| s.rfind('(')) else {
+            let Some(open) = source.get(..close).and_then(|s| s.rfind('('))
+            else {
                 continue;
             };
             out.push(LinkRef {
                 kind,
                 dest,
-                dest_range: offset + range.start + open + 1..offset + range.start + close,
+                dest_range: offset + range.start + open + 1
+                    ..offset + range.start + close,
                 link_range: offset + range.start..offset + range.end,
-                text_range: text_range(source, open, offset + range.start, kind),
+                text_range: text_range(
+                    source,
+                    open,
+                    offset + range.start,
+                    kind,
+                ),
             });
             continue;
         }
@@ -228,7 +243,8 @@ pub fn links(text: &str) -> Vec<LinkRef> {
         };
         out.push(LinkRef {
             kind,
-            dest_range: offset + range.start + at..offset + range.start + at + dest.len(),
+            dest_range: offset + range.start + at
+                ..offset + range.start + at + dest.len(),
             link_range: offset + range.start..offset + range.end,
             text_range: text_range(source, at, offset + range.start, kind),
             dest,
@@ -252,7 +268,8 @@ pub fn links(text: &str) -> Vec<LinkRef> {
         };
         out.push(LinkRef {
             kind: LinkKind::Definition,
-            dest_range: offset + span.start + at..offset + span.start + at + dest.len(),
+            dest_range: offset + span.start + at
+                ..offset + span.start + at + dest.len(),
             link_range: offset + span.start..offset + span.end,
             text_range: None,
             dest,
@@ -262,7 +279,12 @@ pub fn links(text: &str) -> Vec<LinkRef> {
     out
 }
 
-fn text_range(source: &str, dest_at: usize, base: usize, kind: LinkKind) -> Option<Range<usize>> {
+fn text_range(
+    source: &str,
+    dest_at: usize,
+    base: usize,
+    kind: LinkKind,
+) -> Option<Range<usize>> {
     if kind != LinkKind::Inline {
         return None;
     }
@@ -324,7 +346,10 @@ pub fn headings(text: &str) -> Vec<HeadingRef> {
                 let end = body
                     .get(range.end..)
                     .and_then(|rest| {
-                        if body.get(..range.end).is_some_and(|b| b.ends_with('\n')) {
+                        if body
+                            .get(..range.end)
+                            .is_some_and(|b| b.ends_with('\n'))
+                        {
                             Some(0)
                         } else {
                             rest.find('\n').map(|i| i + 1)
@@ -332,7 +357,8 @@ pub fn headings(text: &str) -> Vec<HeadingRef> {
                     })
                     .map_or(body.len(), |extra| range.end + extra);
                 let raw = body.get(start..end).unwrap_or_default();
-                let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+                let text =
+                    text.split_whitespace().collect::<Vec<_>>().join(" ");
                 out.push(HeadingRef {
                     level,
                     range: offset + start..offset + end,
@@ -446,7 +472,9 @@ pub fn map_links(
             }
             continue;
         }
-        if let (Some(new_text), Some(range)) = (change.text, link.text_range.clone()) {
+        if let (Some(new_text), Some(range)) =
+            (change.text, link.text_range.clone())
+        {
             edits.push((range, escape_link_text(&new_text)));
         }
         if let Some(dest) = change.dest {
@@ -485,7 +513,8 @@ vellum: 1
 # Services
 
 See [the gateway](vellum://doc/01JBK0000000000000000000A2) and
-[§](vellum://doc/01JBK0000000000000000000A3), [ref][r] and <vellum://doc/01JBK0000000000000000000A4>.
+[§](vellum://doc/01JBK0000000000000000000A3), [ref][r] and \
+    <vellum://doc/01JBK0000000000000000000A4>.
 
 ```text
 [not a link](vellum://doc/01JBK0000000000000000000A5)
@@ -513,7 +542,8 @@ Setext heading
         assert_eq!(body(&renamed), body(DOC));
         let added = set_front_matter(DOC, "status", "draft");
         assert_eq!(front_matter(&added, "status").as_deref(), Some("draft"));
-        let bare = set_front_matter("Hello\n", "id", "01JBK0000000000000000000A1");
+        let bare =
+            set_front_matter("Hello\n", "id", "01JBK0000000000000000000A1");
         assert_eq!(
             front_matter(&bare, "id").as_deref(),
             Some("01JBK0000000000000000000A1")
@@ -536,7 +566,10 @@ Setext heading
             ]
         );
         for link in &found {
-            assert_eq!(DOC.get(link.dest_range.clone()), Some(link.dest.as_str()));
+            assert_eq!(
+                DOC.get(link.dest_range.clone()),
+                Some(link.dest.as_str())
+            );
         }
         let xref = found.get(1).and_then(|l| l.text_range.clone());
         assert_eq!(xref.and_then(|r| DOC.get(r)), Some("§"));

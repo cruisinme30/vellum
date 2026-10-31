@@ -10,14 +10,16 @@
 use std::fmt;
 
 use vellum_kernel::id::{
-    BookId, CollectionId, DocId, DriveId, FolderId, ObjectId, ShareId, SpaceId, UserId,
+    BookId, CollectionId, DocId, DriveId, FolderId, ObjectId, ShareId, SpaceId,
+    UserId,
 };
 
 /// A 128-bit object identity, stored as a 16-byte blob in SQLite and a
 /// `uuid` in Postgres.
 ///
-/// It carries the same bits as the `vellum-kernel` IDs and converts to and from each of them, because tuples mix kinds (a
-/// space, a folder, a document, a user, a share link, a group).
+/// It carries the same bits as the `vellum-kernel` IDs and converts to and from
+/// each of them, because tuples mix kinds (a space, a folder, a document, a
+/// user, a share link, a group).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Id(pub u128);
 
@@ -350,7 +352,11 @@ pub struct Tuple {
 impl Tuple {
     /// A role grant.
     #[must_use]
-    pub const fn role(object: Object, relation: Relation, subject: Subject) -> Self {
+    pub const fn role(
+        object: Object,
+        relation: Relation,
+        subject: Subject,
+    ) -> Self {
         Self {
             object,
             relation: TupleRelation::Role(relation),
@@ -471,7 +477,10 @@ mod tests {
     #[test]
     fn well_formed_tuples() {
         let u = Subject::User(Id(1));
-        assert!(Tuple::role(Object::Node(Id(2)), Relation::Editor, u).is_well_formed());
+        assert!(
+            Tuple::role(Object::Node(Id(2)), Relation::Editor, u)
+                .is_well_formed()
+        );
         assert!(Tuple::member(Id(3), u).is_well_formed());
         assert!(Tuple::restricted(Id(2)).is_well_formed());
         let bad = Tuple {
@@ -485,8 +494,12 @@ mod tests {
 
     #[test]
     fn expiry_is_exclusive() {
-        let t =
-            Tuple::role(Object::Space(Id(1)), Relation::Viewer, Subject::User(Id(2))).expiring(100);
+        let t = Tuple::role(
+            Object::Space(Id(1)),
+            Relation::Viewer,
+            Subject::User(Id(2)),
+        )
+        .expiring(100);
         assert!(t.is_live(99));
         assert!(!t.is_live(100));
     }

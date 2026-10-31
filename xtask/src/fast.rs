@@ -4,11 +4,27 @@
 //! `cargo xtask fast`: the "Fast suite" CI workflow, run locally.
 //!
 //! Each step runs the same command as `.github/workflows/ci.yml`. A step
-//! whose tool is not installed is skipped and named in the summary, so a
-//! contributor can still push; CI runs every step regardless.
+//! whose tool is not installed fails the run, because a skipped check is
+//! how failures used to reach CI unnoticed; `scripts/dev/install-tools.sh`
+//! installs them all. `VELLUM_ALLOW_MISSING_TOOLS=1` turns a missing tool
+//! back into a reported skip (ADR 0048, D203).
 //!
 //! Like CI, the Rust and web steps are skipped when the branch does not touch
 //! them; `scripts/ci/changed-areas.sh` decides for both (ADR 0035, D139).
+//! Locally the run is focused (Gourav, 2026-10-29: threads run focused
+//! tests and the integrator's batch runs everything): clippy, rustdoc and
+//! the Rust tests cover only the crates the branch changed, and the web and
+//! desktop unit tests only the files related to its changes, without the
+//! coverage gate. CI runs the whole workspace. `VELLUM_FAST_ALL_TESTS=1`
+//! runs the full checks locally too.
+//! `VELLUM_FAST_ALL_TESTS=1` also adds the UI layout checks: the
+//! integrator's full run (issue #532).
+//!
+//! The local gate (`scripts/dev/gate.sh`, ADR 0073, D318) also sets
+//! `VELLUM_FAST_ALL_AREAS=1`, which checks every area whatever the branch
+//! changed, as the merge queue and the full suite do, and
+//! `VELLUM_FAST_SKIP_UI=1`, because it runs the whole UI suite in every
+//! browser in the Playwright image itself.
 
 use std::env;
 use std::ffi::OsString;
@@ -23,16 +39,23 @@ enum Area {
     Rust,
     Web,
     Desktop,
+    /// The UI layout, focus and loading checks: the web app and the website.
+    Ui,
     /// Always runs: files, docs, secrets and commits.
     Any,
 }
 
 /// Which areas the branch changed, as `scripts/ci/changed-areas.sh` says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "one flag per line the script prints"
+)]
 struct Areas {
     rust: bool,
     web: bool,
     desktop: bool,
+    ui: bool,
 }
 
 impl Areas {
@@ -40,6 +63,7 @@ impl Areas {
         rust: true,
         web: true,
         desktop: true,
+        ui: true,
     };
 
     /// Parses the script's `rust=true` / `web=false` lines.
@@ -54,6 +78,7 @@ impl Areas {
             rust: flag("rust"),
             web: flag("web"),
             desktop: flag("desktop"),
+            ui: flag("ui"),
         }
     }
 
@@ -62,6 +87,7 @@ impl Areas {
             Area::Rust => self.rust,
             Area::Web => self.web,
             Area::Desktop => self.desktop,
+            Area::Ui => self.ui,
             Area::Any => true,
         }
     }
@@ -78,6 +104,8 @@ struct Step {
     /// Directory relative to the repository root.
     dir: &'static str,
     env: Vec<(&'static str, &'static str)>,
+    /// Nothing for this step to check on this branch.
+    not_needed: bool,
 }
 
 impl Step {
@@ -90,6 +118,7 @@ impl Step {
             args: args.iter().map(|&arg| arg.to_owned()).collect(),
             dir: ".",
             env: Vec::new(),
+            not_needed: false,
         }
     }
 
@@ -122,25 +151,66 @@ enum Outcome {
     Passed,
     Failed,
     Skipped,
+    /// The step's tool is not installed, and missing tools are not allowed.
+    Missing,
     /// The branch does not change what the step checks; CI skips it too.
     NotNeeded,
+}
+
+/// Set to `1` to report a missing tool as a skip instead of a failure.
+const ALLOW_MISSING_TOOLS: &str = "VELLUM_ALLOW_MISSING_TOOLS";
+/// Set to `1` to run every crate's tests, as CI does.
+const ALL_TESTS: &str = "VELLUM_FAST_ALL_TESTS";
+/// Set to `1` to check every area, not only those the branch changed.
+const ALL_AREAS: &str = "VELLUM_FAST_ALL_AREAS";
+/// Set to `1` to leave the UI layout checks to a caller that runs them.
+const SKIP_UI: &str = "VELLUM_FAST_SKIP_UI";
+
+/// What a skipped step means: allowed only when the contributor opted in.
+const fn missing_tool(allowed: bool) -> Outcome {
+    if allowed {
+        Outcome::Skipped
+    } else {
+        Outcome::Missing
+    }
+}
+
+fn env_flag(key: &str) -> bool {
+    env::var(key).is_ok_and(|value| value == "1")
 }
 
 /// Runs every fast check and fails if any check that ran failed.
 pub fn run() -> Result<(), String> {
     let root = repo_root()?;
     let base = merge_base(&root);
-    let areas = base
-        .as_deref()
-        .map_or(Areas::ALL, |base| changed_areas(&root, base));
+    let areas = if env_flag(ALL_AREAS) {
+        Areas::ALL
+    } else {
+        base.as_deref()
+            .map_or(Areas::ALL, |base| changed_areas(&root, base))
+    };
     let mut results = Vec::new();
     let started = Instant::now();
+    let allow_missing = env_flag(ALLOW_MISSING_TOOLS);
+    let tested = if env_flag(ALL_TESTS) {
+        None
+    } else {
+        base.as_deref()
+            .and_then(|base| changed_packages(&root, base))
+    };
 
-    for step in steps(base.as_deref(), current_branch(&root).as_deref()) {
-        let outcome = if areas.includes(step.area) {
-            execute(&root, &step)
-        } else {
+    for step in steps(
+        base.as_deref(),
+        current_branch(&root).as_deref(),
+        tested.as_deref(),
+    ) {
+        let outcome = if !areas.includes(step.area) || step.not_needed {
             Outcome::NotNeeded
+        } else {
+            match execute(&root, &step) {
+                Outcome::Skipped => missing_tool(allow_missing),
+                outcome => outcome,
+            }
         };
         results.push((step.name, outcome));
     }
@@ -151,7 +221,10 @@ pub fn run() -> Result<(), String> {
     };
     if areas.rust && !docker_available() {
         // The missing tool is Docker, which the Postgres and Meilisearch tests need.
-        results.push(("Postgres and Meilisearch tests (Docker)", Outcome::Skipped));
+        results.push((
+            "Postgres and Meilisearch tests (Docker)",
+            Outcome::Skipped,
+        ));
     }
     results.push(("Crate boundaries", boundaries));
     results.push(("Help books and their corpus", help));
@@ -166,38 +239,73 @@ pub fn run() -> Result<(), String> {
     report(&results, started.elapsed().as_secs());
     if results
         .iter()
+        .any(|(_, outcome)| *outcome == Outcome::Missing)
+    {
+        return Err(format!(
+            "Some checks could not run because their tool is not installed, so CI \
+             would be the first to run them. Install the tools with \
+             scripts/dev/install-tools.sh, or set {ALLOW_MISSING_TOOLS}=1 to push anyway."
+        ));
+    }
+    if results
+        .iter()
         .any(|(_, outcome)| *outcome == Outcome::Failed)
     {
-        return Err("Fast suite failed locally; fix the steps above before pushing.".to_owned());
+        return Err(
+            "Fast suite failed locally; fix the steps above before pushing."
+                .to_owned(),
+        );
     }
     Ok(())
 }
 
 /// The Web job's steps, run in `web/`.
-fn web_steps() -> Vec<Step> {
-    [
+fn web_steps(focus: Option<&str>) -> Vec<Step> {
+    let mut steps: Vec<Step> = [
         ("Web install", &["install", "--frozen-lockfile"][..]),
         ("Web format", &["run", "format:check"]),
         ("Web types", &["run", "typecheck"]),
         ("Web lint", &["run", "lint"]),
         ("Web dead code", &["run", "knip"]),
-        ("Web tests with coverage", &["run", "test:coverage"]),
         ("Web dependency audit", &["audit"]),
     ]
     .into_iter()
-    .map(|(name, args)| Step::new(name, "pnpm", args).in_dir("web").area(Area::Web))
-    .collect()
+    .map(|(name, args)| {
+        Step::new(name, "pnpm", args).in_dir("web").area(Area::Web)
+    })
+    .collect();
+    steps.insert(
+        5,
+        js_tests("Web tests", focus).in_dir("web").area(Area::Web),
+    );
+    steps
+}
+
+/// The unit tests of `web/` or `desktop/`: with coverage, or, focused on a
+/// base commit, only the tests related to the files changed since it.
+fn js_tests(name: &'static str, focus: Option<&str>) -> Step {
+    focus.map_or_else(
+        || Step::new(name, "pnpm", &["run", "test:coverage"]),
+        |base| {
+            let mut step = Step::new(
+                name,
+                "pnpm",
+                &["exec", "vitest", "run", "--passWithNoTests"],
+            );
+            step.args.push(format!("--changed={base}"));
+            step
+        },
+    )
 }
 
 /// The Desktop job's steps, run in `desktop/`.
-fn desktop_steps() -> Vec<Step> {
-    [
+fn desktop_steps(focus: Option<&str>) -> Vec<Step> {
+    let mut steps: Vec<Step> = [
         ("Desktop install", &["install", "--frozen-lockfile"][..]),
         ("Desktop format", &["run", "format:check"]),
         ("Desktop types", &["run", "typecheck"]),
         ("Desktop lint", &["run", "lint"]),
         ("Desktop dead code", &["run", "knip"]),
-        ("Desktop tests with coverage", &["run", "test:coverage"]),
         ("Desktop build", &["run", "build"]),
         ("Desktop dependency audit", &["audit"]),
     ]
@@ -207,38 +315,41 @@ fn desktop_steps() -> Vec<Step> {
             .in_dir("desktop")
             .area(Area::Desktop)
     })
-    .collect()
+    .collect();
+    steps.insert(
+        5,
+        js_tests("Desktop tests", focus)
+            .in_dir("desktop")
+            .area(Area::Desktop),
+    );
+    steps
 }
 
 /// Tests that start Postgres or Meilisearch in a container through
-/// testcontainers: two whole `vellum-db` binaries, plus every test named
-/// after the engine it starts.
-const DOCKER_TESTS: &str = "binary_id(vellum-db::postgres) | binary_id(vellum-db::shards) \
+/// testcontainers: every test named after the engine it starts (which
+/// covers the whole `postgres` module of `vellum-db`), plus that crate's
+/// `shards` module.
+const DOCKER_TESTS: &str = "(package(vellum-db) & test(/^shards::/)) \
      | test(/postgres/) | test(/meilisearch/)";
 
 /// Whether a Docker daemon looks reachable: `DOCKER_HOST` is set or the
 /// default socket exists. Cloud sandboxes have neither.
 fn docker_available() -> bool {
-    env::var_os("DOCKER_HOST").is_some() || Path::new("/var/run/docker.sock").exists()
+    env::var_os("DOCKER_HOST").is_some()
+        || Path::new("/var/run/docker.sock").exists()
 }
-/// The workspace tests. Without Docker, the container-backed database
-/// and search tests are left out (and reported as skipped); CI always runs them.
-/// tests are left out (and reported as skipped); CI always runs them.
-fn rust_tests(docker: bool) -> Step {
-    let mut step = Step::new(
-        "Rust tests",
-        "cargo",
-        &[
-            "nextest",
-            "run",
-            "--workspace",
-            "--locked",
-            "--profile",
-            "ci",
-        ],
-    )
-    .needs("cargo-nextest")
-    .area(Area::Rust);
+/// The tests of `packages`, or of the whole workspace when `None`. With no
+/// packages the step is not needed.
+/// Without Docker, the container-backed database and search tests are left
+/// out (and reported as skipped); CI always runs them.
+fn rust_tests(docker: bool, packages: Option<&[String]>) -> Step {
+    let mut step = Step::new("Rust tests", "cargo", &["nextest", "run"])
+        .needs("cargo-nextest")
+        .area(Area::Rust);
+    scope(&mut step, packages);
+    for arg in ["--locked", "--profile", "ci"] {
+        step.args.push(arg.to_owned());
+    }
     if !docker {
         step.args.push("-E".to_owned());
         step.args.push(format!("not ({DOCKER_TESTS})"));
@@ -246,36 +357,58 @@ fn rust_tests(docker: bool) -> Step {
     step
 }
 
+/// Narrows a cargo step to `packages`: the whole workspace for `None`, not
+/// needed for none.
+fn scope(step: &mut Step, packages: Option<&[String]>) {
+    match packages {
+        None => step.args.push("--workspace".to_owned()),
+        Some([]) => step.not_needed = true,
+        Some(packages) => {
+            for package in packages {
+                step.args.push("-p".to_owned());
+                step.args.push(package.clone());
+            }
+        }
+    }
+}
+
+/// A cargo step: `command`, its scope, then `rest`.
+fn cargo_step(
+    name: &'static str,
+    command: &str,
+    packages: Option<&[String]>,
+    rest: &[&str],
+) -> Step {
+    let mut step = Step::new(name, "cargo", &[command]);
+    scope(&mut step, packages);
+    step.args.extend(rest.iter().map(|arg| (*arg).to_owned()));
+    step
+}
+
 /// The fast suite, in the order CI runs it.
-fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
+fn steps(
+    base: Option<&str>,
+    branch: Option<&str>,
+    tested: Option<&[String]>,
+) -> Vec<Step> {
     let mut steps = vec![
         // Rust
-        Step::new("Rust format", "cargo", &["fmt", "--all", "--check"]).area(Area::Rust),
+        Step::new("Rust format", "cargo", &["fmt", "--all", "--check"])
+            .area(Area::Rust),
         // `-D warnings` after `--` also denies rustc warnings in every
         // target, matching CI's RUSTFLAGS without invalidating the
         // contributor's normal build cache.
-        Step::new(
+        cargo_step(
             "Clippy",
-            "cargo",
-            &[
-                "clippy",
-                "--workspace",
-                "--all-targets",
-                "--locked",
-                "--",
-                "-D",
-                "warnings",
-            ],
+            "clippy",
+            tested,
+            &["--all-targets", "--locked", "--", "-D", "warnings"],
         )
         .area(Area::Rust),
-        Step::new(
-            "Rust docs",
-            "cargo",
-            &["doc", "--workspace", "--no-deps", "--locked"],
-        )
-        .with_env("RUSTDOCFLAGS", "-D warnings")
-        .area(Area::Rust),
-        rust_tests(docker_available()),
+        cargo_step("Rust docs", "doc", tested, &["--no-deps", "--locked"])
+            .with_env("RUSTDOCFLAGS", "-D warnings")
+            .area(Area::Rust),
+        rust_tests(docker_available(), tested),
         Step::new(
             "Licences, bans, sources and advisories",
             "cargo",
@@ -287,8 +420,10 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
             .needs("cargo-audit")
             .area(Area::Rust),
     ];
-    steps.extend(web_steps());
-    steps.extend(desktop_steps());
+    // Focused JS tests need a base, and are full when the Rust side is.
+    let focus = base.filter(|_| tested.is_some());
+    steps.extend(web_steps(focus));
+    steps.extend(desktop_steps(focus));
     steps.extend([
         // Files, docs and secrets
         Step::new("REUSE headers", "reuse", &["lint"]),
@@ -298,10 +433,17 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
             "bash",
             &[
                 "-c",
-                "shellcheck -x scripts/*/*.sh deploy/*/*.sh .githooks/*",
+                "shellcheck -x scripts/*/*.sh deploy/*/*.sh deploy/packages/linux/*.sh site/*.sh .githooks/*",
             ],
         )
         .needs("shellcheck"),
+        // Without a GitHub token zizmor runs only its offline audits; CI
+        // adds the online ones.
+        Step::new(
+            "Workflow security (zizmor)",
+            "zizmor",
+            &["--persona=regular", "--min-severity=low", ".github"],
+        ),
         Step::new("Decision records", "scripts/ci/check-adrs.sh", &[]).needs("bash"),
         Step::new("Markdown", "markdownlint-cli2", &[]),
         Step::new(
@@ -319,12 +461,8 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
                 "--offline",
                 "--no-progress",
                 "--include-fragments",
-                "--exclude-path",
-                "LICENSES",
-                "--exclude-path",
-                "web/node_modules",
-                "--exclude-path",
-                "corpus",
+                // lychee.toml excludes LICENSES, corpus and downloaded
+                // third-party docs (node_modules, target, cargo home).
                 "**/*.md",
             ],
         ),
@@ -338,7 +476,11 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
 
     if let Some(base) = base {
         let range = format!("--log-opts={base}..HEAD");
-        let mut secrets = Step::new("Secrets", "gitleaks", &["git", "--no-banner", "--redact"]);
+        let mut secrets = Step::new(
+            "Secrets",
+            "gitleaks",
+            &["git", "--no-banner", "--redact"],
+        );
         secrets.args.push(range);
         steps.push(secrets);
 
@@ -352,7 +494,9 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
         steps.push(commits);
     }
 
-    if let Some(branch) = branch.filter(|name| !matches!(*name, "develop" | "main")) {
+    if let Some(branch) =
+        branch.filter(|name| !matches!(*name, "develop" | "main"))
+    {
         let mut name = Step::new(
             "Branch name",
             "bash",
@@ -366,6 +510,18 @@ fn steps(base: Option<&str>, branch: Option<&str>) -> Vec<Step> {
         name.args.push(branch.to_owned());
         steps.push(name);
     }
+    // Last, so the reports it leaves in web/test-results cannot reach
+    // the Markdown and prose checks, which in CI run in another job.
+    // The "UI layout (quick)" job: what a merged batch most often breaks
+    // without any single branch failing on its own (issue #532). It takes
+    // minutes, so only the integrator's full run (VELLUM_FAST_ALL_TESTS=1)
+    // includes it; threads run focused tests. The local gate runs the
+    // whole UI suite itself (ADR 0073), so it skips this one.
+    let mut ui = Step::new("UI layout (quick)", "scripts/ci/ui-quick.sh", &[])
+        .needs("mdbook")
+        .area(Area::Ui);
+    ui.not_needed = !env_flag(ALL_TESTS) || env_flag(SKIP_UI);
+    steps.push(ui);
 
     steps
 }
@@ -377,7 +533,9 @@ const LOCAL_BUILD_ENV: [(&str, &str); 2] =
     [("CARGO_PROFILE_DEV_DEBUG", "0"), ("CARGO_INCREMENTAL", "0")];
 
 /// The `LOCAL_BUILD_ENV` entries the environment does not already set.
-fn local_build_env(is_set: impl Fn(&str) -> bool) -> Vec<(&'static str, &'static str)> {
+fn local_build_env(
+    is_set: impl Fn(&str) -> bool,
+) -> Vec<(&'static str, &'static str)> {
     LOCAL_BUILD_ENV
         .into_iter()
         .filter(|(key, _)| !is_set(key))
@@ -453,8 +611,13 @@ fn report(results: &[(&str, Outcome)], seconds: u64) {
         lines.push(match outcome {
             Outcome::Passed => format!("  pass  {name}"),
             Outcome::Failed => format!("  FAIL  {name}"),
-            Outcome::Skipped => format!("  skip  {name} (tool not installed; CI still runs it)"),
-            Outcome::NotNeeded => format!("  skip  {name} (no changes here; CI skips it too)"),
+            Outcome::Skipped => {
+                format!("  skip  {name} (tool not installed; CI still runs it)")
+            }
+            Outcome::Missing => format!("  MISS  {name} (tool not installed)"),
+            Outcome::NotNeeded => {
+                format!("  skip  {name} (no changes here; CI skips it too)")
+            }
         });
     }
     progress(&lines.join("\n"));
@@ -469,7 +632,9 @@ fn progress(message: &str) {
 fn repo_root() -> Result<PathBuf, String> {
     git(Path::new("."), &["rev-parse", "--show-toplevel"])
         .map(PathBuf::from)
-        .ok_or_else(|| "cargo xtask fast must run inside the Vellum repository".to_owned())
+        .ok_or_else(|| {
+            "cargo xtask fast must run inside the Vellum repository".to_owned()
+        })
 }
 
 /// The commit where the current branch left `develop`, if known.
@@ -504,6 +669,55 @@ fn changed_areas(root: &Path, base: &str) -> Areas {
     }
 }
 
+/// The workspace crates the commits since `base` touch, by name. `None`
+/// when git or `cargo metadata` fails, so the caller tests everything.
+fn changed_packages(root: &Path, base: &str) -> Option<Vec<String>> {
+    let paths =
+        git(root, &["diff", "--name-only", base, "HEAD"]).unwrap_or_default();
+    let metadata = cargo_metadata::MetadataCommand::new()
+        .current_dir(root)
+        .no_deps()
+        .exec()
+        .ok()?;
+    let crates: Vec<(String, String)> = metadata
+        .workspace_packages()
+        .into_iter()
+        .filter_map(|package| {
+            let dir =
+                package.manifest_path.parent()?.strip_prefix(root).ok()?;
+            Some((package.name.to_string(), dir.as_str().to_owned()))
+        })
+        .collect();
+    Some(packages_for(paths.lines(), &crates))
+}
+
+/// The crates (name, directory relative to the root) that own `paths`. A
+/// path belongs to the crate with the deepest directory that contains it;
+/// paths outside every crate (the root manifest, docs) select none.
+fn packages_for<'a>(
+    paths: impl IntoIterator<Item = &'a str>,
+    crates: &[(String, String)],
+) -> Vec<String> {
+    let mut names: Vec<String> = paths
+        .into_iter()
+        .filter_map(|path| {
+            crates
+                .iter()
+                .filter(|(_, dir)| {
+                    !dir.is_empty()
+                        && path
+                            .strip_prefix(dir.as_str())
+                            .is_some_and(|rest| rest.starts_with('/'))
+                })
+                .max_by_key(|(_, dir)| dir.len())
+                .map(|(name, _)| name.clone())
+        })
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
 fn current_branch(root: &Path) -> Option<String> {
     git(root, &["symbolic-ref", "--quiet", "--short", "HEAD"])
 }
@@ -522,8 +736,9 @@ fn git(dir: &Path, args: &[&str]) -> Option<String> {
 }
 
 fn on_path(tool: &str) -> bool {
-    env::var_os("PATH")
-        .is_some_and(|paths| env::split_paths(&paths).any(|dir| dir.join(tool).is_file()))
+    env::var_os("PATH").is_some_and(|paths| {
+        env::split_paths(&paths).any(|dir| dir.join(tool).is_file())
+    })
 }
 
 #[cfg(test)]
@@ -536,7 +751,7 @@ mod tests {
 
     #[test]
     fn mirrors_every_fast_suite_job() {
-        let steps = steps(Some("abc123"), Some("feat/thing"));
+        let steps = steps(Some("abc123"), Some("feat/thing"), None);
         let names = names(&steps);
         for expected in [
             "Rust format",
@@ -544,6 +759,7 @@ mod tests {
             "Rust tests",
             "Web lint",
             "REUSE headers",
+            "Workflow security (zizmor)",
             "Secrets",
             "Commit template and DCO sign-off",
             "Branch name",
@@ -553,8 +769,37 @@ mod tests {
     }
 
     #[test]
+    fn focused_runs_check_only_the_changed_crates_and_files() {
+        let tested = vec!["vellum-db".to_owned()];
+        let steps = steps(Some("abc"), None, Some(&tested));
+        let args = |name: &str| {
+            steps
+                .iter()
+                .find(|step| step.name == name)
+                .map(|step| step.args.clone())
+                .unwrap_or_default()
+        };
+        assert_eq!(args("Clippy")[..3], ["clippy", "-p", "vellum-db"]);
+        assert!(
+            args("Clippy").ends_with(&["-D".to_owned(), "warnings".to_owned()])
+        );
+        assert_eq!(args("Rust docs")[..3], ["doc", "-p", "vellum-db"]);
+        assert!(args("Web tests").contains(&"--changed=abc".to_owned()));
+
+        let full = steps_full();
+        assert!(full.iter().any(|s| s.name == "Clippy"
+            && s.args.contains(&"--workspace".to_owned())));
+        assert!(full.iter().any(|s| s.name == "Web tests"
+            && s.args.contains(&"test:coverage".to_owned())));
+    }
+
+    fn steps_full() -> Vec<Step> {
+        steps(Some("abc"), None, None)
+    }
+
+    #[test]
     fn commit_checks_need_a_base() {
-        let names = names(&steps(None, None));
+        let names = names(&steps(None, None, None));
         assert!(!names.contains(&"Commit template and DCO sign-off"));
         assert!(!names.contains(&"Secrets"));
         assert!(!names.contains(&"Branch name"));
@@ -563,13 +808,16 @@ mod tests {
     #[test]
     fn long_lived_branches_skip_the_name_check() {
         for branch in ["develop", "main"] {
-            assert!(!names(&steps(Some("abc"), Some(branch))).contains(&"Branch name"));
+            assert!(
+                !names(&steps(Some("abc"), Some(branch), None))
+                    .contains(&"Branch name")
+            );
         }
     }
 
     #[test]
     fn commit_check_spans_base_to_head() {
-        let steps = steps(Some("abc123"), None);
+        let steps = steps(Some("abc123"), None, None);
         let commits = steps
             .iter()
             .find(|step| step.name == "Commit template and DCO sign-off")
@@ -580,11 +828,12 @@ mod tests {
     #[test]
     fn areas_follow_the_script_output() {
         assert_eq!(
-            Areas::parse("rust=false\nweb=true\ndesktop=false\n"),
+            Areas::parse("rust=false\nweb=true\ndesktop=false\nui=false\n"),
             Areas {
                 rust: false,
                 web: true,
-                desktop: false
+                desktop: false,
+                ui: false,
             }
         );
         assert_eq!(Areas::parse(""), Areas::ALL);
@@ -592,17 +841,21 @@ mod tests {
 
     #[test]
     fn rust_and_web_steps_are_tagged() {
-        let steps = steps(Some("abc"), None);
-        let area = |name: &str| steps.iter().find(|step| step.name == name).map(|s| s.area);
+        let steps = steps(Some("abc"), None, None);
+        let area = |name: &str| {
+            steps.iter().find(|step| step.name == name).map(|s| s.area)
+        };
         assert_eq!(area("Clippy"), Some(Area::Rust));
         assert_eq!(area("Rust tests"), Some(Area::Rust));
         assert_eq!(area("Web lint"), Some(Area::Web));
         assert_eq!(area("Prose (Vale)"), Some(Area::Any));
         assert_eq!(area("Desktop lint"), Some(Area::Desktop));
+        assert_eq!(area("UI layout (quick)"), Some(Area::Ui));
         let docs_only = Areas {
             rust: false,
             web: false,
             desktop: false,
+            ui: false,
         };
         assert!(!docs_only.includes(Area::Rust));
         assert!(docs_only.includes(Area::Any));
@@ -615,10 +868,48 @@ mod tests {
     }
 
     #[test]
+    fn missing_tools_fail_unless_allowed() {
+        assert_eq!(missing_tool(false), Outcome::Missing);
+        assert_eq!(missing_tool(true), Outcome::Skipped);
+    }
+
+    #[test]
+    fn rust_tests_cover_only_the_changed_crates() {
+        let all = rust_tests(true, None);
+        assert!(all.args.contains(&"--workspace".to_owned()));
+        let some = rust_tests(true, Some(&["vellum-db".to_owned()]));
+        assert_eq!(some.args[..4], ["nextest", "run", "-p", "vellum-db"]);
+        assert!(!some.args.contains(&"--workspace".to_owned()));
+        assert!(rust_tests(true, Some(&[])).not_needed);
+    }
+
+    #[test]
+    fn changed_paths_map_to_their_crates() {
+        let crates = [
+            ("vellum-db".to_owned(), "crates/vellum-db".to_owned()),
+            ("vellum-dbx".to_owned(), "crates/vellum-dbx".to_owned()),
+            ("xtask".to_owned(), "xtask".to_owned()),
+            ("inner".to_owned(), "crates/vellum-db/inner".to_owned()),
+        ];
+        let paths = [
+            "crates/vellum-db/src/lib.rs",
+            "crates/vellum-db/tests/it/jobs.rs",
+            "crates/vellum-db/inner/src/lib.rs",
+            "xtask/src/fast.rs",
+            "Cargo.lock",
+            "docs/adr/0048-x.md",
+        ];
+        assert_eq!(
+            packages_for(paths, &crates),
+            ["inner", "vellum-db", "xtask"]
+        );
+    }
+
+    #[test]
     fn rust_tests_leave_out_container_tests_only_without_docker() {
-        let with = rust_tests(true);
+        let with = rust_tests(true, None);
         assert!(!with.args.iter().any(|arg| arg == "-E"));
-        let without = rust_tests(false);
+        let without = rust_tests(false, None);
         assert_eq!(
             without.args[without.args.len() - 2..],
             ["-E".to_owned(), format!("not ({DOCKER_TESTS})")]
@@ -628,8 +919,14 @@ mod tests {
     #[test]
     fn the_last_changed_path_counts() {
         // `git diff` output is trimmed, so the last path has no newline.
-        let root = repo_root().expect("inside the repository");
-        let output = Command::new(root.join("scripts/ci/changed-areas.sh"))
+        // The root comes from Cargo, not git: in a container, git can
+        // refuse a mounted checkout or a worktree whose `.git` points to a
+        // host path.
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .expect("xtask sits in the repository root");
+        let output = Command::new("bash")
+            .arg(root.join("scripts/ci/changed-areas.sh"))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .spawn()

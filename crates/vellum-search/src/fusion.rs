@@ -73,7 +73,8 @@ mod tests {
 
     #[test]
     fn an_item_in_both_lists_beats_one_in_a_single_list() {
-        let fused = fuse(&[ranked(&["a", "b", "c"], 1.0), ranked(&["c", "d"], 1.0)]);
+        let fused =
+            fuse(&[ranked(&["a", "b", "c"], 1.0), ranked(&["c", "d"], 1.0)]);
         let order: Vec<_> = fused.iter().map(|(item, _)| *item).collect();
         assert_eq!(order, ["c", "a", "b", "d"]);
     }

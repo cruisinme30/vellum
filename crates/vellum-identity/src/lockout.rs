@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 use sha2::{Digest as _, Sha256};
 use vellum_kernel::Timestamp;
-use vellum_security::rate::Lockout;
+use vellum_security::rate::{Lockout, client_bucket};
 
 use crate::store::{Attempts, Store};
 
@@ -45,14 +45,15 @@ impl Key<'_> {
     fn id(self) -> String {
         let text = match self {
             Self::Email(email) => format!("email:{email}"),
-            Self::Ip(ip) => format!("ip:{ip}"),
+            Self::Ip(ip) => format!("ip:{}", client_bucket(ip)),
         };
-        Sha256::digest(text.as_bytes())
-            .iter()
-            .fold(String::with_capacity(64), |mut hex, b| {
+        Sha256::digest(text.as_bytes()).iter().fold(
+            String::with_capacity(64),
+            |mut hex, b| {
                 let _ = write!(hex, "{b:02x}");
                 hex
-            })
+            },
+        )
     }
 }
 
@@ -86,7 +87,12 @@ impl Lockouts {
     }
 
     /// Whether `key` may try now; otherwise how long until it may.
-    pub fn check(&self, store: &Store, key: Key<'_>, now: Instant) -> Result<(), Duration> {
+    pub fn check(
+        &self,
+        store: &Store,
+        key: Key<'_>,
+        now: Instant,
+    ) -> Result<(), Duration> {
         if store.is_shared() {
             let id = key.id();
             let until = store.read(|s| s.lockouts.get(&id).map(|a| a.until));
@@ -100,7 +106,7 @@ impl Lockouts {
         }
         match key {
             Key::Email(email) => self.email.check(&email.to_owned(), now),
-            Key::Ip(ip) => self.ip.check(&ip, now),
+            Key::Ip(ip) => self.ip.check(&client_bucket(ip), now),
         }
         .map_err(|l| l.retry_after)
     }
@@ -135,7 +141,7 @@ impl Lockouts {
         }
         let _ = match key {
             Key::Email(email) => self.email.fail(&email.to_owned(), now),
-            Key::Ip(ip) => self.ip.fail(&ip, now),
+            Key::Ip(ip) => self.ip.fail(&client_bucket(ip), now),
         };
     }
 
@@ -151,7 +157,7 @@ impl Lockouts {
         }
         match key {
             Key::Email(email) => self.email.succeed(&email.to_owned()),
-            Key::Ip(ip) => self.ip.succeed(&ip),
+            Key::Ip(ip) => self.ip.succeed(&client_bucket(ip)),
         }
     }
 }
@@ -174,5 +180,26 @@ mod tests {
         assert_eq!(id.len(), 64);
         assert!(!id.contains("priya"));
         assert_ne!(id, Key::Ip("10.0.0.1".parse().unwrap()).id());
+    }
+
+    /// Red team round 4: rotating addresses inside one `IPv6` `/64` must not
+    /// reset the IP lockout.
+    #[test]
+    fn an_ipv6_client_is_locked_out_across_its_slash_64() {
+        let lockouts = Lockouts::new();
+        let store = Store::memory();
+        let now = Instant::now();
+        for n in 0..=IP_FREE {
+            let ip = format!("2001:db8:7:7::{n:x}").parse().unwrap();
+            lockouts.fail(&store, Key::Ip(ip), now);
+        }
+        let fresh = "2001:db8:7:7:dead:beef::1".parse().unwrap();
+        assert!(lockouts.check(&store, Key::Ip(fresh), now).is_err());
+        let neighbour = "2001:db8:7:8::1".parse().unwrap();
+        assert!(lockouts.check(&store, Key::Ip(neighbour), now).is_ok());
+        assert_eq!(
+            Key::Ip("2001:db8:7:7::1".parse().unwrap()).id(),
+            Key::Ip("2001:db8:7:7::2".parse().unwrap()).id()
+        );
     }
 }

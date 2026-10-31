@@ -125,19 +125,6 @@
   inset-inline-start: 76px;
 }
 
-.vl-theme-settings fieldset {
-  display: grid;
-  gap: 4px;
-  margin: 0 0 12px;
-  padding: 0;
-  border: 0;
-}
-
-.vl-theme-settings legend {
-  margin-bottom: 4px;
-  font-weight: 500;
-}
-
 .vl-radio {
   display: flex;
   align-items: center;
@@ -285,6 +272,22 @@
   box-shadow: 0 2px 6px rgb(0 0 0 / 20%);
 }
 
+/* The New menu (D323): from the rail it opens beside the button, from the
+   bottom bar above it, so it stays on screen. */
+.vl-new-anchor {
+  display: grid;
+}
+
+.vl-rail .vl-new-menu {
+  inset-inline: 0 auto;
+}
+
+.vl-bottom-bar .vl-new-menu {
+  top: auto;
+  bottom: 100%;
+  inset-inline: 0 auto;
+}
+
 .vl-menu [role="menuitem"] {
   display: flex;
   align-items: center;
@@ -358,6 +361,39 @@
   font-weight: 400;
 }
 
+/* A screen's title and its contextual help link (ADR 0024, D256). */
+.vl-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.vl-title-row h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.vl-help-link {
+  flex: none;
+}
+
+.vl-guides {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-guides a {
+  display: block;
+  padding: 16px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 16px;
+  font-weight: 500;
+}
+
 .vl-page-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -409,6 +445,53 @@
   min-height: 56px;
   border-radius: var(--vl-radius-l);
   font-size: 1rem;
+}
+
+.vl-search-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: end;
+  max-width: 720px;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.vl-search-filters legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.vl-search-filters label {
+  display: grid;
+  gap: 2px;
+  font-size: 0.875rem;
+}
+
+.vl-search-filters label:has(input[type="checkbox"]) {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 40px;
+}
+
+.vl-search-filters select {
+  min-height: 40px;
+  max-width: 100%;
+}
+
+/* Matched words in search results and the ⌘K menu. */
+.vl-page-list mark,
+.command-menu mark {
+  border-radius: 2px;
+  background: var(--md-primary-container, Mark);
+  color: var(--md-on-primary-container, MarkText);
+  font-weight: 600;
 }
 
 .vl-shortcuts div {
@@ -495,6 +578,11 @@ kbd {
   color: var(--md-on-surface);
 }
 
+/* A long status name wraps inside its chip instead of widening the page. */
+.vl-page-props .vl-chip {
+  white-space: normal;
+}
+
 .vl-status-verified {
   background: var(--md-callout-good-bg);
   color: var(--md-callout-good);
@@ -534,6 +622,19 @@ kbd {
 
 /* Phones: a bottom bar and a "More" sheet replace the rail and sidebar. */
 @media (max-width: 599.98px) {
+  /*
+   * The fixed bottom bar covers the bottom of the viewport, so a control
+   * scrolled into view there (by Tab or find-in-page) would sit under it
+   * (WCAG 2.4.11). Scrolling keeps that much room free: the bar's fixed
+   * parts (72px), its label line at up to 1.7 line-height (1.275rem) and
+   * 8px for the focus ring.
+   */
+  :root {
+    scroll-padding-block-end: calc(
+      80px + 1.275rem + env(safe-area-inset-bottom, 0px)
+    );
+  }
+
   .vl-shell {
     grid-template-columns: 1fr;
   }
@@ -619,15 +720,23 @@ kbd {
   padding: 0 24px;
 }
 
+/*
+ * Fixed tracks, not wrapping flex: on a phone the four pills only just fit
+ * one row, so the fallback font wrapped them and Roboto unwrapped them,
+ * shifting the page (CLS 0.25, D285). Two or four columns never depend on
+ * the font.
+ */
 .vl-home-shortcuts {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
   gap: 8px;
+  max-width: 40rem;
   margin: 0 0 16px;
 }
 
 .vl-home-shortcuts a {
   padding: 6px 16px;
+  text-align: center;
   border: 1px solid var(--md-outline-variant);
   border-radius: 999px;
   color: var(--md-primary);
@@ -638,4 +747,32 @@ kbd {
 .vl-home-shortcuts a:hover,
 .vl-home-shortcuts a:focus-visible {
   background: var(--md-surface-container);
+}
+
+/* Single sign-on above the password form, and the second sign-in step (issue
+   523). */
+.vl-auth-sso {
+  display: grid;
+  gap: 8px;
+  margin-top: 24px;
+}
+
+.vl-auth-sso .vl-filled-button {
+  justify-content: center;
+  text-decoration: none;
+}
+
+.vl-auth-or {
+  margin: 0;
+  text-align: center;
+}
+
+.vl-second-step {
+  display: grid;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.vl-second-step .vl-filled-button {
+  justify-content: center;
 }

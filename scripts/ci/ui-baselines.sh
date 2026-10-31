@@ -11,7 +11,8 @@
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-version="$(sed -n 's/.*"@playwright\/test": "^\{0,1\}\([0-9.]*\)".*/\1/p' "${root}/web/package.json")"
+version="$(sed -n 's/.*"@playwright\/test": "^\{0,1\}\([0-9.]*\)".*/\1/p' \
+  "${root}/web/package.json")"
 image="mcr.microsoft.com/playwright:v${version}-noble"
 
 # The container installs its own node_modules into a named volume, so the
@@ -20,4 +21,5 @@ docker run --rm --ipc=host \
   -v "${root}:/repo" -v vellum-ui-node-modules:/repo/web/node_modules \
   -w /repo/web -e HOME=/tmp -e CI= -e UI_VISUAL=1 -e UI_BROWSERS=chromium \
   "${image}" bash -c 'corepack enable && pnpm install --frozen-lockfile &&
-    pnpm exec playwright test e2e/ui/visual.spec.ts --update-snapshots "$@"' bash "$@"
+    pnpm exec playwright test e2e/ui/visual.spec.ts --update-snapshots "$@"' \
+  bash "$@"

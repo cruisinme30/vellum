@@ -55,7 +55,9 @@ export function createSaver(
 ): Saver {
   const idleMs = options.idleMs ?? IDLE_SAVE_MS;
   let status: SaveStatus = "saved";
-  /** Bumped by every local change, so a save knows whether it covered them all. */
+  /**
+   * Bumped by every local change, so a save knows whether it covered them all.
+   */
   let edits = 0;
   let timer: ReturnType<typeof setTimeout> | undefined;
   /** An object, so checks after an `await` are not narrowed away. */
@@ -84,7 +86,7 @@ export function createSaver(
 
   const canSave = () => {
     const state = live.getSnapshot();
-    return state.status === "online" && state.canWrite;
+    return state.status === "online" && state.canWrite === true;
   };
 
   /** Records how a save that covered `covered` edits ended. */
@@ -106,7 +108,12 @@ export function createSaver(
    * below schedules the version then.
    */
   const save = async (force = false) => {
-    if (life.disposed || status === "saving" || (status === "saved" && !force) || !canSave()) {
+    if (
+      life.disposed ||
+      status === "saving" ||
+      (status === "saved" && !force) ||
+      !canSave()
+    ) {
       return;
     }
     if (timer !== undefined) {

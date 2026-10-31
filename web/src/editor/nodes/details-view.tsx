@@ -1,14 +1,25 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { NodeViewContent, NodeViewWrapper, type ReactNodeViewProps } from "@tiptap/react";
+import {
+  NodeViewContent,
+  NodeViewWrapper,
+  type ReactNodeViewProps,
+} from "@tiptap/react";
 import { useId, useState } from "react";
 
 import { useT } from "../../i18n/i18n";
 import { Icon } from "../../shell/icon";
 
-/** `::: details`: collapsed by default; the open state is per viewer, never saved. */
-export function DetailsView({ node, updateAttributes, editor }: ReactNodeViewProps) {
+/**
+ * `::: details`: collapsed by default; the open state is per viewer, never
+ * saved.
+ */
+export function DetailsView({
+  node,
+  updateAttributes,
+  editor,
+}: ReactNodeViewProps) {
   const [open, setOpen] = useState(false);
   const t = useT();
   const bodyId = useId();

@@ -1,0 +1,156 @@
+/* SPDX-FileCopyrightText: 2026 The Vellum contributors */
+/* SPDX-License-Identifier: AGPL-3.0-only */
+
+/* The help reader at /guide (ADR 0024, D256): a bar, the book's contents
+   and the page. Colours come only from the --vl-* theme variables, so the
+   reader follows the system's light or dark preference. */
+
+body.vl-help {
+  margin: 0;
+  color: var(--vl-on-surface);
+  background: var(--vl-surface);
+  font:
+    16px / 1.6 Roboto,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+.vl-help a {
+  color: var(--vl-link);
+}
+.vl-help :focus-visible {
+  outline: 2px solid var(--vl-primary);
+  outline-offset: 2px;
+}
+.vl-help-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--vl-surface-container);
+  border-bottom: 1px solid var(--vl-outline-variant);
+}
+.vl-help-bar nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  padding: 12px 16px;
+}
+.vl-help-bar a {
+  text-decoration: none;
+  font-weight: 500;
+}
+.vl-help-bar a[aria-current] {
+  text-decoration: underline;
+  text-underline-offset: 0.3em;
+}
+.vl-help-home {
+  margin-right: auto;
+  color: var(--vl-on-surface) !important;
+}
+.vl-help-layout {
+  display: grid;
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+  gap: 32px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+}
+.vl-help-layout > main:only-child {
+  grid-column: 1 / -1;
+  max-width: 760px;
+}
+.vl-help-contents {
+  font-size: 0.9rem;
+  position: sticky;
+  top: 64px;
+  align-self: start;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+.vl-help-contents ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.vl-help-contents li {
+  margin: 2px 0;
+}
+.vl-help-contents .vl-help-part {
+  margin-top: 16px;
+  font-weight: 600;
+  color: var(--vl-on-surface-variant);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+.vl-help-contents .vl-help-nested {
+  padding-left: 14px;
+}
+.vl-help-contents a {
+  display: block;
+  padding: 4px 8px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--vl-on-surface);
+}
+.vl-help-contents a:hover {
+  background: var(--vl-surface-container-high);
+}
+.vl-help-contents a[aria-current="page"] {
+  background: var(--vl-primary-container);
+  color: var(--vl-on-primary-container);
+  font-weight: 500;
+}
+.vl-help main {
+  min-width: 0;
+}
+.vl-help-books {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.vl-help-books li {
+  padding: 16px;
+  border: 1px solid var(--vl-outline-variant);
+  border-radius: 16px;
+}
+.vl-help-books span {
+  color: var(--vl-on-surface-variant);
+  margin-left: 8px;
+}
+.vl-help-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 48px;
+  padding-top: 16px;
+  border-top: 1px solid var(--vl-outline-variant);
+  color: var(--vl-on-surface-variant);
+  font-size: 0.9rem;
+}
+@media (max-width: 760px) {
+  .vl-help-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  /* The page comes first on a phone, its book's contents after it. */
+  .vl-help-contents {
+    order: 2;
+    position: static;
+    max-height: none;
+    border-top: 1px solid var(--vl-outline-variant);
+    padding-top: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vl-help * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+}
+/* Long inline code, such as a path, wraps instead of widening the page. */
+.vl-help .vl-doc :not(pre) > code {
+  overflow-wrap: anywhere;
+}

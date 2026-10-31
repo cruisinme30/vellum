@@ -57,7 +57,12 @@ export const TRACE: Trace = {
     },
   ],
   client: [
-    { name: "navigation", start_us: -4000, duration_us: 20_000, attributes: [["page", "/p/{id}"]] },
+    {
+      name: "navigation",
+      start_us: -4000,
+      duration_us: 20_000,
+      attributes: [["page", "/p/{id}"]],
+    },
   ],
   dropped_spans: 2,
 };

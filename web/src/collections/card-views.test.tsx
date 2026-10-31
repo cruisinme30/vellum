@@ -11,7 +11,10 @@ import { COLLECTION } from "./mock-data";
 import type { QueryInput } from "./types";
 
 /** A store whose queries are changed on the way out. */
-function storeWith(change: (input: QueryInput) => Partial<QueryInput>, empty = false) {
+function storeWith(
+  change: (input: QueryInput) => Partial<QueryInput>,
+  empty = false,
+) {
   const collections = createMockCollectionsStore();
   const query = collections.query.bind(collections);
   vi.spyOn(collections, "query").mockImplementation(async (input) => {
@@ -28,11 +31,15 @@ describe("GalleryView", () => {
     const cards = within(gallery).getAllByRole("button");
     expect(cards).toHaveLength(8);
     const first = cards[0];
-    expect(first?.textContent).toMatch(/^TToken bucket per tenantStatusIn progressLabelsfeature/);
+    expect(first?.textContent).toMatch(
+      /^TToken bucket per tenantStatusIn progressLabelsfeature/,
+    );
     expect(first?.querySelectorAll(".vl-card-field")).toHaveLength(4);
     await user.click(cards[1] ?? gallery);
     expect(
-      await screen.findByRole("dialog", { name: "Gateway returns 502 on cold start" }),
+      await screen.findByRole("dialog", {
+        name: "Gateway returns 502 on cold start",
+      }),
     ).toBeDefined();
   });
 
@@ -51,7 +58,9 @@ describe("ListView", () => {
     const { user } = renderApp(`/data/${COLLECTION.issues}?view=Open`);
     const list = await screen.findByRole("region", { name: "Open" });
     const rows = within(list).getAllByRole("button");
-    expect(rows.map((row) => row.querySelector(".vl-card-title")?.textContent)).toEqual([
+    expect(
+      rows.map((row) => row.querySelector(".vl-card-title")?.textContent),
+    ).toEqual([
       "Replay protection for webhooks",
       "Token bucket per tenant",
       "Gateway returns 502 on cold start",
@@ -71,7 +80,9 @@ describe("ListView", () => {
       undefined,
       storeWith(() => ({ group: "status" })),
     );
-    expect(await screen.findByRole("heading", { level: 2, name: "Backlog" })).toBeDefined();
+    expect(
+      await screen.findByRole("heading", { level: 2, name: "Backlog" }),
+    ).toBeDefined();
     const progress = screen.getByRole("region", { name: "In progress" });
     expect(within(progress).getAllByRole("button")).toHaveLength(2);
   });

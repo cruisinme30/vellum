@@ -12,7 +12,9 @@ use async_trait::async_trait;
 use vellum_kernel::{Error, ErrorKind, Result};
 
 use crate::hub::RoomKey;
-use crate::ports::{DocumentFiles, MarkdownVersion, Seq, StoredUpdate, UpdateStore};
+use crate::ports::{
+    DocumentFiles, MarkdownVersion, Seq, StoredUpdate, UpdateStore,
+};
 
 /// An [`UpdateStore`] in a map. It can be told to fail, to exercise retries.
 #[derive(Debug, Default)]
@@ -94,7 +96,12 @@ impl UpdateStore for MemoryUpdateStore {
         Ok(empty)
     }
 
-    async fn compact(&self, room: RoomKey, through: Seq, merged: Vec<u8>) -> Result<()> {
+    async fn compact(
+        &self,
+        room: RoomKey,
+        through: Seq,
+        merged: Vec<u8>,
+    ) -> Result<()> {
         self.check()?;
         let mut logs = self.logs();
         let log = logs.entry(room).or_default();
@@ -160,7 +167,11 @@ impl DocumentFiles for MemoryFiles {
             .cloned())
     }
 
-    async fn write_version(&self, room: RoomKey, version: MarkdownVersion) -> Result<()> {
+    async fn write_version(
+        &self,
+        room: RoomKey,
+        version: MarkdownVersion,
+    ) -> Result<()> {
         self.files
             .lock()
             .unwrap_or_else(PoisonError::into_inner)

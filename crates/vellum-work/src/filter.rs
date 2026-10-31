@@ -101,13 +101,19 @@ pub enum Field {
     Blocked,
     /// The SLA risk (`gray`, `yellow`, `orange`, `red`); empty with no SLA.
     Sla,
+    /// How often the issue repeats (`2w`); empty when it does not (D313).
+    Repeat,
 }
 
 impl Field {
     const fn is_date(self) -> bool {
         matches!(
             self,
-            Self::Due | Self::Created | Self::Updated | Self::Started | Self::Completed
+            Self::Due
+                | Self::Created
+                | Self::Updated
+                | Self::Started
+                | Self::Completed
         )
     }
 }
@@ -275,7 +281,9 @@ fn check_condition(c: &Condition) -> Result<(), String> {
             Field::Estimate => v.parse::<f64>().is_ok(),
             Field::Blocked => matches!(v.as_str(), "true" | "false"),
             Field::Sla => Risk::from_name(v).is_some(),
-            _ if f.is_date() => v.starts_with("@today") || Date::parse(v, DATE).is_ok(),
+            _ if f.is_date() => {
+                v.starts_with("@today") || Date::parse(v, DATE).is_ok()
+            }
             _ => true,
         };
         if !ok {
@@ -329,15 +337,22 @@ fn extract(field: Field, issue: &Issue, ctx: &EvalContext<'_>) -> Vec<String> {
             .map(|c| c.as_str().to_owned())),
         Field::Priority => vec![issue.priority.name().to_owned()],
         Field::Estimate => opt(issue.estimate.map(|e| e.points().to_string())),
-        Field::Assignee => opt(issue.assignee.as_ref().map(ToString::to_string)),
+        Field::Assignee => {
+            opt(issue.assignee.as_ref().map(ToString::to_string))
+        }
         Field::Creator => opt(issue.creator.as_ref().map(ToString::to_string)),
-        Field::Subscriber => issue.subscribers.iter().map(ToString::to_string).collect(),
+        Field::Subscriber => {
+            issue.subscribers.iter().map(ToString::to_string).collect()
+        }
         Field::Label => issue.labels.clone(),
         Field::Project => opt(issue.project.as_ref().map(ToString::to_string)),
-        Field::Milestone => opt(issue.milestone.as_ref().map(ToString::to_string)),
+        Field::Milestone => {
+            opt(issue.milestone.as_ref().map(ToString::to_string))
+        }
         Field::Cycle => opt(issue.cycle.as_ref().map(ToString::to_string)),
         Field::Parent => opt(issue.parent.as_ref().map(ToString::to_string)),
         Field::Due => opt(issue.due.map(date_text)),
+        Field::Repeat => opt(issue.repeat.map(|r| r.to_string())),
         Field::Created => day(Some(issue.created_at)),
         Field::Updated => day(Some(issue.updated_at)),
         Field::Started => day(issue.started_at),
@@ -357,7 +372,12 @@ fn extract(field: Field, issue: &Issue, ctx: &EvalContext<'_>) -> Vec<String> {
 }
 
 /// Resolves `@me`, `@current` and priority numbers in a value list.
-fn resolve(field: Field, values: &[String], issue: &Issue, ctx: &EvalContext<'_>) -> Vec<String> {
+fn resolve(
+    field: Field,
+    values: &[String],
+    issue: &Issue,
+    ctx: &EvalContext<'_>,
+) -> Vec<String> {
     values
         .iter()
         .filter_map(|v| match (field, v.as_str()) {
@@ -366,7 +386,9 @@ fn resolve(field: Field, values: &[String], issue: &Issue, ctx: &EvalContext<'_>
                 .lookup
                 .current_cycle(&issue.team, ctx.today)
                 .map(|c| c.to_string()),
-            (Field::Priority, p) => Priority::from_name(p).map(|p| p.name().to_owned()),
+            (Field::Priority, p) => {
+                Priority::from_name(p).map(|p| p.name().to_owned())
+            }
             (Field::Team, t) => Some(t.to_ascii_uppercase()),
             _ => Some(v.clone()),
         })
@@ -392,7 +414,9 @@ fn eval(c: &Condition, issue: &Issue, ctx: &EvalContext<'_>) -> bool {
             found == (c.op == Op::Contains)
         }
         Op::Before | Op::After | Op::OnOrBefore | Op::OnOrAfter => {
-            let Some(bound) = values.first().and_then(|v| resolve_date(v, ctx.today)) else {
+            let Some(bound) =
+                values.first().and_then(|v| resolve_date(v, ctx.today))
+            else {
                 return false;
             };
             tokens
@@ -406,7 +430,9 @@ fn eval(c: &Condition, issue: &Issue, ctx: &EvalContext<'_>) -> bool {
                 })
         }
         Op::Lt | Op::Gt | Op::Lte | Op::Gte => {
-            let Some(bound) = values.first().and_then(|v| v.parse::<f64>().ok()) else {
+            let Some(bound) =
+                values.first().and_then(|v| v.parse::<f64>().ok())
+            else {
                 return false;
             };
             tokens
@@ -500,6 +526,7 @@ pub(crate) mod tests {
             c(Field::Blocked, Op::Is, &["true"]),
             c(Field::Team, Op::Is, &["eng"]),
             c(Field::Sla, Op::IsEmpty, &[]),
+            c(Field::Repeat, Op::IsEmpty, &[]),
         ];
         for f in &yes {
             f.check().unwrap();
@@ -511,10 +538,27 @@ pub(crate) mod tests {
             c(Field::Estimate, Op::Gt, &["3"]),
             c(Field::Due, Op::Before, &["@today"]),
             c(Field::Started, Op::IsNotEmpty, &[]),
+            c(Field::Repeat, Op::IsNotEmpty, &[]),
         ];
         for f in &no {
             assert!(!matches(f, "priya"), "{f:?}");
         }
+    }
+
+    #[test]
+    fn repeat_finds_recurring_issues() {
+        let me = UserRef::parse("dev").unwrap();
+        let ctx = EvalContext {
+            today: date!(2026 - 10 - 29),
+            now: datetime!(2026-10-29 12:00 UTC),
+            me: Some(&me),
+            lookup: &Fixed,
+        };
+        let mut i = issue();
+        i.repeat = Some("2w".parse().unwrap());
+        assert!(c(Field::Repeat, Op::IsNotEmpty, &[]).matches(&i, &ctx));
+        assert!(c(Field::Repeat, Op::Is, &["2w"]).matches(&i, &ctx));
+        assert!(!c(Field::Repeat, Op::Is, &["1w"]).matches(&i, &ctx));
     }
 
     #[test]
@@ -540,10 +584,14 @@ pub(crate) mod tests {
 
     #[test]
     fn filters_round_trip_through_yaml() {
-        let yaml = "and:\n- field: priority\n  op: is\n  values: [urgent]\n- or:\n  - field: assignee\n    op: is\n    values: ['@me']\n  - not:\n      field: project\n      op: is_empty\n";
+        let yaml = "and:\n- field: priority\n  op: is\n  values: [urgent]\n\
+            - or:\n  - field: assignee\n    op: is\n    values: ['@me']\n  - \
+            not:\n      field: project\n      op: is_empty\n";
         let f: Filter = serde_saphyr::from_str(yaml).unwrap();
         f.check().unwrap();
-        let back: Filter = serde_saphyr::from_str(&serde_saphyr::to_string(&f).unwrap()).unwrap();
+        let back: Filter =
+            serde_saphyr::from_str(&serde_saphyr::to_string(&f).unwrap())
+                .unwrap();
         assert_eq!(back, f);
     }
 

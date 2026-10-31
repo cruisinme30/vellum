@@ -32,9 +32,14 @@ impl RegisteredOp {
     ///
     /// The handler's error, or `unauthenticated`, `permission_denied`,
     /// `unavailable` (breaker open) or `timeout` from the checks.
-    pub async fn invoke(&self, ctx: RequestContext, input: Value) -> Result<Value, Error> {
+    pub async fn invoke(
+        &self,
+        ctx: RequestContext,
+        input: Value,
+    ) -> Result<Value, Error> {
         let op = &self.op;
-        let anonymous = ctx.principal.kind() == vellum_contracts::CredentialKind::Anonymous;
+        let anonymous =
+            ctx.principal.kind() == vellum_contracts::CredentialKind::Anonymous;
         if !(anonymous && op.allows_anonymous()) {
             ctx.principal.require_scope(op.scope())?;
         }
@@ -44,7 +49,10 @@ impl RegisteredOp {
         if !self.breaker.try_acquire(Instant::now()) {
             return Err(Error::new(
                 ErrorKind::Unavailable,
-                format!("the {} service is temporarily unavailable", self.service),
+                format!(
+                    "the {} service is temporarily unavailable",
+                    self.service
+                ),
             ));
         }
         let span = tracing::info_span!(
@@ -68,7 +76,8 @@ impl RegisteredOp {
                 ),
             ))
         });
-        let failed = result.as_ref().err().is_some_and(|e| is_failure(e.kind()));
+        let failed =
+            result.as_ref().err().is_some_and(|e| is_failure(e.kind()));
         self.breaker.record(!failed, Instant::now());
         result
     }
@@ -126,7 +135,10 @@ impl Registry {
     ///
     /// [`ErrorKind::Internal`] for an invalid operation, a duplicate service
     /// name, operation ID, `GraphQL` name or route.
-    pub fn new(services: Vec<Arc<dyn Service>>, policy: BreakerPolicy) -> Result<Self, Error> {
+    pub fn new(
+        services: Vec<Arc<dyn Service>>,
+        policy: BreakerPolicy,
+    ) -> Result<Self, Error> {
         let mut names = HashSet::new();
         let mut ids = HashSet::new();
         let mut graphql = HashSet::new();
@@ -143,7 +155,9 @@ impl Registry {
             let breaker = Arc::new(CircuitBreaker::new(policy));
             for op in Arc::clone(service).operations() {
                 op.validate(name)?;
-                if !ids.insert(op.id()) || !graphql.insert(graphql_name(op.id())) {
+                if !ids.insert(op.id())
+                    || !graphql.insert(graphql_name(op.id()))
+                {
                     return Err(Error::new(
                         ErrorKind::Internal,
                         format!("operation `{}` registered twice", op.id()),
@@ -153,7 +167,10 @@ impl Registry {
                 if let Some(other) = routes.insert(shape, op.id()) {
                     return Err(Error::new(
                         ErrorKind::Internal,
-                        format!("operations `{other}` and `{}` share a route", op.id()),
+                        format!(
+                            "operations `{other}` and `{}` share a route",
+                            op.id()
+                        ),
                     ));
                 }
                 ops.push(Arc::new(RegisteredOp {

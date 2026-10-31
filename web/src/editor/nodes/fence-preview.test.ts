@@ -7,7 +7,9 @@ import { keyValues, KROKI, parseChart, parseCsv } from "./fence-preview";
 
 describe("keyValues", () => {
   it("splits on the first colon and skips lines without a key", () => {
-    expect(keyValues("title: A: B\nno colon\n: empty key\n  type : bar ")).toEqual([
+    expect(
+      keyValues("title: A: B\nno colon\n: empty key\n  type : bar "),
+    ).toEqual([
       ["title", "A: B"],
       ["type", "bar"],
     ]);
@@ -17,8 +19,16 @@ describe("keyValues", () => {
 describe("parseChart", () => {
   it("reads labels and values options", () => {
     expect(
-      parseChart("title: Weekly\ntype: line\nlabels: [W1, W2]\nvalues: [1, 2.5]\nunit: ms"),
-    ).toEqual({ title: "Weekly", type: "line", labels: ["W1", "W2"], values: [1, 2.5] });
+      parseChart(
+        "title: Weekly\ntype: line\nlabels: [W1, W2]\nvalues: [1, " +
+          "2.5]\nunit: ms",
+      ),
+    ).toEqual({
+      title: "Weekly",
+      type: "line",
+      labels: ["W1", "W2"],
+      values: [1, 2.5],
+    });
   });
 
   it("turns pie-style lines into the series, defaulting to a bar chart", () => {
@@ -30,14 +40,21 @@ describe("parseChart", () => {
     });
   });
 
-  it("returns undefined without values or with a value that is not a number", () => {
-    expect(parseChart("title: Empty")).toBeUndefined();
-    expect(parseChart("values: [1, two]")).toBeUndefined();
-    expect(parseChart("values: []")).toBeUndefined();
-  });
+  it(
+    "returns undefined without values or with a value that is not a " +
+      "number",
+    () => {
+      expect(parseChart("title: Empty")).toBeUndefined();
+      expect(parseChart("values: [1, two]")).toBeUndefined();
+      expect(parseChart("values: []")).toBeUndefined();
+    },
+  );
 
   it("accepts lists without brackets", () => {
-    expect(parseChart("labels: a, b\nvalues: 3, 4")?.labels).toEqual(["a", "b"]);
+    expect(parseChart("labels: a, b\nvalues: 3, 4")?.labels).toEqual([
+      "a",
+      "b",
+    ]);
   });
 });
 

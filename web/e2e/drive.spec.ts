@@ -7,7 +7,7 @@
 import { AxeBuilder } from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-import { signedIn } from "./support/server-session";
+import { SAM, signedIn } from "./support/server-session";
 
 // Feature tests: once per browser, at laptop size. The UI suite covers sizes.
 // The offline worker is blocked: once it controls the page, WebKit and
@@ -19,18 +19,26 @@ test.use({
   isMobile: false,
   serviceWorkers: "block",
 });
-// eslint-disable-next-line no-empty-pattern -- Playwright needs the fixtures object
+// Playwright needs the fixtures object.
+// eslint-disable-next-line no-empty-pattern
 test.beforeEach(({}, testInfo) => {
-  test.skip(!testInfo.project.name.endsWith("-laptop"), "runs at laptop size only");
+  test.skip(
+    !testInfo.project.name.endsWith("-laptop"),
+    "runs at laptop size only",
+  );
 });
 
-test("the page tree comes from the server's drive and changes it", async ({ page }) => {
+test("the page tree comes from the server's drive and changes it", async ({
+  page,
+}) => {
   const drive = await signedIn(page);
   await page.goto("/");
   const tree = page.getByRole("tree");
   await expect(tree.getByRole("treeitem", { name: "Plans" })).toBeVisible();
   await expect(tree.getByRole("treeitem", { name: "Roadmap" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "My Drive" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "My Drive" }),
+  ).toBeVisible();
   const axe = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
     .analyze();
@@ -42,18 +50,24 @@ test("the page tree comes from the server's drive and changes it", async ({ page
   const title = page.getByRole("textbox", { name: "Page title" });
   await title.fill("Launch notes");
   await title.press("Enter");
-  await expect(tree.getByRole("treeitem", { name: "Launch notes" })).toBeVisible();
+  await expect(
+    tree.getByRole("treeitem", { name: "Launch notes" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Favorite" }).click();
   await expect(page.getByRole("button", { name: "Favorite" })).toHaveAttribute(
     "aria-pressed",
     "true",
   );
-  await expect.poll(() => drive.starred.has("01M6400000PAGE00NEW0000001")).toBe(true);
+  await expect
+    .poll(() => drive.starred.has("01M6400000PAGE00NEW0000001"))
+    .toBe(true);
 
   // A folder lists its pages.
   await tree.getByRole("treeitem", { name: "Plans" }).click();
   await expect(page.getByText("A folder. The pages in it:")).toBeVisible();
-  await expect(page.getByRole("main").getByRole("link", { name: /Roadmap/ })).toBeVisible();
+  await expect(
+    page.getByRole("main").getByRole("link", { name: /Roadmap/ }),
+  ).toBeVisible();
 
   // Search asks the server.
   await page.goto("/search?q=road");
@@ -61,7 +75,9 @@ test("the page tree comes from the server's drive and changes it", async ({ page
 
   // After a reload everything comes back from the server.
   await page.goto("/favorites");
-  await expect(page.getByRole("main").getByRole("link", { name: /Launch notes/ })).toBeVisible();
+  await expect(
+    page.getByRole("main").getByRole("link", { name: /Launch notes/ }),
+  ).toBeVisible();
   expect(drive.changes).toEqual([
     "POST /spaces/01M6400000SPACE0MYDRIVE001/pages",
     "PATCH /items/01M6400000PAGE00NEW0000001",
@@ -93,4 +109,23 @@ test("a change the server refuses is undone and says why", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Move to trash" }).click();
   await expect(tree.getByRole("treeitem", { name: "Plans" })).toHaveCount(0);
   expect(drive.items.map((item) => item.title)).toEqual(["Roadmap"]);
+});
+
+test("a page shared on its own opens from Shared with me", async ({ page }) => {
+  // #567: the page screen looked only in the person's own trees, so a page
+  // shared with them from someone else's drive "did not exist".
+  await signedIn(page, SAM);
+  await page.goto("/drive/shared-with-me");
+  await page.getByRole("link", { name: "Launch plan Q1" }).click();
+  await expect(page).toHaveURL(/\/p\/01M6400000PAGE00LAUNCHQ101$/);
+  await expect(page.getByRole("textbox", { name: "Page title" })).toHaveValue(
+    "Launch plan Q1",
+  );
+  await expect(
+    page.getByRole("heading", { name: "This page does not exist" }),
+  ).toHaveCount(0);
+  // It is not added to the person's own trees.
+  await expect(
+    page.getByRole("tree").getByRole("treeitem", { name: "Launch plan Q1" }),
+  ).toHaveCount(0);
 });

@@ -3,7 +3,12 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { newRequestId, newTraceparent, setTelemetrySink, telemetry } from "./telemetry";
+import {
+  newRequestId,
+  newTraceparent,
+  setTelemetrySink,
+  telemetry,
+} from "./telemetry";
 
 describe("telemetry", () => {
   it("defaults to performance measures and swaps sinks", () => {

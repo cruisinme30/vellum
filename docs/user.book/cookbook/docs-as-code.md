@@ -21,11 +21,17 @@ flowchart LR
 
 ## Steps
 
-1. Create a shared drive "Product docs" and choose **Git** as its storage. Give it the repository URL and a deploy key; Vellum clones it.
-2. Create a book "Gateway guide" in the drive. Vellum writes `gateway-guide.book/` with `book.yaml` and `SUMMARY.md` into the repository.
-3. Write in Vellum. Each batch of saves becomes a commit by the person who made it.
-4. Engineers edit the same files in their editor and open pull requests. When a pull request merges, Vellum pulls and merges the change into the book; a clash becomes a conflict copy, never a lost edit.
-5. Add CI that runs markdownlint and Vale on the book and builds it with `mdbook build`.
+1. Create a shared drive "Product docs" and choose **Git** as its storage. Give
+   it the repository URL and a deploy key; Vellum clones it.
+2. Create a book "Gateway guide" in the drive. Vellum writes
+   `gateway-guide.book/` with `book.yaml` and `SUMMARY.md` into the repository.
+3. Write in Vellum. Each batch of saves becomes a commit by the person who made
+   it.
+4. Engineers edit the same files in their editor and open pull requests. When a
+   pull request merges, Vellum pulls and merges the change into the book; a
+   clash becomes a conflict copy, never a lost edit.
+5. Add CI that runs markdownlint and Vale on the book and builds it with `mdbook
+   build`.
 6. Publish the site from CI, or from **⋯ → Publish** in Vellum.
 
 ## The CI job

@@ -16,7 +16,7 @@ use crate::scale::EstimateScale;
 use crate::sla::SlaPolicy;
 use crate::template::Template;
 use crate::triage::TriageRule;
-use crate::workflow::Workflow;
+use crate::workflow::{StatusKey, Workflow};
 
 /// A team's key prefix, such as `ENG`.
 ///
@@ -111,6 +111,46 @@ impl Default for EstimateSettings {
     }
 }
 
+/// Which status each Git moment moves an issue to.
+///
+/// This is `git:` in `team.yaml` (R-WK-10). A moment left out does not move
+/// issues. When the whole block is absent, the integration's own mapping or
+/// its default applies.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GitMapping {
+    /// A branch naming the issue is pushed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch_pushed: Option<StatusKey>,
+    /// A pull request naming the issue is opened.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_opened: Option<StatusKey>,
+    /// Every open pull request is approved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_approved: Option<StatusKey>,
+    /// The closing pull request merged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_merged: Option<StatusKey>,
+    /// A pull request closed without merging.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_closed_unmerged: Option<StatusKey>,
+}
+
+impl GitMapping {
+    /// Every mapped status, with the moment's name.
+    pub fn statuses(&self) -> impl Iterator<Item = (&'static str, &StatusKey)> {
+        [
+            ("branch_pushed", &self.branch_pushed),
+            ("pr_opened", &self.pr_opened),
+            ("pr_approved", &self.pr_approved),
+            ("pr_merged", &self.pr_merged),
+            ("pr_closed_unmerged", &self.pr_closed_unmerged),
+        ]
+        .into_iter()
+        .filter_map(|(name, status)| status.as_ref().map(|s| (name, s)))
+    }
+}
+
 /// A team and everything it owns, stored as `teams/KEY/team.yaml`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -161,6 +201,13 @@ pub struct Team {
     /// Intake forms that let anyone file a well-formed triage issue.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub forms: Vec<crate::intake::IntakeForm>,
+    /// The Git automation mapping; `None` leaves it to the integration.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git: Option<GitMapping>,
+    /// An archived team keeps its issues, keys and history, readable as
+    /// before, but takes no new issues and leaves team lists (D303).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub archived: bool,
 }
 
 fn utc() -> String {
@@ -178,7 +225,11 @@ impl Team {
     /// # Errors
     ///
     /// Never in practice; the standard workflow is valid.
-    pub fn new(id: TeamId, key: TeamKey, name: &str) -> Result<Self, WorkError> {
+    pub fn new(
+        id: TeamId,
+        key: TeamKey,
+        name: &str,
+    ) -> Result<Self, WorkError> {
         Ok(Self {
             id,
             key,
@@ -196,6 +247,8 @@ impl Team {
             labels: Vec::new(),
             templates: Vec::new(),
             forms: Vec::new(),
+            git: None,
+            archived: false,
         })
     }
 
@@ -216,7 +269,8 @@ impl Team {
             reason,
         };
         self.workflow.check().map_err(fail)?;
-        let has_triage = self.workflow.first_in(crate::Category::Triage).is_some();
+        let has_triage =
+            self.workflow.first_in(crate::Category::Triage).is_some();
         if self.triage && !has_triage {
             return Err(fail(
                 "triage is on but the workflow has no triage status".to_owned(),
@@ -225,6 +279,13 @@ impl Team {
         if let Some(c) = &self.cycles {
             c.check().map_err(|r| fail(r.to_owned()))?;
         }
+        for (moment, status) in self.git.iter().flat_map(GitMapping::statuses) {
+            if self.workflow.get(status).is_none() {
+                return Err(fail(format!(
+                    "git {moment} names unknown status {status}"
+                )));
+            }
+        }
         for (i, l) in self.labels.iter().enumerate() {
             if self.labels.iter().skip(i + 1).any(|m| m.same_name(l)) {
                 return Err(fail(format!("label {} is defined twice", l.name)));
@@ -232,7 +293,10 @@ impl Team {
         }
         for (i, t) in self.templates.iter().enumerate() {
             if self.templates.iter().skip(i + 1).any(|u| u.name == t.name) {
-                return Err(fail(format!("template {} is defined twice", t.name)));
+                return Err(fail(format!(
+                    "template {} is defined twice",
+                    t.name
+                )));
             }
         }
         for (i, f) in self.forms.iter().enumerate() {
@@ -258,10 +322,11 @@ impl Team {
     /// Returns [`WorkError::File`] if the YAML is malformed, and the
     /// [`Team::check`] error if the settings break a rule.
     pub fn from_yaml(path: &str, text: &str) -> Result<Self, WorkError> {
-        let team: Self = serde_saphyr::from_str(text).map_err(|e| WorkError::File {
-            path: path.to_owned(),
-            reason: e.to_string(),
-        })?;
+        let team: Self =
+            serde_saphyr::from_str(text).map_err(|e| WorkError::File {
+                path: path.to_owned(),
+                reason: e.to_string(),
+            })?;
         team.check()?;
         Ok(team)
     }
@@ -320,6 +385,16 @@ mod tests {
         assert!(t.check().is_err());
         t.triage = false;
         t.check().unwrap();
+    }
+
+    #[test]
+    fn archived_is_written_only_when_set() {
+        let mut t = team();
+        assert!(!t.to_yaml().unwrap().contains("archived"));
+        t.archived = true;
+        let yaml = t.to_yaml().unwrap();
+        assert!(yaml.contains("archived: true"));
+        assert!(Team::from_yaml("t", &yaml).unwrap().archived);
     }
 
     #[test]

@@ -20,7 +20,8 @@ function fakeUpdater(result: () => Promise<unknown>) {
   return {
     check,
     updater: updater as Updater & typeof updater,
-    emit: (event: string, value: unknown) => listeners.get(event)?.(value as never),
+    emit: (event: string, value: unknown) =>
+      listeners.get(event)?.(value as never),
   };
 }
 

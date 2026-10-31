@@ -4,11 +4,16 @@
 import { useId, useState, type ReactNode } from "react";
 import { Navigate, useNavigate, useSearchParams } from "react-router";
 
+import { SecondStepRequired } from "../api/auth";
 import { ApiError } from "../api/http";
 import { safeNext, useSession } from "../api/session";
 import { useT } from "../i18n/i18n";
 
-/** What a failed request says, with the request ID to quote when reporting it. */
+import { SecondStep } from "./second-step";
+
+/**
+ * What a failed request says, with the request ID to quote when reporting it.
+ */
 export function describeError(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
     return error.requestId === undefined
@@ -85,24 +90,27 @@ function Field({
 function useSubmit(fallback: string) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | undefined>();
-  const submit = (run: () => Promise<void>) => (event: { preventDefault(): void }) => {
-    event.preventDefault();
-    setBusy(true);
-    setError(undefined);
-    run().then(
-      () => {
-        setBusy(false);
-      },
-      (error_: unknown) => {
-        setBusy(false);
-        setError(describeError(error_, fallback));
-      },
-    );
-  };
+  const submit =
+    (run: () => Promise<void>) => (event: { preventDefault(): void }) => {
+      event.preventDefault();
+      setBusy(true);
+      setError(undefined);
+      run().then(
+        () => {
+          setBusy(false);
+        },
+        (error_: unknown) => {
+          setBusy(false);
+          setError(describeError(error_, fallback));
+        },
+      );
+    };
   return { busy, error, submit };
 }
 
-/** `/sign-in?next=…`: the server sends people here when they need to sign in. */
+/**
+ * `/sign-in?next=…`: the server sends people here when they need to sign in.
+ */
 export function SignInView() {
   const t = useT();
   const session = useSession();
@@ -111,21 +119,84 @@ export function SignInView() {
   const next = safeNext(parameters.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [step, setStep] = useState<SecondStepRequired>();
   const { busy, error, submit } = useSubmit(t("auth-error"));
 
   if (session === undefined) return <Navigate to="/" replace />;
   if (session.status.needsSetup) return <Navigate to="/setup" replace />;
 
-  const onSubmit = submit(async () => {
-    await session.auth.signIn(email, password);
+  const signedIn = async () => {
     await session.refresh();
     // A server-side page (an app asking for consent) needs a full load.
     if (next.startsWith("/oauth/")) globalThis.location.assign(next);
     else void navigate(next, { replace: true });
+  };
+  const onSubmit = submit(async () => {
+    try {
+      await session.auth.signIn(email, password);
+    } catch (error_) {
+      if (
+        error_ instanceof SecondStepRequired &&
+        session.auth.steps !== undefined
+      ) {
+        setPassword("");
+        setStep(error_);
+        return;
+      }
+      throw error_;
+    }
+    await signedIn();
   });
 
+  if (step !== undefined && session.auth.steps !== undefined) {
+    return (
+      <AuthCard
+        title={
+          step.step === "verify"
+            ? t("second-step-title")
+            : t("second-step-enrol-title")
+        }
+        intro={
+          step.step === "verify"
+            ? t("second-step-intro")
+            : t("second-step-enrol-intro")
+        }
+      >
+        <SecondStep
+          step={step}
+          steps={session.auth.steps}
+          onSignedIn={signedIn}
+          onStartOver={() => {
+            setStep(undefined);
+          }}
+        />
+      </AuthCard>
+    );
+  }
+
+  const sso = session.status.sso ?? undefined;
+  const buttons = session.status.providers ?? (sso === undefined ? [] : [sso]);
+  const query = new URLSearchParams({ next }).toString();
   return (
     <AuthCard title={t("sign-in-title")} intro={t("sign-in-intro")}>
+      {buttons.length > 0 && (
+        <div className="vl-auth-sso">
+          {buttons.map((button) => (
+            <a
+              key={button.id ?? button.startUrl}
+              className="vl-filled-button"
+              href={
+                button.startUrl +
+                (button.startUrl.includes("?") ? "&" : "?") +
+                query
+              }
+            >
+              {t("sign-in-sso", { name: button.name })}
+            </a>
+          ))}
+          <p className="vl-muted vl-auth-or">{t("sign-in-or")}</p>
+        </div>
+      )}
       <form className="vl-auth-form" onSubmit={onSubmit} aria-busy={busy}>
         <Field
           label={t("auth-email")}

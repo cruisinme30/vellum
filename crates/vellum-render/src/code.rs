@@ -19,7 +19,8 @@ use crate::html;
 const MAX_BYTES: usize = 256 * 1024;
 const MAX_LINES: usize = 5_000;
 
-static SYNTAXES: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
+static SYNTAXES: LazyLock<SyntaxSet> =
+    LazyLock::new(SyntaxSet::load_defaults_newlines);
 
 /// Loads the grammars now instead of on the first code block; servers call
 /// it at start-up so the first render meets its latency target.
@@ -50,7 +51,8 @@ pub fn parse_line_list(spec: &str) -> Vec<usize> {
     for part in spec.split(',') {
         let part = part.trim();
         let (a, b) = part.split_once('-').unwrap_or((part, part));
-        if let (Ok(a), Ok(b)) = (a.trim().parse::<usize>(), b.trim().parse::<usize>())
+        if let (Ok(a), Ok(b)) =
+            (a.trim().parse::<usize>(), b.trim().parse::<usize>())
             && a <= b
             && b - a <= MAX_LINES
         {
@@ -81,7 +83,9 @@ fn class_for_scope(scope: Scope) -> Option<&'static str> {
         "string"
     } else if starts("punctuation.definition.comment") || starts("comment") {
         "comment"
-    } else if starts("constant.numeric") || starts("constant.language") || starts("constant.other")
+    } else if starts("constant.numeric")
+        || starts("constant.language")
+        || starts("constant.other")
     {
         "number"
     } else if starts("entity.name.function")
@@ -117,8 +121,15 @@ fn class_for_scope(scope: Scope) -> Option<&'static str> {
 
 /// Writes highlighted code (the inside of `<code>`) for `lang`; unknown
 /// languages and oversized input are escaped plainly.
-pub fn highlight(out: &mut String, lang: &str, code: &str, options: &CodeOptions) {
-    let syntax = (!lang.is_empty() && code.len() <= MAX_BYTES && code.lines().count() <= MAX_LINES)
+pub fn highlight(
+    out: &mut String,
+    lang: &str,
+    code: &str,
+    options: &CodeOptions,
+) {
+    let syntax = (!lang.is_empty()
+        && code.len() <= MAX_BYTES
+        && code.lines().count() <= MAX_LINES)
         .then(|| SYNTAXES.find_syntax_by_token(lang))
         .flatten();
     let mut state = syntax.map(ParseState::new);
@@ -157,7 +168,11 @@ pub fn highlight(out: &mut String, lang: &str, code: &str, options: &CodeOptions
                     let _ = stack.apply(&op);
                 }
                 if pos < line.len() {
-                    token(out, class_for(&stack), line.get(pos..).unwrap_or_default());
+                    token(
+                        out,
+                        class_for(&stack),
+                        line.get(pos..).unwrap_or_default(),
+                    );
                 }
             }
             None => html::text(out, line),
@@ -230,7 +245,8 @@ mod tests {
         highlight(&mut out, "", "a\nb\n", &options);
         assert_eq!(
             out,
-            "<span class=\"vl-line\" data-line=\"1\">a</span><span class=\"vl-line vl-line-hl\" data-line=\"2\">b</span>"
+            "<span class=\"vl-line\" data-line=\"1\">a</span><span \
+                class=\"vl-line vl-line-hl\" data-line=\"2\">b</span>"
         );
     }
 

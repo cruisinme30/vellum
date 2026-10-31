@@ -3942,6 +3942,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20870f649af7073d53e38067b2a84312175d56ea15217e1b15bc83506ec50afb"
 
 [[package]]
+name = "lettre"
+version = "0.11.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2c646bd5cc763b1087b15493e29a64be6147ba8f19342004fa52048ee596eae"
+dependencies = [
+ "async-trait",
+ "base64 0.23.1",
+ "email_address",
+ "futures-io",
+ "futures-util",
+ "idna",
+ "nom 8.0.0",
+ "percent-encoding",
+ "rustls",
+ "rustls-platform-verifier",
+ "socket2",
+ "tokio",
+ "tokio-rustls",
+ "url",
+]
+
+[[package]]
 name = "levenshtein_automata"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5433,16 +5455,17 @@ dependencies = [
 
 [[package]]
 name = "proptest"
-version = "1.11.0"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b45fcc2344c680f5025fe57779faef368840d0bd1f42f216291f0dc4ace4744"
+checksum = "b8530004ccb15eae51c7e40009fbe317f341f804db54dc033eec1c50be28cfa0"
 dependencies = [
- "bit-set 0.8.0",
- "bit-vec 0.8.0",
+ "bit-set 0.11.1",
+ "bit-vec 0.10.1",
  "bitflags 2.13.2",
+ "chacha20",
+ "core_detect",
  "num-traits",
- "rand 0.9.5",
- "rand_chacha 0.9.0",
+ "rand 0.10.3",
  "rand_xorshift",
  "regex-syntax",
  "rusty-fork",
@@ -5516,6 +5539,12 @@ name = "pxfm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d55d956fa96f5ec02be2e13af0e20391a5aa83d6a074e3ad368959d0fab299ea"
+
+[[package]]
+name = "qrcodegen"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4339fc7a1021c9c1621d87f5e3505f2805c8c105420ba2f2a4df86814590c142"
 
 [[package]]
 name = "quick-error"
@@ -5718,11 +5747,11 @@ dependencies = [
 
 [[package]]
 name = "rand_xorshift"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "513962919efc330f829edb2535844d1b912b0fbe2ca165d613e4e8788bb05a5a"
+checksum = "60aa6af80be32871323012e02e6e65f8a7cc7890931ae421d217ad8fe0df2ccf"
 dependencies = [
- "rand_core 0.9.5",
+ "rand_core 0.10.1",
 ]
 
 [[package]]
@@ -8905,6 +8934,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "vellum-assist"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "schemars 1.2.3",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "url",
+ "vellum-contracts",
+ "vellum-kernel",
+ "vellum-security",
+]
+
+[[package]]
 name = "vellum-authz"
 version = "0.0.0"
 dependencies = [
@@ -8964,11 +9010,14 @@ dependencies = [
  "clap",
  "futures",
  "getrandom 0.4.3",
+ "hex",
  "hkdf 0.13.0",
  "hmac 0.13.0",
  "http",
  "http-body-util",
  "jiff",
+ "lettre",
+ "lru",
  "reqwest",
  "schemars 1.2.3",
  "serde",
@@ -8982,9 +9031,12 @@ dependencies = [
  "tower",
  "tracing",
  "url",
+ "uuid",
  "vellum-admin",
  "vellum-api",
+ "vellum-assist",
  "vellum-authz",
+ "vellum-books",
  "vellum-books-service",
  "vellum-collab",
  "vellum-collections",
@@ -8992,22 +9044,29 @@ dependencies = [
  "vellum-crypto",
  "vellum-db",
  "vellum-drive",
+ "vellum-e2e",
+ "vellum-export",
  "vellum-format",
  "vellum-help",
  "vellum-identity",
  "vellum-integrations",
+ "vellum-jobs",
  "vellum-kernel",
+ "vellum-kms",
  "vellum-mcp",
  "vellum-notify",
  "vellum-observe",
  "vellum-private",
  "vellum-render",
+ "vellum-sealed-store",
  "vellum-search",
  "vellum-security",
  "vellum-store",
  "vellum-tasks",
  "vellum-work",
  "vellum-work-service",
+ "zeroize",
+ "zip",
 ]
 
 [[package]]
@@ -9101,7 +9160,9 @@ dependencies = [
 name = "vellum-db"
 version = "0.0.0"
 dependencies = [
+ "futures-util",
  "libsqlite3-sys",
+ "openssl-sys",
  "serde",
  "serde-saphyr 2.0.0",
  "sha2 0.11.1",
@@ -9146,6 +9207,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "vellum-e2e"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "base64 0.23.1",
+ "bytes",
+ "futures",
+ "hex",
+ "schemars 1.2.3",
+ "serde",
+ "serde-saphyr 2.0.0",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "vellum-contracts",
+ "vellum-crypto",
+ "vellum-kernel",
+ "vellum-security",
+ "vellum-store",
+]
+
+[[package]]
 name = "vellum-export"
 version = "0.0.0"
 dependencies = [
@@ -9173,6 +9256,7 @@ dependencies = [
  "vellum-format",
  "vellum-jobs",
  "vellum-kernel",
+ "vellum-render",
  "zip",
 ]
 
@@ -9201,9 +9285,15 @@ dependencies = [
  "aws-lc-rs",
  "axum",
  "base64 0.23.1",
+ "ciborium",
+ "data-encoding",
+ "flate2",
  "getrandom 0.4.3",
  "http",
  "http-body-util",
+ "qrcodegen",
+ "rcgen",
+ "roxmltree 0.21.2",
  "schemars 1.2.3",
  "serde",
  "serde_json",
@@ -9220,6 +9310,7 @@ dependencies = [
  "vellum-db",
  "vellum-kernel",
  "vellum-security",
+ "x509-parser",
 ]
 
 [[package]]
@@ -9343,6 +9434,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "uuid",
  "vellum-contracts",
  "vellum-kernel",
  "vellum-security",
@@ -9399,6 +9491,7 @@ version = "0.0.0"
 dependencies = [
  "ammonia",
  "futures-util",
+ "imagesize",
  "material-colors",
  "merman",
  "proptest",
@@ -9462,6 +9555,7 @@ dependencies = [
  "vellum-db",
  "vellum-format",
  "vellum-kernel",
+ "vellum-search",
  "vellum-store",
  "zeroize",
 ]
@@ -9479,6 +9573,7 @@ dependencies = [
  "tracing",
  "url",
  "vellum-kernel",
+ "zip",
 ]
 
 [[package]]
@@ -9570,6 +9665,7 @@ version = "0.0.0"
 dependencies = [
  "bytes",
  "futures",
+ "jiff",
  "schemars 1.2.3",
  "serde",
  "serde_json",

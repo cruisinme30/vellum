@@ -9,10 +9,12 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use vellum_kernel::{Actor, ObjectId, SpaceId, Timestamp, UserId, VersionId};
 
+use crate::drive::AdminSpace;
 use crate::model::{
-    Activity, ActivityKind, Node, NodeKind, RetentionPolicy, Space, SpaceKind, SpaceSettings,
-    VersionRecord,
+    Activity, ActivityKind, Node, NodeKind, RetentionPolicy, Space, SpaceKind,
+    SpaceSettings, VersionRecord,
 };
+use crate::ports::SpaceRole;
 
 /// No input.
 #[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
@@ -46,7 +48,9 @@ pub struct VersionKey {
 }
 
 /// What kind of space.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum SpaceKindView {
     /// A team drive.
@@ -162,7 +166,9 @@ pub struct SpaceList {
 }
 
 /// What an item is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum NodeKindView {
     /// A folder.
@@ -360,14 +366,24 @@ impl From<&Activity> for ActivityView {
         let (kind, from, to) = match &a.kind {
             ActivityKind::Created => ("created", None, None),
             ActivityKind::Edited { .. } => ("edited", None, None),
-            ActivityKind::Renamed { from, to } => ("renamed", Some(from.clone()), Some(to.clone())),
-            ActivityKind::Moved { from, to } => ("moved", Some(from.clone()), Some(to.clone())),
-            ActivityKind::Copied { from } => ("copied", Some(from.to_string()), None),
+            ActivityKind::Renamed { from, to } => {
+                ("renamed", Some(from.clone()), Some(to.clone()))
+            }
+            ActivityKind::Moved { from, to } => {
+                ("moved", Some(from.clone()), Some(to.clone()))
+            }
+            ActivityKind::Copied { from } => {
+                ("copied", Some(from.to_string()), None)
+            }
             ActivityKind::Trashed => ("trashed", None, None),
             ActivityKind::Restored => ("restored", None, None),
             ActivityKind::Purged => ("purged", None, None),
-            ActivityKind::ConflictCopy { copy } => ("conflict_copy", None, Some(copy.to_string())),
-            ActivityKind::VersionRestored { .. } => ("version_restored", None, None),
+            ActivityKind::ConflictCopy { copy } => {
+                ("conflict_copy", None, Some(copy.to_string()))
+            }
+            ActivityKind::VersionRestored { .. } => {
+                ("version_restored", None, None)
+            }
         };
         Self {
             at: a.at,
@@ -643,4 +659,116 @@ pub struct Removed {
 pub struct Done {
     /// Always true.
     pub ok: bool,
+}
+
+/// A role on a whole space (ADR 0021, D242).
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum SpaceRoleView {
+    /// May view.
+    Viewer,
+    /// May view and comment.
+    Commenter,
+    /// May view, comment and edit.
+    Editor,
+    /// May also share, trash, purge and change settings.
+    Manager,
+    /// May also transfer ownership.
+    Owner,
+}
+
+impl From<SpaceRole> for SpaceRoleView {
+    fn from(role: SpaceRole) -> Self {
+        match role {
+            SpaceRole::Viewer => Self::Viewer,
+            SpaceRole::Commenter => Self::Commenter,
+            SpaceRole::Editor => Self::Editor,
+            SpaceRole::Manager => Self::Manager,
+            SpaceRole::Owner => Self::Owner,
+        }
+    }
+}
+
+impl From<SpaceRoleView> for SpaceRole {
+    fn from(role: SpaceRoleView) -> Self {
+        match role {
+            SpaceRoleView::Viewer => Self::Viewer,
+            SpaceRoleView::Commenter => Self::Commenter,
+            SpaceRoleView::Editor => Self::Editor,
+            SpaceRoleView::Manager => Self::Manager,
+            SpaceRoleView::Owner => Self::Owner,
+        }
+    }
+}
+
+/// A person with a role on a whole space.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct MemberView {
+    /// The person.
+    pub user_id: UserId,
+    /// Their role.
+    pub role: SpaceRoleView,
+}
+
+/// A space as the admin console shows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct AdminSpaceView {
+    /// The space, its owner and its settings.
+    pub space: SpaceView,
+    /// Bytes its pages, files, trash and versions use.
+    pub used_bytes: u64,
+    /// The people with a role on the whole space.
+    pub members: Vec<MemberView>,
+}
+
+impl From<AdminSpace> for AdminSpaceView {
+    fn from(a: AdminSpace) -> Self {
+        Self {
+            space: SpaceView::from(&a.space),
+            used_bytes: a.used,
+            members: a
+                .members
+                .into_iter()
+                .map(|m| MemberView {
+                    user_id: m.user,
+                    role: m.role.into(),
+                })
+                .collect(),
+        }
+    }
+}
+
+/// Every space, for the admin console.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct AdminSpaceList {
+    /// Shared drives first, then My Drives, each by name.
+    pub spaces: Vec<AdminSpaceView>,
+}
+
+/// A shared drive an administrator creates.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AdminCreateSpace {
+    /// The short name in its folder path: lowercase letters, digits and
+    /// dashes.
+    pub slug: String,
+    /// The display name.
+    pub name: String,
+    /// Who owns it.
+    pub owner_id: UserId,
+}
+
+/// Sets or removes a person's role on a shared drive.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SetMember {
+    /// The shared drive.
+    pub space_id: SpaceId,
+    /// The person.
+    pub user_id: UserId,
+    /// Their new role; absent or null removes them.
+    #[serde(default)]
+    pub role: Option<SpaceRoleView>,
 }

@@ -11,7 +11,8 @@ import {
   pushSupported,
 } from "./push";
 
-// The Push API answers null for "no subscription"; the lint rules forbid the literal.
+// The Push API answers null for "no subscription"; the lint rules forbid the
+// literal.
 const NULL = JSON.parse("null") as undefined;
 
 function subscription(endpoint = "https://push.example/1") {
@@ -36,9 +37,13 @@ function environment(options: {
   const fetchMock = vi.fn<typeof fetch>((input) => {
     const url = typeof input === "string" ? input : "";
     if (url.endsWith("/vapid-key")) {
-      return Promise.resolve(Response.json({ publicKey: options.vapid ?? "AQID-_8" }));
+      return Promise.resolve(
+        Response.json({ publicKey: options.vapid ?? "AQID-_8" }),
+      );
     }
-    return Promise.resolve(new Response(undefined, { status: options.status ?? 204 }));
+    return Promise.resolve(
+      new Response(undefined, { status: options.status ?? 204 }),
+    );
   });
   const pushEnvironment: PushEnvironment = {
     baseUrl: "https://northstar.dev",
@@ -54,40 +59,52 @@ describe("web push", () => {
     expect([...decodeBase64Url("AQID-_8")]).toEqual([1, 2, 3, 251, 255]);
   });
 
-  it("subscribes with the server's VAPID key and registers the subscription", async () => {
-    const { pushEnvironment, fetchMock, pushManager } = environment({});
-    expect(await enablePush(pushEnvironment)).toBe("enabled");
-    expect(pushManager.subscribe).toHaveBeenCalledWith({
-      userVisibleOnly: true,
-      applicationServerKey: decodeBase64Url("AQID-_8"),
-    });
-    const [url, init] = fetchMock.mock.calls[1] ?? [];
-    expect(url).toBe("https://northstar.dev/api/v1/push/subscriptions");
-    expect(init?.method).toBe("POST");
-    expect(JSON.parse(typeof init?.body === "string" ? init.body : "{}")).toMatchObject({
-      endpoint: "https://push.example/new",
-    });
-  });
+  it(
+    "subscribes with the server's VAPID key and registers the " +
+      "subscription",
+    async () => {
+      const { pushEnvironment, fetchMock, pushManager } = environment({});
+      expect(await enablePush(pushEnvironment)).toBe("enabled");
+      expect(pushManager.subscribe).toHaveBeenCalledWith({
+        userVisibleOnly: true,
+        applicationServerKey: decodeBase64Url("AQID-_8"),
+      });
+      const [url, init] = fetchMock.mock.calls[1] ?? [];
+      expect(url).toBe("https://northstar.dev/api/v1/push/subscriptions");
+      expect(init?.method).toBe("POST");
+      expect(
+        JSON.parse(typeof init?.body === "string" ? init.body : "{}"),
+      ).toMatchObject({
+        endpoint: "https://push.example/new",
+      });
+    },
+  );
 
   it("reuses an existing subscription", async () => {
-    const { pushEnvironment, pushManager, fetchMock } = environment({ existing: subscription() });
+    const { pushEnvironment, pushManager, fetchMock } = environment({
+      existing: subscription(),
+    });
     await enablePush(pushEnvironment);
     expect(pushManager.subscribe).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it("stops when permission is refused", async () => {
-    const { pushEnvironment, fetchMock } = environment({ permission: "denied" });
+    const { pushEnvironment, fetchMock } = environment({
+      permission: "denied",
+    });
     expect(await enablePush(pushEnvironment)).toBe("denied");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("fails on a missing key or a server error", async () => {
-    await expect(enablePush(environment({ vapid: 7 }).pushEnvironment)).rejects.toThrow(
-      "no VAPID key",
-    );
     await expect(
-      enablePush(environment({ existing: subscription(), status: 500 }).pushEnvironment),
+      enablePush(environment({ vapid: 7 }).pushEnvironment),
+    ).rejects.toThrow("no VAPID key");
+    await expect(
+      enablePush(
+        environment({ existing: subscription(), status: 500 }).pushEnvironment,
+      ),
     ).rejects.toThrow("HTTP 500");
   });
 
@@ -113,7 +130,11 @@ describe("web push", () => {
     const send = vi.fn(() => Promise.resolve());
     const withClient = { ...pushEnvironment, send };
     await enablePush(withClient);
-    expect(send).toHaveBeenCalledWith("POST", "/api/v1/push/subscriptions", existing.toJSON());
+    expect(send).toHaveBeenCalledWith(
+      "POST",
+      "/api/v1/push/subscriptions",
+      existing.toJSON(),
+    );
     await disablePush(withClient);
     expect(send).toHaveBeenLastCalledWith(
       "DELETE",

@@ -1,13 +1,21 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  use,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { telemetry } from "../platform/telemetry";
 
 import "./keyboard.css";
 
-import { CommandMenu } from "./command-menu";
+import { CommandMenu, type PageFinder } from "./command-menu";
 import { Keymap, type Command, type Scope } from "./keymap";
 import { currentPlatform, type KeyPlatform } from "./keys";
 import { ShortcutSheet } from "./shortcut-sheet";
@@ -19,6 +27,8 @@ export interface KeyboardRootProperties {
   /** Scopes in force besides `global`, such as `issues` on an issue list. */
   readonly scopes?: readonly Scope[];
   readonly platform?: KeyPlatform;
+  /** Page search in the ⌘K menu; commands only when absent. */
+  readonly pages?: PageFinder | undefined;
   readonly children?: ReactNode;
 }
 
@@ -26,6 +36,34 @@ type Open = "none" | "menu" | "sheet";
 
 const NO_COMMANDS: readonly Command[] = [];
 const NO_SCOPES: readonly Scope[] = [];
+
+/** What the current screen adds to the keyboard model. */
+interface ScreenKeys {
+  readonly commands: readonly Command[];
+  readonly scopes: readonly Scope[];
+}
+
+const ScreenKeysContext = createContext<
+  ((keys: ScreenKeys | undefined) => void) | undefined
+>(undefined);
+
+/**
+ * Lets the mounted screen add its commands and scopes (such as `issues` on
+ * an issue list) while it is shown. Pass memoised arrays.
+ */
+export function useScreenCommands(
+  commands: readonly Command[],
+  scopes: readonly Scope[] = NO_SCOPES,
+) {
+  const set = use(ScreenKeysContext);
+  useEffect(() => {
+    if (set === undefined) return;
+    set({ commands, scopes });
+    return () => {
+      set(undefined);
+    };
+  }, [set, commands, scopes]);
+}
 
 /**
  * Listens for shortcuts on the whole document and owns the ⌘K command
@@ -35,17 +73,23 @@ export function KeyboardRoot({
   commands = NO_COMMANDS,
   scopes = NO_SCOPES,
   platform = currentPlatform(),
+  pages,
   children,
 }: KeyboardRootProperties) {
   const [open, setOpen] = useState<Open>("none");
+  const [screen, setScreen] = useState<ScreenKeys>();
   const returnFocus = useRef<Element | null>(null);
-  const active = useMemo(() => new Set<Scope>(["global", ...scopes]), [scopes]);
+  const active = useMemo(
+    () =>
+      new Set<Scope>(["global", ...scopes, ...(screen?.scopes ?? NO_SCOPES)]),
+    [scopes, screen],
+  );
 
   const all = useMemo<Command[]>(
     () => [
       {
         id: "menu.open",
-        title: "Search and run any command",
+        title: "Search pages and run any command",
         scope: "global",
         keys: ["mod+k"],
         run: () => {
@@ -63,8 +107,9 @@ export function KeyboardRoot({
         },
       },
       ...commands,
+      ...(screen?.commands ?? NO_COMMANDS),
     ],
-    [commands],
+    [commands, screen],
   );
   const keymap = useMemo(() => new Keymap(all, { platform }), [all, platform]);
 
@@ -85,10 +130,17 @@ export function KeyboardRoot({
       if (result.kind === "run") {
         returnFocus.current = document.activeElement;
         result.command.run();
-        telemetry().histogram("ui.keyboard.dispatch", performance.now() - started, {
+        telemetry().histogram(
+          "ui.keyboard.dispatch",
+          performance.now() - started,
+          {
+            command: result.command.id,
+          },
+        );
+        telemetry().count("ui.keyboard.commands", {
           command: result.command.id,
+          via: "key",
         });
-        telemetry().count("ui.keyboard.commands", { command: result.command.id, via: "key" });
       }
     };
     document.addEventListener("keydown", onKeyDown);
@@ -105,22 +157,33 @@ export function KeyboardRoot({
   };
 
   return (
-    <>
+    <ScreenKeysContext value={setScreen}>
       {children}
       {open === "menu" ? (
         <CommandMenu
-          commands={all.filter((c) => active.has(c.scope) && c.id !== "menu.open")}
+          commands={all.filter(
+            (c) => active.has(c.scope) && c.id !== "menu.open",
+          )}
+          pages={pages}
           platform={platform}
           onClose={close}
           onRun={(command) => {
             command.run();
-            telemetry().count("ui.keyboard.commands", { command: command.id, via: "menu" });
+            telemetry().count("ui.keyboard.commands", {
+              command: command.id,
+              via: "menu",
+            });
           }}
         />
       ) : undefined}
       {open === "sheet" ? (
-        <ShortcutSheet commands={all} platform={platform} scopes={active} onClose={close} />
+        <ShortcutSheet
+          commands={all}
+          platform={platform}
+          scopes={active}
+          onClose={close}
+        />
       ) : undefined}
-    </>
+    </ScreenKeysContext>
   );
 }

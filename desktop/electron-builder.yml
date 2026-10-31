@@ -1,9 +1,10 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 
-# Packaging for macOS (notarised, universal), Windows (NSIS) and Linux
-# (AppImage and deb). Signing material comes only from the environment; see
-# .github/workflows/release.yml and ADR 0023 (D99).
+# Packaging for macOS (notarised, universal), Windows (NSIS, signed with Azure
+# Trusted Signing) and Linux (AppImage, deb and rpm). Signing material comes
+# only from the environment; see .github/workflows/release.yml and ADR 0023
+# (D99).
 appId: dev.vellum.desktop
 productName: Vellum
 copyright: Copyright © 2026 The Vellum contributors
@@ -14,11 +15,14 @@ files:
   - dist/**
   - package.json
   - "!**/*.map"
-# The built web app and the `vellum` server binary for local mode.
+# The built web app and the `vellum` server binary for local mode. The
+# release workflow puts the released binary for each architecture in
+# target/desktop-bin/<arch>/ (ADR 0022, D252); for a local build, copy
+# target/release/vellum there.
 extraResources:
   - from: ../web/dist
     to: web
-  - from: ../target/release/${env.VELLUM_BINARY}
+  - from: ../target/desktop-bin/${arch}/${env.VELLUM_BINARY}
     to: bin/${env.VELLUM_BINARY}
 protocols:
   - name: Vellum link
@@ -43,6 +47,9 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
+  # The bundled server binary is already universal, so the universal merge
+  # keeps the x64 build's copy instead of trying to merge the two.
+  x64ArchFiles: Contents/Resources/bin/vellum
   # Notarisation reads APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID;
   # the release workflow turns it off when those secrets are missing.
   notarize: true
@@ -61,6 +68,8 @@ linux:
     - target: AppImage
       arch: [x64, arm64]
     - target: deb
+      arch: [x64, arm64]
+    - target: rpm
       arch: [x64, arm64]
 publish:
   provider: github

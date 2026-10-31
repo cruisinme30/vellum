@@ -7,7 +7,14 @@ import type { Command } from "./keymap";
 import { rankCommands, score } from "./search";
 
 function command(title: string, keywords: string[] = []): Command {
-  return { id: title, title, keys: [], scope: "global", keywords, run: vi.fn() };
+  return {
+    id: title,
+    title,
+    keys: [],
+    scope: "global",
+    keywords,
+    run: vi.fn(),
+  };
 }
 
 describe("score", () => {
@@ -45,8 +52,12 @@ describe("rankCommands", () => {
       "Go to Inbox",
       "Assign to me",
     ]);
-    expect(rankCommands(commands, "is").map((c) => c.title)).toEqual(["New issue"]);
-    expect(rankCommands(commands, "ticket").map((c) => c.title)).toEqual(["New issue"]);
+    expect(rankCommands(commands, "is").map((c) => c.title)).toEqual([
+      "New issue",
+    ]);
+    expect(rankCommands(commands, "ticket").map((c) => c.title)).toEqual([
+      "New issue",
+    ]);
     expect(rankCommands(commands, "xyz")).toEqual([]);
   });
 });

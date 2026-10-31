@@ -105,7 +105,9 @@ pub fn parse(url: &Url) -> Result<Prefill, CreateUrlError> {
         .map(Iterator::collect)
         .unwrap_or_default();
     let team = match segments.as_slice() {
-        ["team", key, "new"] if is_team_key(&key.to_ascii_uppercase()) => key.to_ascii_uppercase(),
+        ["team", key, "new"] if is_team_key(&key.to_ascii_uppercase()) => {
+            key.to_ascii_uppercase()
+        }
         _ => return Err(CreateUrlError::NotCreateUrl),
     };
     let mut prefill = Prefill {
@@ -214,7 +216,8 @@ pub fn build(base: &Url, prefill: &Prefill) -> Url {
         put("description", prefill.description.clone());
         put("priority", prefill.priority.map(|p| p.number().to_string()));
         put("assignee", prefill.assignee.clone());
-        let labels: Vec<&str> = prefill.labels.iter().map(String::as_str).collect();
+        let labels: Vec<&str> =
+            prefill.labels.iter().map(String::as_str).collect();
         put("labels", (!labels.is_empty()).then(|| labels.join(",")));
         put("estimate", prefill.estimate.clone());
         put("project", prefill.project.clone());
@@ -248,9 +251,10 @@ mod tests {
     #[test]
     fn parses_every_parameter() -> Result<(), CreateUrlError> {
         let prefill = parse(&url(
-            "https://vellum.northstar.dev/team/eng/new?title=Login+fails&description=On+**Safari**\
-             &priority=p1&assignee=me&labels=bug,web&label=ios&estimate=3&project=Auth&cycle=next\
-             &state=Todo&due=2026-11-24&parent=ENG-1&template=bug&utm_source=x&priority=nope",
+            "https://vellum.northstar.dev/team/eng/new?title=Login+fails&descri\
+             ption=On+**Safari**&priority=p1&assignee=me&labels=bug,web&label=i\
+             os&estimate=3&project=Auth&cycle=next&state=Todo&due=2026-11-24&pa\
+             rent=ENG-1&template=bug&utm_source=x&priority=nope",
         ))?;
         assert_eq!(prefill.team, "ENG");
         assert_eq!(prefill.title.as_deref(), Some("Login fails"));
@@ -295,15 +299,15 @@ mod tests {
             ..Prefill::default()
         };
         prefill.title = Some("Rotate keys & certs".to_owned());
-        prefill.labels = ["sec".to_owned(), "infra".to_owned()].into_iter().collect();
+        prefill.labels =
+            ["sec".to_owned(), "infra".to_owned()].into_iter().collect();
         prefill.cycle = Some(CycleRef::Number(12));
         prefill.priority = Some(Priority::High);
         let built = build(&url("https://vellum.northstar.dev/?x=1"), &prefill);
-        assert!(
-            built.as_str().starts_with(
-                "https://vellum.northstar.dev/team/OPS/new?title=Rotate+keys+%26+certs"
-            )
-        );
+        assert!(built.as_str().starts_with(
+            "https://vellum.northstar.dev/team/OPS/new?title=Rotate+keys+%2\
+                    6+certs"
+        ));
         assert_eq!(parse(&built)?, prefill);
         let empty = build(
             &url("https://vellum.northstar.dev"),
@@ -319,7 +323,8 @@ mod tests {
     #[test]
     fn long_values_are_ignored() -> Result<(), CreateUrlError> {
         let long = "a".repeat(MAX_TITLE + 1);
-        let prefill = parse(&url(&format!("https://x.dev/team/ENG/new?title={long}")))?;
+        let prefill =
+            parse(&url(&format!("https://x.dev/team/ENG/new?title={long}")))?;
         assert_eq!(prefill.title, None);
         assert_eq!(prefill.ignored.len(), 1);
         Ok(())

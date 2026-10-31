@@ -25,8 +25,9 @@ use vellum_kernel::ObjectId;
 use crate::config::IndexConfig;
 use crate::error::{Error, Result};
 use crate::index::{Index, Pool};
-use crate::reindex::{self, FileReader, ReindexReport, Snapshot};
+use crate::reindex::{self, FileReader, Listing, ReindexReport, Snapshot};
 use crate::telemetry::traced;
+use crate::tx::BeginWrite as _;
 
 /// Environment variable naming the main database.
 pub const MAIN_URL_VAR: &str = "VELLUM_DATABASE_URL";
@@ -57,32 +58,42 @@ impl ShardsConfig {
     /// [`Error::Config`] when the main URL or a shard URL is missing, a
     /// name is empty, repeated or not `[A-Za-z0-9_]`, or two shards share
     /// a database.
-    pub fn from_env(var: impl Fn(&str) -> Option<String>) -> Result<Option<Self>> {
-        let Some(list) = var(SHARDS_VAR).filter(|v| !v.trim().is_empty()) else {
+    pub fn from_env(
+        var: impl Fn(&str) -> Option<String>,
+    ) -> Result<Option<Self>> {
+        let Some(list) = var(SHARDS_VAR).filter(|v| !v.trim().is_empty())
+        else {
             return Ok(None);
         };
         let main = var(MAIN_URL_VAR)
             .filter(|v| !v.trim().is_empty())
             .ok_or_else(|| {
-                Error::Config(format!("{SHARDS_VAR} is set but {MAIN_URL_VAR} is not"))
+                Error::Config(format!(
+                    "{SHARDS_VAR} is set but {MAIN_URL_VAR} is not"
+                ))
             })?;
         let mut names = HashSet::new();
         let mut urls = HashSet::new();
         let mut shards = Vec::new();
         for raw in list.split(',') {
             let name = raw.trim().to_ascii_lowercase();
-            if name.is_empty() || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_') {
+            if name.is_empty()
+                || !name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+            {
                 return Err(Error::Config(format!(
-                    "shard name {raw:?} in {SHARDS_VAR} must be letters, digits or _"
+                    "shard name {raw:?} in {SHARDS_VAR} must be letters, \
+                        digits or _"
                 )));
             }
             if !names.insert(name.clone()) {
-                return Err(Error::Config(format!("shard {name:?} is listed twice")));
+                return Err(Error::Config(format!(
+                    "shard {name:?} is listed twice"
+                )));
             }
             let key = shard_url_var(&name);
-            let url = var(&key)
-                .filter(|v| !v.trim().is_empty())
-                .ok_or_else(|| Error::Config(format!("shard {name:?} needs {key}")))?;
+            let url = var(&key).filter(|v| !v.trim().is_empty()).ok_or_else(
+                || Error::Config(format!("shard {name:?} needs {key}")),
+            )?;
             if !urls.insert(url.clone()) {
                 return Err(Error::Config(format!(
                     "shard {name:?} uses the same database as another shard"
@@ -96,6 +107,24 @@ impl ShardsConfig {
         }))
     }
 }
+
+/// The tables holding a space's rows on its shard, each with the order
+/// that puts parents before children (folders reference their parent).
+const SPACE_TABLES: [(&str, &str); 13] = [
+    ("spaces", ""),
+    ("folders", " ORDER BY length(path)"),
+    ("documents", ""),
+    ("page_ancestors", ""),
+    ("grants", ""),
+    ("effective_access", ""),
+    ("user_doc_state", ""),
+    ("drive_spaces", ""),
+    ("drive_nodes", ""),
+    ("drive_activity", ""),
+    ("drive_activity_scope", ""),
+    ("drive_links", ""),
+    ("drive_versions", ""),
+];
 
 /// One shard: its name and its index.
 #[derive(Debug, Clone)]
@@ -134,7 +163,11 @@ impl ShardedIndex {
     /// # Errors
     /// [`Error::Config`] when no shard is listed; otherwise any error from
     /// [`Index::open`].
-    #[tracing::instrument(name = "db.open_shards", skip_all, fields(shards = config.shards.len()))]
+    #[tracing::instrument(
+        name = "db.open_shards",
+        skip_all,
+        fields(shards = config.shards.len())
+    )]
     pub async fn open(config: &ShardsConfig) -> Result<Self> {
         let main = Index::open(&config.main).await?;
         let mut shards = Vec::with_capacity(config.shards.len());
@@ -147,11 +180,26 @@ impl ShardedIndex {
                 index,
             });
         }
-        let home = shards
-            .first()
-            .cloned()
-            .ok_or_else(|| Error::Config("at least one shard is needed".into()))?;
+        let home = shards.first().cloned().ok_or_else(|| {
+            Error::Config("at least one shard is needed".into())
+        })?;
         Ok(Self { main, home, shards })
+    }
+
+    /// One database acting as both the main database and the only shard,
+    /// `home`: a deployment without `VELLUM_SHARDS` routes through the same
+    /// code with every space at home.
+    #[must_use]
+    pub fn single(index: Index) -> Self {
+        let home = Shard {
+            name: "home".to_owned(),
+            index: index.clone(),
+        };
+        Self {
+            main: index,
+            home: home.clone(),
+            shards: vec![home],
+        }
     }
 
     /// The main database.
@@ -187,10 +235,24 @@ impl ShardedIndex {
     /// configured; database errors from the main database.
     #[tracing::instrument(name = "db.shard_for", skip_all, fields(db.shard))]
     pub async fn shard_for(&self, space: ObjectId) -> Result<&Shard> {
+        let shard = match self.assigned(space).await? {
+            Some(name) => self.shard(&name).ok_or(Error::UnknownShard(name))?,
+            None => self.home(),
+        };
+        let _ =
+            tracing::Span::current().record("db.shard", shard.name.as_str());
+        Ok(shard)
+    }
+
+    /// The shard named for `space` in the map, if any.
+    ///
+    /// # Errors
+    /// Database errors from the main database.
+    pub async fn assigned(&self, space: ObjectId) -> Result<Option<String>> {
         let id = space.as_uuid();
         let system = self.main.backend().otel_system();
         let sql = "SELECT shard FROM space_shards WHERE space_id = $1";
-        let name: Option<String> = match &self.main.pool {
+        Ok(match &self.main.pool {
             Pool::Sqlite(pool) => {
                 let q = sqlx::query_scalar(sql).bind(id).fetch_optional(pool);
                 traced(system, "space_shards.get", q).await?
@@ -199,13 +261,41 @@ impl ShardedIndex {
                 let q = sqlx::query_scalar(sql).bind(id).fetch_optional(pool);
                 traced(system, "space_shards.get", q).await?
             }
+        })
+    }
+
+    /// How many spaces the map puts on each shard, by name.
+    ///
+    /// # Errors
+    /// Database errors from the main database.
+    pub async fn counts(&self) -> Result<HashMap<String, u64>> {
+        let system = self.main.backend().otel_system();
+        let sql = "SELECT shard, COUNT(*) FROM space_shards GROUP BY shard";
+        let rows: Vec<(String, i64)> = match &self.main.pool {
+            Pool::Sqlite(pool) => {
+                let q = sqlx::query_as(sql).fetch_all(pool);
+                traced(system, "space_shards.count", q).await?
+            }
+            Pool::Postgres(pool) => {
+                let q = sqlx::query_as(sql).fetch_all(pool);
+                traced(system, "space_shards.count", q).await?
+            }
         };
-        let shard = match name {
-            Some(name) => self.shard(&name).ok_or(Error::UnknownShard(name))?,
-            None => self.home(),
-        };
-        let _ = tracing::Span::current().record("db.shard", shard.name.as_str());
-        Ok(shard)
+        Ok(rows
+            .into_iter()
+            .map(|(name, n)| {
+                (name.to_ascii_lowercase(), u64::try_from(n).unwrap_or(0))
+            })
+            .collect())
+    }
+
+    /// Records `space` on shard `name` unless the map already has an
+    /// entry for it, which then stands.
+    ///
+    /// # Errors
+    /// Database errors from the main database.
+    pub async fn claim(&self, space: ObjectId, name: &str) -> Result<()> {
+        self.record(&[(space, name.to_owned())], false).await
     }
 
     /// Records that `space` lives on shard `name`. This only updates the
@@ -214,7 +304,11 @@ impl ShardedIndex {
     /// # Errors
     /// [`Error::UnknownShard`] for a name that is not configured; database
     /// errors from the main database.
-    #[tracing::instrument(name = "db.assign_shard", skip_all, fields(db.shard = name))]
+    #[tracing::instrument(
+        name = "db.assign_shard",
+        skip_all,
+        fields(db.shard = name)
+    )]
     pub async fn assign(&self, space: ObjectId, name: &str) -> Result<()> {
         let shard = self
             .shard(name)
@@ -237,20 +331,58 @@ impl ShardedIndex {
     /// [`Error::UnknownShard`] before anything is written, when the map
     /// names a shard that is not configured; otherwise scan or database
     /// errors.
-    #[tracing::instrument(name = "db.reindex_shards", skip_all, fields(root = %root.display(), documents))]
-    pub async fn reindex<R>(&self, root: &Path, reader: R) -> Result<ReindexReport>
+    #[tracing::instrument(
+        name = "db.reindex_shards",
+        skip_all,
+        fields(root = %root.display(), documents)
+    )]
+    pub async fn reindex<R>(
+        &self,
+        root: &Path,
+        reader: R,
+    ) -> Result<ReindexReport>
     where
         R: FileReader + 'static,
     {
         let now = reindex::now_ms();
         let snap = reindex::scan(root, reader, now).await?;
+        self.write_split(snap, now).await
+    }
+
+    /// Like [`ShardedIndex::reindex`], from a [`Listing`] of a bucket.
+    ///
+    /// # Errors
+    /// As [`ShardedIndex::reindex`].
+    #[tracing::instrument(
+        name = "db.reindex_shards",
+        skip_all,
+        fields(files = listing.len(), documents)
+    )]
+    pub async fn reindex_listing(
+        &self,
+        listing: Listing,
+    ) -> Result<ReindexReport> {
+        let now = reindex::now_ms();
+        let snap = reindex::scan_listing(listing, now).await?;
+        self.write_split(snap, now).await
+    }
+
+    /// Writes each shard's part of `snap`.
+    async fn write_split(
+        &self,
+        snap: Snapshot,
+        now: i64,
+    ) -> Result<ReindexReport> {
         let placement = self.place(&snap).await?;
         for (i, shard) in self.shards.iter().enumerate() {
-            let part = snap.split_off(|space| placement.get(&space) == Some(&i), false);
+            let part = snap
+                .split_off(|space| placement.get(&space) == Some(&i), false);
             shard
                 .index
                 .write_snapshot(&part, now)
-                .instrument(tracing::info_span!("db.shard", db.shard = %shard.name))
+                .instrument(
+                    tracing::info_span!("db.shard", db.shard = %shard.name),
+                )
                 .await?;
         }
         let report = snap.split_off(|_| true, true).report();
@@ -281,7 +413,9 @@ impl ShardedIndex {
     }
 
     /// Every entry of the map.
-    async fn assignments(&self) -> Result<HashMap<ObjectId, String>> {
+    pub(crate) async fn assignments(
+        &self,
+    ) -> Result<HashMap<ObjectId, String>> {
         let system = self.main.backend().otel_system();
         let sql = "SELECT space_id, shard FROM space_shards";
         let rows: Vec<(Uuid, String)> = match &self.main.pool {
@@ -310,26 +444,35 @@ impl ShardedIndex {
 
     /// Writes map entries in one transaction. `replace` overwrites an
     /// existing entry; otherwise an existing entry wins.
-    async fn record(&self, entries: &[(ObjectId, String)], replace: bool) -> Result<()> {
+    async fn record(
+        &self,
+        entries: &[(ObjectId, String)],
+        replace: bool,
+    ) -> Result<()> {
         if entries.is_empty() {
             return Ok(());
         }
         let now = reindex::now_ms();
         let system = self.main.backend().otel_system();
         let sql = if replace {
-            "INSERT INTO space_shards (space_id, shard, assigned_at) VALUES ($1, $2, $3) \
-             ON CONFLICT (space_id) DO UPDATE SET shard = excluded.shard, \
-             assigned_at = excluded.assigned_at"
+            "INSERT INTO space_shards (space_id, shard, assigned_at) VALUES \
+             ($1, $2, $3) ON CONFLICT (space_id) DO UPDATE SET shard = \
+             excluded.shard, assigned_at = excluded.assigned_at"
         } else {
-            "INSERT INTO space_shards (space_id, shard, assigned_at) VALUES ($1, $2, $3) \
-             ON CONFLICT (space_id) DO NOTHING"
+            "INSERT INTO space_shards (space_id, shard, assigned_at) VALUES \
+             ($1, $2, $3) ON CONFLICT (space_id) DO NOTHING"
         };
         macro_rules! write {
             ($pool:expr) => {{
-                let mut tx = $pool.begin().await?;
+                let mut tx = $pool.begin_write().await?;
                 for (space, name) in entries {
-                    let q = sqlx::query(sql).bind(space.as_uuid()).bind(name).bind(now);
-                    let _ = traced(system, "space_shards.put", q.execute(&mut *tx)).await?;
+                    let q = sqlx::query(sql)
+                        .bind(space.as_uuid())
+                        .bind(name)
+                        .bind(now);
+                    let _ =
+                        traced(system, "space_shards.put", q.execute(&mut *tx))
+                            .await?;
                 }
                 tx.commit().await?;
             }};
@@ -339,6 +482,81 @@ impl ShardedIndex {
             Pool::Postgres(pool) => write!(pool),
         }
         Ok(())
+    }
+
+    /// Moves every row of `space` to shard `to`, then records the move in
+    /// the map. Run it with every replica stopped: running replicas keep
+    /// the old placement in memory (ADR 0040, D175).
+    ///
+    /// The rows are copied into `to` in one transaction, which first clears
+    /// anything an interrupted move left there, and only then deleted from
+    /// the old shard; running it again after a failure converges. Returns
+    /// how many rows were copied.
+    ///
+    /// # Errors
+    /// [`Error::UnknownShard`] for a name that is not configured,
+    /// [`Error::Config`] unless both shards are on Postgres, and database
+    /// errors.
+    #[tracing::instrument(
+        name = "db.move_space",
+        skip_all,
+        fields(db.shard = to, rows)
+    )]
+    pub async fn move_space(&self, space: ObjectId, to: &str) -> Result<u64> {
+        use futures_util::StreamExt as _;
+        use sqlx::postgres::PgPoolCopyExt as _;
+
+        let target = self
+            .shard(to)
+            .ok_or_else(|| Error::UnknownShard(to.to_owned()))?;
+        let source = self.shard_for(space).await?;
+        if source.name == target.name {
+            return Ok(0);
+        }
+        let (Pool::Postgres(from), Pool::Postgres(into)) =
+            (&source.index.pool, &target.index.pool)
+        else {
+            return Err(Error::Config(
+                "moving a space needs Postgres shards".into(),
+            ));
+        };
+        let id = space.as_uuid();
+        let mut rows = 0;
+        let mut tx = into.begin().await?;
+        for (table, _) in SPACE_TABLES.iter().rev() {
+            let sql = format!("DELETE FROM {table} WHERE space_id = $1");
+            let q = sqlx::query(sqlx::AssertSqlSafe(sql)).bind(id);
+            let _ =
+                traced("postgresql", "space.move.clear", q.execute(&mut *tx))
+                    .await?;
+        }
+        for (table, order) in SPACE_TABLES {
+            let mut out = from
+                .copy_out_raw(&format!(
+                    "COPY (SELECT * FROM {table} WHERE space_id = \
+                        '{id}'{order}) TO STDOUT"
+                ))
+                .await?;
+            let mut copy =
+                tx.copy_in_raw(&format!("COPY {table} FROM STDIN")).await?;
+            while let Some(chunk) = out.next().await {
+                let _ = copy.send(chunk?).await?;
+            }
+            rows += copy.finish().await?;
+        }
+        tx.commit().await?;
+        self.record(&[(space, target.name.clone())], true).await?;
+        let mut tx = from.begin().await?;
+        for (table, _) in SPACE_TABLES.iter().rev() {
+            let sql = format!("DELETE FROM {table} WHERE space_id = $1");
+            let q = sqlx::query(sqlx::AssertSqlSafe(sql)).bind(id);
+            let _ =
+                traced("postgresql", "space.move.drop", q.execute(&mut *tx))
+                    .await?;
+        }
+        tx.commit().await?;
+        let _ = tracing::Span::current().record("rows", rows);
+        Ok(rows)
     }
 
     /// Closes the main database and every shard.
@@ -392,7 +610,8 @@ mod tests {
         ]))
         .unwrap()
         .unwrap();
-        let names: Vec<&str> = config.shards.iter().map(|(n, _)| n.as_str()).collect();
+        let names: Vec<&str> =
+            config.shards.iter().map(|(n, _)| n.as_str()).collect();
         assert_eq!(names, ["eu", "us_east"]);
         assert_eq!(
             shard_url_var("us_east"),
@@ -402,13 +621,21 @@ mod tests {
 
     #[test]
     fn rejects_inconsistent_settings() {
-        assert!(config_error(&[("VELLUM_SHARDS", "eu")]).contains("VELLUM_DATABASE_URL"));
+        assert!(
+            config_error(&[("VELLUM_SHARDS", "eu")])
+                .contains("VELLUM_DATABASE_URL")
+        );
         let main = ("VELLUM_DATABASE_URL", "postgres://main");
         assert!(
-            config_error(&[main, ("VELLUM_SHARDS", "eu")]).contains("VELLUM_SHARD_EU_DATABASE_URL")
+            config_error(&[main, ("VELLUM_SHARDS", "eu")])
+                .contains("VELLUM_SHARD_EU_DATABASE_URL")
         );
-        assert!(config_error(&[main, ("VELLUM_SHARDS", ",eu")]).contains("letters"));
-        assert!(config_error(&[main, ("VELLUM_SHARDS", "e-u")]).contains("letters"));
+        assert!(
+            config_error(&[main, ("VELLUM_SHARDS", ",eu")]).contains("letters")
+        );
+        assert!(
+            config_error(&[main, ("VELLUM_SHARDS", "e-u")]).contains("letters")
+        );
         assert!(
             config_error(&[
                 main,

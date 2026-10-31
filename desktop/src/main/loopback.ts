@@ -8,7 +8,9 @@ import type { AddressInfo } from "node:net";
 export interface Redirect {
   /** `http://127.0.0.1:<port>/callback` */
   readonly uri: string;
-  /** The authorization code, once the browser comes back with a matching state. */
+  /**
+   * The authorization code, once the browser comes back with a matching state.
+   */
   readonly code: Promise<string>;
   close(): void;
 }
@@ -16,11 +18,21 @@ export interface Redirect {
 const TIMEOUT_MS = 5 * 60_000;
 
 const page = (message: string) =>
-  `<!doctype html><meta charset="utf-8"><title>Vellum</title><body style="font:16px system-ui;margin:4rem auto;max-width:32rem">${message}</body>`;
+  `<!doctype html><meta charset="utf-8"><title>Vellum</title><body ` +
+  `style="font:16px system-ui;margin:4rem ` +
+  `auto;max-width:32rem">${message}</body>`;
 
-/** Listens on an ephemeral 127.0.0.1 port until the browser returns or five minutes pass. */
-export async function waitForRedirect(state: string, timeoutMs = TIMEOUT_MS): Promise<Redirect> {
-  let settle: { resolve: (code: string) => void; reject: (error: Error) => void } | undefined;
+/**
+ * Listens on an ephemeral 127.0.0.1 port until the browser returns or five
+ * minutes pass.
+ */
+export async function waitForRedirect(
+  state: string,
+  timeoutMs = TIMEOUT_MS,
+): Promise<Redirect> {
+  let settle:
+    | { resolve: (code: string) => void; reject: (error: Error) => void }
+    | undefined;
   const code = new Promise<string>((resolve, reject) => {
     settle = { resolve, reject };
   });
@@ -32,7 +44,10 @@ export async function waitForRedirect(state: string, timeoutMs = TIMEOUT_MS): Pr
     }
     const error = url.searchParams.get("error");
     const received = url.searchParams.get("code");
-    const ok = error === null && received !== null && url.searchParams.get("state") === state;
+    const ok =
+      error === null &&
+      received !== null &&
+      url.searchParams.get("state") === state;
     response
       .writeHead(ok ? 200 : 400, {
         "content-type": "text/html; charset=utf-8",
@@ -46,11 +61,17 @@ export async function waitForRedirect(state: string, timeoutMs = TIMEOUT_MS): Pr
         ),
       );
     if (ok) settle?.resolve(received);
-    else settle?.reject(new Error(error ?? "The sign-in response did not match this request"));
+    else
+      settle?.reject(
+        new Error(error ?? "The sign-in response did not match this request"),
+      );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
-  const timer = setTimeout(() => settle?.reject(new Error("Sign-in timed out")), timeoutMs);
+  const timer = setTimeout(
+    () => settle?.reject(new Error("Sign-in timed out")),
+    timeoutMs,
+  );
   // Nothing waits on a rejected code once the caller has closed the redirect.
   code.catch(() => {
     // Handled by whoever awaits `code`.

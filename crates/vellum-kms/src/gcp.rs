@@ -27,15 +27,17 @@ use crate::http::{self, b64, unb64};
 const BACKEND: &str = "gcp-kms";
 const PREFIX: &str = "gcp-kms:";
 const ENDPOINT: &str = "https://cloudkms.googleapis.com";
-const METADATA_TOKEN_URL: &str =
-    "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
+const METADATA_TOKEN_URL: &str = "http://metadata.google.internal/computeMetada\
+    ta/v1/instance/service-accounts/default/token";
 /// Refresh a cached token this long before it expires.
 const REFRESH_MARGIN: Duration = Duration::from_mins(1);
 
 /// Supplies `OAuth` 2.0 access tokens with the `cloudkms` scope.
 pub trait TokenSource: Send + Sync {
     /// A token valid for at least the next request.
-    fn token(&self) -> impl Future<Output = Result<Zeroizing<String>, CryptoError>> + Send;
+    fn token(
+        &self,
+    ) -> impl Future<Output = Result<Zeroizing<String>, CryptoError>> + Send;
 }
 
 /// A fixed access token, for example from `gcloud auth print-access-token`
@@ -57,7 +59,10 @@ impl fmt::Debug for StaticToken {
 }
 
 impl TokenSource for StaticToken {
-    fn token(&self) -> impl Future<Output = Result<Zeroizing<String>, CryptoError>> + Send {
+    fn token(
+        &self,
+    ) -> impl Future<Output = Result<Zeroizing<String>, CryptoError>> + Send
+    {
         std::future::ready(Ok(self.0.clone()))
     }
 }
@@ -113,7 +118,9 @@ impl MetadataServerToken {
             .get(&self.url)
             .header("metadata-flavor", "Google");
         let body = http::send_json(BACKEND, request).await?;
-        let token = Zeroizing::new(http::string_at(BACKEND, &body, "/access_token")?.to_owned());
+        let token = Zeroizing::new(
+            http::string_at(BACKEND, &body, "/access_token")?.to_owned(),
+        );
         let lifetime = body
             .pointer("/expires_in")
             .and_then(serde_json::Value::as_u64)
@@ -204,17 +211,26 @@ impl<T: TokenSource> KeyProvider for GcpKms<T> {
         self.current.clone()
     }
 
-    #[tracing::instrument(name = "kms.wrap", skip_all, fields(backend = BACKEND, kek_id = %self.current))]
+    #[tracing::instrument(
+        name = "kms.wrap",
+        skip_all,
+        fields(backend = BACKEND, kek_id = %self.current)
+    )]
     async fn wrap(&self, dek: &SecretKey) -> Result<WrappedDek, CryptoError> {
         let started = Instant::now();
         let result = async {
             let plaintext = Zeroizing::new(b64(dek.expose()));
             let body = json!({
                 "plaintext": plaintext.as_str(),
-                "additionalAuthenticatedData": b64(http::aad(&self.current).as_bytes()),
+                "additionalAuthenticatedData": b64(
+                    http::aad(&self.current).as_bytes()
+                ),
             });
             let response = self.call("encrypt", &self.current, &body).await?;
-            let blob = unb64(BACKEND, http::string_at(BACKEND, &response, "/ciphertext")?)?;
+            let blob = unb64(
+                BACKEND,
+                http::string_at(BACKEND, &response, "/ciphertext")?,
+            )?;
             Ok(WrappedDek {
                 kek_id: self.current.clone(),
                 blob,
@@ -224,13 +240,22 @@ impl<T: TokenSource> KeyProvider for GcpKms<T> {
         http::record(BACKEND, "wrap", started, result)
     }
 
-    #[tracing::instrument(name = "kms.unwrap", skip_all, fields(backend = BACKEND, kek_id = %wrapped.kek_id))]
-    async fn unwrap(&self, wrapped: &WrappedDek) -> Result<SecretKey, CryptoError> {
+    #[tracing::instrument(
+        name = "kms.unwrap",
+        skip_all,
+        fields(backend = BACKEND, kek_id = %wrapped.kek_id)
+    )]
+    async fn unwrap(
+        &self,
+        wrapped: &WrappedDek,
+    ) -> Result<SecretKey, CryptoError> {
         let started = Instant::now();
         let result = async {
             let body = json!({
                 "ciphertext": b64(&wrapped.blob),
-                "additionalAuthenticatedData": b64(http::aad(&wrapped.kek_id).as_bytes()),
+                "additionalAuthenticatedData": b64(
+                    http::aad(&wrapped.kek_id).as_bytes()
+                ),
             });
             let response = self.call("decrypt", &wrapped.kek_id, &body).await?;
             let plaintext = Zeroizing::new(unb64(
@@ -285,14 +310,21 @@ mod tests {
 
     #[test]
     fn key_names_must_be_crypto_keys() -> Result<(), CryptoError> {
-        let name = "projects/northstar/locations/europe-west1/keyRings/vellum/cryptoKeys/kek";
+        let name = "projects/northstar/locations/europe-west1/keyRings/vellum/c\
+            ryptoKeys/kek";
         let id = kek_id(name)?;
         assert_eq!(parse(&id)?, name);
         assert!(kek_id("projects/p/locations/l/keyRings/r").is_err());
         assert!(
-            kek_id("projects/p/locations/l/keyRings/r/cryptoKeys/k/cryptoKeyVersions/1").is_err()
+            kek_id(
+                "projects/p/locations/l/keyRings/r/cryptoKeys/k/cryptoKeyVer\
+                sions/1"
+            )
+            .is_err()
         );
-        assert!(kek_id("projects/../locations/l/keyRings/r/cryptoKeys/k").is_err());
+        assert!(
+            kek_id("projects/../locations/l/keyRings/r/cryptoKeys/k").is_err()
+        );
         Ok(())
     }
 }

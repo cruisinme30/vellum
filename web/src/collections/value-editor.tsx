@@ -19,7 +19,13 @@ interface ValueEditorProperties {
   readonly onCancel: () => void;
 }
 
-function ChoiceEditor({ property, value, label, onCommit, onCancel }: ValueEditorProperties) {
+function ChoiceEditor({
+  property,
+  value,
+  label,
+  onCommit,
+  onCancel,
+}: ValueEditorProperties) {
   const choices = useChoices(property);
   return (
     <OptionPicker
@@ -40,7 +46,13 @@ function ChoiceEditor({ property, value, label, onCommit, onCancel }: ValueEdito
  * change (or explains why it cannot), Escape drops it, and leaving the
  * field keeps it when it parses.
  */
-function TextEditor({ property, value, label, onCommit, onCancel }: ValueEditorProperties) {
+function TextEditor({
+  property,
+  value,
+  label,
+  onCommit,
+  onCancel,
+}: ValueEditorProperties) {
   const t = useT();
   const errorId = useId();
   const input = useRef<HTMLInputElement>(null);

@@ -21,7 +21,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use vellum_crypto::KeyProvider;
 use vellum_db::sqlx::{self, Row as _};
-use vellum_db::{Index, IndexPool, traced};
+use vellum_db::{BeginWrite as _, Index, IndexPool, traced};
 use vellum_kernel::{Error, ErrorKind, Result};
 
 use crate::hub::RoomKey;
@@ -50,13 +50,18 @@ impl<K: KeyProvider + 'static> Sealer for Envelope<K> {
         vellum_crypto::seal(&self.0, &plaintext)
             .await
             .map_err(|err| {
-                Error::new(ErrorKind::Internal, "sealing a collab record failed").with_source(err)
+                Error::new(
+                    ErrorKind::Internal,
+                    "sealing a collab record failed",
+                )
+                .with_source(err)
             })
     }
 
     async fn open(&self, stored: Vec<u8>) -> Result<Vec<u8>> {
         vellum_crypto::open(&self.0, &stored).await.map_err(|err| {
-            Error::new(ErrorKind::Internal, "opening a collab record failed").with_source(err)
+            Error::new(ErrorKind::Internal, "opening a collab record failed")
+                .with_source(err)
         })
     }
 }
@@ -171,7 +176,8 @@ fn to_seq(value: i64) -> Result<Seq> {
 }
 
 fn from_seq(seq: Seq) -> Result<i64> {
-    i64::try_from(seq).map_err(|_| Error::new(ErrorKind::InvalidInput, "seq out of range"))
+    i64::try_from(seq)
+        .map_err(|_| Error::new(ErrorKind::InvalidInput, "seq out of range"))
 }
 
 /// The same statements for both backends; only placeholders and ID
@@ -187,7 +193,8 @@ macro_rules! statements {
                 "2 ORDER BY seq"
             ),
             append: concat!(
-                "INSERT INTO collab_updates (space_id, doc_id, seq, payload, created_at) SELECT ",
+                "INSERT INTO collab_updates (space_id, doc_id, seq, payload, \
+                    created_at) SELECT ",
                 $p,
                 "1, ",
                 $p,
@@ -202,7 +209,8 @@ macro_rules! statements {
                 "2 RETURNING seq"
             ),
             seed: concat!(
-                "INSERT INTO collab_updates (space_id, doc_id, seq, payload, created_at) SELECT ",
+                "INSERT INTO collab_updates (space_id, doc_id, seq, payload, \
+                    created_at) SELECT ",
                 $p,
                 "1, ",
                 $p,
@@ -210,7 +218,8 @@ macro_rules! statements {
                 $p,
                 "3, ",
                 $p,
-                "4 WHERE NOT EXISTS (SELECT 1 FROM collab_updates WHERE space_id = ",
+                "4 WHERE NOT EXISTS (SELECT 1 FROM collab_updates WHERE \
+                    space_id = ",
                 $p,
                 "1 AND doc_id = ",
                 $p,
@@ -226,7 +235,8 @@ macro_rules! statements {
                 "3"
             ),
             insert: concat!(
-                "INSERT INTO collab_updates (space_id, doc_id, seq, payload, created_at) VALUES (",
+                "INSERT INTO collab_updates (space_id, doc_id, seq, payload, \
+                    created_at) VALUES (",
                 $p,
                 "1, ",
                 $p,
@@ -253,7 +263,14 @@ struct Statements {
 /// Runs one operation against whichever backend the index uses. `$space`
 /// and `$doc` are bound as the backend's ID type.
 macro_rules! with_pool {
-    ($self:expr, $room:expr, |$pool:ident, $space:ident, $doc:ident, $sql:ident| $body:block) => {
+    (
+        $self:expr,
+        $room:expr,
+        |$pool:ident,
+        $space:ident,
+        $doc:ident,
+        $sql:ident| $body:block
+    ) => {
         match $self.index.pool() {
             IndexPool::Sqlite($pool) => {
                 let $space = $room.space.as_u128().to_be_bytes().to_vec();
@@ -267,26 +284,34 @@ macro_rules! with_pool {
                 let $sql = statements!("$");
                 $body
             }
-            _ => Err(Error::new(ErrorKind::Internal, "unsupported index backend")),
+            _ => Err(Error::new(
+                ErrorKind::Internal,
+                "unsupported index backend",
+            )),
         }
     };
 }
 
 #[async_trait]
 impl UpdateStore for SqlUpdateStore {
-    #[tracing::instrument(name = "collab.log.load", skip_all, fields(room = %room))]
+    #[tracing::instrument(
+        name = "collab.log.load",
+        skip_all,
+        fields(room = %room)
+    )]
     async fn load(&self, room: RoomKey) -> Result<Vec<StoredUpdate>> {
         let system = self.system();
-        let rows: Vec<(i64, Vec<u8>)> = with_pool!(self, room, |pool, space, doc, sql| {
-            let query = sqlx::query(sql.load).bind(space).bind(doc);
-            traced(system, "collab.load", query.fetch_all(pool))
-                .await
-                .map_err(db_error)?
-                .iter()
-                .map(|row| Ok((row.try_get(0)?, row.try_get(1)?)))
-                .collect::<std::result::Result<_, sqlx::Error>>()
-                .map_err(db_error)
-        })?;
+        let rows: Vec<(i64, Vec<u8>)> =
+            with_pool!(self, room, |pool, space, doc, sql| {
+                let query = sqlx::query(sql.load).bind(space).bind(doc);
+                traced(system, "collab.load", query.fetch_all(pool))
+                    .await
+                    .map_err(db_error)?
+                    .iter()
+                    .map(|row| Ok((row.try_get(0)?, row.try_get(1)?)))
+                    .collect::<std::result::Result<_, sqlx::Error>>()
+                    .map_err(db_error)
+            })?;
         let mut out = Vec::with_capacity(rows.len());
         for (seq, payload) in rows {
             out.push(StoredUpdate {
@@ -297,7 +322,11 @@ impl UpdateStore for SqlUpdateStore {
         Ok(out)
     }
 
-    #[tracing::instrument(name = "collab.log.append", skip_all, fields(room = %room, bytes = update.len()))]
+    #[tracing::instrument(
+        name = "collab.log.append",
+        skip_all,
+        fields(room = %room, bytes = update.len())
+    )]
     async fn append(&self, room: RoomKey, update: Vec<u8>) -> Result<Seq> {
         let system = self.system();
         let payload = self.seal(room, update).await?;
@@ -314,7 +343,11 @@ impl UpdateStore for SqlUpdateStore {
         to_seq(seq)
     }
 
-    #[tracing::instrument(name = "collab.log.seed", skip_all, fields(room = %room))]
+    #[tracing::instrument(
+        name = "collab.log.seed",
+        skip_all,
+        fields(room = %room)
+    )]
     async fn seed(&self, room: RoomKey, update: Vec<u8>) -> Result<bool> {
         let system = self.system();
         let payload = self.seal(room, update).await?;
@@ -335,31 +368,46 @@ impl UpdateStore for SqlUpdateStore {
 
     #[allow(
         clippy::clone_on_copy,
-        reason = "the same statements bind owned blobs (SQLite) and Copy UUIDs (Postgres)"
+        reason = "the same statements bind owned blobs (SQLite) and Copy UUIDs \
+            (Postgres)"
     )]
-    #[tracing::instrument(name = "collab.log.compact", skip_all, fields(room = %room, through))]
-    async fn compact(&self, room: RoomKey, through: Seq, merged: Vec<u8>) -> Result<()> {
+    #[tracing::instrument(
+        name = "collab.log.compact",
+        skip_all,
+        fields(room = %room, through)
+    )]
+    async fn compact(
+        &self,
+        room: RoomKey,
+        through: Seq,
+        merged: Vec<u8>,
+    ) -> Result<()> {
         let system = self.system();
         let through = from_seq(through)?;
         let payload = self.seal(room, merged).await?;
         with_pool!(self, room, |pool, space, doc, sql| {
-            let mut tx = pool.begin().await.map_err(db_error)?;
+            let mut tx = pool.begin_write().await.map_err(db_error)?;
             let prune = sqlx::query(sql.prune)
                 .bind(space.clone())
                 .bind(doc.clone())
                 .bind(through);
-            let _pruned = traced(system, "collab.compact.prune", prune.execute(&mut *tx))
-                .await
-                .map_err(db_error)?;
+            let _pruned =
+                traced(system, "collab.compact.prune", prune.execute(&mut *tx))
+                    .await
+                    .map_err(db_error)?;
             let insert = sqlx::query(sql.insert)
                 .bind(space)
                 .bind(doc)
                 .bind(through)
                 .bind(payload)
                 .bind(now_ms());
-            let _inserted = traced(system, "collab.compact.insert", insert.execute(&mut *tx))
-                .await
-                .map_err(db_error)?;
+            let _inserted = traced(
+                system,
+                "collab.compact.insert",
+                insert.execute(&mut *tx),
+            )
+            .await
+            .map_err(db_error)?;
             tx.commit().await.map_err(db_error)
         })
     }

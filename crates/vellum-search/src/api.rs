@@ -19,7 +19,9 @@ use std::sync::Arc;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use vellum_contracts::{Operation, RequestContext, Scope, Service};
-use vellum_kernel::{BlockId, DocId, Error, ErrorKind, ObjectId, SpaceId, UserId};
+use vellum_kernel::{
+    BlockId, DocId, Error, ErrorKind, ObjectId, SpaceId, UserId,
+};
 
 use crate::access::Principal;
 use crate::model::{DocKind, Filters, SearchPage, SearchQuery, TitleHit};
@@ -143,9 +145,12 @@ impl QueryInput {
         let modified = match (self.modified_from, self.modified_to) {
             (None, None) => None,
             (from, to) => {
-                let (from, to) = (from.unwrap_or(i64::MIN), to.unwrap_or(i64::MAX));
+                let (from, to) =
+                    (from.unwrap_or(i64::MIN), to.unwrap_or(i64::MAX));
                 if from > to {
-                    return Err(invalid("`modified_from` is after `modified_to`".into()));
+                    return Err(invalid(
+                        "`modified_from` is after `modified_to`".into(),
+                    ));
                 }
                 Some(from..=to)
             }
@@ -185,16 +190,19 @@ impl Service for SearchApi {
                     let api = Arc::clone(&query);
                     async move {
                         let principal = principal(&ctx)?;
-                        let page: SearchPage =
-                            api.service.search(&principal, &input.to_query()?).await?;
+                        let page: SearchPage = api
+                            .service
+                            .search(&principal, &input.to_query()?)
+                            .await?;
                         Ok(page)
                     }
                 },
             )
             .summary("Searches blocks across everything the caller can read")
             .description(
-                "Full-text, block-level search with drive filters. Hits carry the block ID, \
-                 its heading path, a highlighted snippet and a citation URI.",
+                "Full-text, block-level search with drive filters. Hits carry \
+                 the block ID, its heading path, a highlighted snippet and a \
+                 citation URI.",
             ),
             Operation::query(
                 "search.titles",
@@ -205,12 +213,20 @@ impl Service for SearchApi {
                     async move {
                         let principal = principal(&ctx)?;
                         let filters = Filters {
-                            spaces: list::<SpaceId>(input.spaces.as_deref(), "space ID")?,
+                            spaces: list::<SpaceId>(
+                                input.spaces.as_deref(),
+                                "space ID",
+                            )?,
                             ..Filters::default()
                         };
                         let hits: Vec<TitleHit> = api
                             .service
-                            .titles(&principal, &input.q, &filters, input.limit.unwrap_or(10))
+                            .titles(
+                                &principal,
+                                &input.q,
+                                &filters,
+                                input.limit.unwrap_or(10),
+                            )
                             .await?;
                         Ok(TitlesPage { hits })
                     }
@@ -230,11 +246,16 @@ impl Service for SearchApi {
                             .service
                             .context(&principal, input.doc_id, input.block_id)
                             .await?;
-                        found.ok_or_else(|| Error::new(ErrorKind::NotFound, "no such block"))
+                        found.ok_or_else(|| {
+                            Error::new(ErrorKind::NotFound, "no such block")
+                        })
                     }
                 },
             )
-            .summary("A block with the heading section around it, for quoting and citations"),
+            .summary(
+                "A block with the heading section around it, for quoting \
+                and citations",
+            ),
         ]
     }
 }
@@ -318,7 +339,10 @@ mod tests {
         let context = ops[2]
             .call(
                 ctx(ada.clone()),
-                json!({ "doc_id": corpus.runbook.to_string(), "block_id": bid(5).to_string() }),
+                json!({
+                    "doc_id": corpus.runbook.to_string(),
+                    "block_id": bid(5).to_string()
+                }),
             )
             .await
             .unwrap();
@@ -327,7 +351,10 @@ mod tests {
         let missing = ops[2]
             .call(
                 ctx(ada),
-                json!({ "doc_id": corpus.runbook.to_string(), "block_id": bid(77).to_string() }),
+                json!({
+                    "doc_id": corpus.runbook.to_string(),
+                    "block_id": bid(77).to_string()
+                }),
             )
             .await
             .unwrap_err();

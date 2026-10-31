@@ -25,16 +25,28 @@ impl Drive {
     ///
     /// # Errors
     /// Store or index failures.
-    #[tracing::instrument(name = "drive.apply_changes", skip_all, fields(changes = changes.len()), err)]
-    pub async fn apply_changes(&self, changes: &[Change]) -> DriveResult<ScanReport> {
+    #[tracing::instrument(
+        name = "drive.apply_changes",
+        skip_all,
+        fields(changes = changes.len()),
+        err
+    )]
+    pub async fn apply_changes(
+        &self,
+        changes: &[Change],
+    ) -> DriveResult<ScanReport> {
         self.observe("apply_changes", async {
             let spaces = self.index.spaces().await?;
             let mut rescan: BTreeSet<SpaceId> = BTreeSet::new();
             let mut moving: HashSet<ObjectId> = HashSet::new();
             for change in changes {
                 // Sibling order is read from its file when listing, so a
-                // changed order file needs no rescan (D169).
-                if changed_path(change).file_name() == layout::ORDER_FILE {
+                // changed order file needs no rescan (D169). Uploaded files
+                // are not in the index at all (D211).
+                let path = changed_path(change);
+                if path.file_name() == layout::ORDER_FILE
+                    || vellum_store::layout::in_attachments(path)
+                {
                     continue;
                 }
                 match change {
@@ -50,8 +62,12 @@ impl Drive {
                     }
                     Change::Created { path, .. }
                     | Change::Removed { path, .. }
-                    | Change::Untracked { path, .. } => rescan.extend(space_of(&spaces, path)),
-                    Change::Duplicated { copy, .. } => rescan.extend(space_of(&spaces, copy)),
+                    | Change::Untracked { path, .. } => {
+                        rescan.extend(space_of(&spaces, path));
+                    }
+                    Change::Duplicated { copy, .. } => {
+                        rescan.extend(space_of(&spaces, copy));
+                    }
                 }
             }
             let mut report = ScanReport::default();
@@ -66,11 +82,16 @@ impl Drive {
     /// Records an in-place edit of a page as a version by the external
     /// editor. Returns false when the change is not a plain page edit and
     /// needs a rescan instead.
-    async fn external_edit(&self, id: ObjectId, path: &BlobPath) -> DriveResult<bool> {
+    async fn external_edit(
+        &self,
+        id: ObjectId,
+        path: &BlobPath,
+    ) -> DriveResult<bool> {
         let Some(mut node) = self.index.node(id).await? else {
             return Ok(false);
         };
-        if !node.is_live() || node.kind != NodeKind::Page || &node.path != path {
+        if !node.is_live() || node.kind != NodeKind::Page || &node.path != path
+        {
             return Ok(false);
         }
         let (text, blob) = self.read_text(path).await?;
@@ -116,7 +137,8 @@ impl Drive {
     ) -> DriveResult<()> {
         let mut blobs: BTreeMap<BlobPath, u64> = BTreeMap::new();
         for root in [space.root.clone(), layout::trash_root()?] {
-            let entries: Vec<_> = self.store.list(Some(&root)).try_collect().await?;
+            let entries: Vec<_> =
+                self.store.list(Some(&root)).try_collect().await?;
             blobs.extend(entries.into_iter().map(|e| (e.path, e.size)));
         }
         let mut seen = HashSet::new();

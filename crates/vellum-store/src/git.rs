@@ -100,15 +100,18 @@ impl GitStore {
     /// Returns [`StoreError::Backend`] if `git` is missing or fails, or I/O
     /// errors from creating the folder.
     #[tracing::instrument(skip_all, fields(dir = %dir.as_ref().display()), err)]
-    pub async fn open(dir: impl AsRef<Path>, config: GitConfig) -> StoreResult<Self> {
+    pub async fn open(
+        dir: impl AsRef<Path>,
+        config: GitConfig,
+    ) -> StoreResult<Self> {
         let local = LocalStore::open(dir.as_ref()).await?;
-        let dir = dir
-            .as_ref()
-            .canonicalize()
-            .map_err(|source| StoreError::Io {
-                path: dir.as_ref().display().to_string(),
-                source,
-            })?;
+        let dir =
+            dir.as_ref()
+                .canonicalize()
+                .map_err(|source| StoreError::Io {
+                    path: dir.as_ref().display().to_string(),
+                    source,
+                })?;
         let this = Self {
             local,
             dir,
@@ -116,7 +119,8 @@ impl GitStore {
             gate: RwLock::new(()),
         };
         let top = this.git(&["rev-parse", "--show-toplevel"]).await;
-        let is_root = top.is_ok_and(|out| Path::new(text(&out).trim()) == this.dir);
+        let is_root =
+            top.is_ok_and(|out| Path::new(text(&out).trim()) == this.dir);
         if !is_root {
             let branch = format!("--initial-branch={}", this.config.branch);
             let _ = this.git(&["init", "--quiet", &branch]).await?;
@@ -151,7 +155,11 @@ impl GitStore {
     /// push the remote refuses for reasons other than a race), or if the
     /// remote keeps moving for five rounds.
     #[tracing::instrument(skip(self, writer), fields(conflicts), err)]
-    pub async fn sync(&self, message: &str, writer: &Writer<'_>) -> StoreResult<Synced> {
+    pub async fn sync(
+        &self,
+        message: &str,
+        writer: &Writer<'_>,
+    ) -> StoreResult<Synced> {
         let _gate = self.gate.write().await;
         let mut synced = Synced {
             committed: self.commit_all(message).await?,
@@ -180,12 +188,14 @@ impl GitStore {
                 {
                     (true, _, _) => {
                         synced.pushed = true;
-                        let _ =
-                            tracing::Span::current().record("conflicts", synced.conflicts.len());
+                        let _ = tracing::Span::current()
+                            .record("conflicts", synced.conflicts.len());
                         return Ok(synced);
                     }
                     (false, _, err) if rejected(&err) => {
-                        tracing::debug!("remote moved during sync; merging again");
+                        tracing::debug!(
+                            "remote moved during sync; merging again"
+                        );
                     }
                     (false, _, err) => return Err(self.failed("push", &err)),
                 }
@@ -201,7 +211,8 @@ impl GitStore {
 
     async fn commit_all(&self, message: &str) -> StoreResult<Option<String>> {
         let _ = self.git(&["add", "--all"]).await?;
-        let (clean, _, _) = self.run(&["diff", "--cached", "--quiet"], None).await?;
+        let (clean, _, _) =
+            self.run(&["diff", "--cached", "--quiet"], None).await?;
         if clean && self.has_commits().await {
             return Ok(None);
         }
@@ -218,7 +229,11 @@ impl GitStore {
         Ok(Some(self.head().await?))
     }
 
-    async fn merge_fetched(&self, writer: &Writer<'_>, synced: &mut Synced) -> StoreResult<()> {
+    async fn merge_fetched(
+        &self,
+        writer: &Writer<'_>,
+        synced: &mut Synced,
+    ) -> StoreResult<()> {
         let before = if self.has_commits().await {
             Some(self.head().await?)
         } else {
@@ -291,10 +306,16 @@ impl GitStore {
             (Some(ours), Some(theirs)) => {
                 let kind = MergeKind::for_path(&path);
                 if let Some(merged) = three_way(kind, &base, &ours, &theirs) {
-                    let _ = self.local.put(&path, merged, Precondition::None).await?;
+                    let _ = self
+                        .local
+                        .put(&path, merged, Precondition::None)
+                        .await?;
                     synced.merged.push(path.clone());
                 } else {
-                    let _ = self.local.put(&path, theirs, Precondition::None).await?;
+                    let _ = self
+                        .local
+                        .put(&path, theirs, Precondition::None)
+                        .await?;
                     let copy = self.copy_out(&path, &ours, writer).await?;
                     synced.conflicts.push((path.clone(), copy));
                 }
@@ -390,7 +411,8 @@ impl GitStore {
             .await?;
         let file = self.dir.join(text(&path).trim());
         let line = format!("/{SYSTEM_DIR}/");
-        let current = tokio::fs::read_to_string(&file).await.unwrap_or_default();
+        let current =
+            tokio::fs::read_to_string(&file).await.unwrap_or_default();
         if current.lines().any(|l| l.trim() == line) {
             return Ok(());
         }
@@ -422,7 +444,9 @@ impl GitStore {
     async fn git(&self, args: &[&str]) -> StoreResult<Vec<u8>> {
         match self.run(args, None).await? {
             (true, out, _) => Ok(out),
-            (false, _, err) => Err(self.failed(args.first().copied().unwrap_or("git"), &err)),
+            (false, _, err) => {
+                Err(self.failed(args.first().copied().unwrap_or("git"), &err))
+            }
         }
     }
 
@@ -436,7 +460,12 @@ impl GitStore {
         let _ = cmd
             .arg("-C")
             .arg(&self.dir)
-            .args(["-c", "core.quotepath=off", "-c", "core.hooksPath=/dev/null"])
+            .args([
+                "-c",
+                "core.quotepath=off",
+                "-c",
+                "core.hooksPath=/dev/null",
+            ])
             .args(args)
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("GIT_AUTHOR_NAME", &self.config.author_name)
@@ -452,9 +481,9 @@ impl GitStore {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
-        let mut child = cmd
-            .spawn()
-            .map_err(|e| StoreError::Backend(format!("git: cannot run git: {e}")))?;
+        let mut child = cmd.spawn().map_err(|e| {
+            StoreError::Backend(format!("git: cannot run git: {e}"))
+        })?;
         if let (Some(input), Some(mut pipe)) = (stdin, child.stdin.take()) {
             pipe.write_all(input)
                 .await
@@ -470,7 +499,10 @@ impl GitStore {
     fn failed(&self, what: &str, stderr: &[u8]) -> StoreError {
         let msg = text(stderr);
         let msg = msg.get(..msg.len().min(400)).unwrap_or(&msg).trim();
-        StoreError::Backend(format!("git {what} in {}: {msg}", self.dir.display()))
+        StoreError::Backend(format!(
+            "git {what} in {}: {msg}",
+            self.dir.display()
+        ))
     }
 
     fn check(path: &BlobPath) -> StoreResult<()> {
@@ -521,7 +553,9 @@ fn literal(path: &BlobPath) -> String {
 /// True when `git push` failed because the remote moved on.
 fn rejected(stderr: &[u8]) -> bool {
     let msg = text(stderr);
-    msg.contains("[rejected]") || msg.contains("fetch first") || msg.contains("non-fast-forward")
+    msg.contains("[rejected]")
+        || msg.contains("fetch first")
+        || msg.contains("non-fast-forward")
 }
 
 fn io(path: &Path, source: std::io::Error) -> StoreError {
@@ -558,20 +592,31 @@ impl BlobStore for GitStore {
         self.local.put(path, bytes, condition).await
     }
 
-    async fn delete(&self, path: &BlobPath, condition: Precondition) -> StoreResult<()> {
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        condition: Precondition,
+    ) -> StoreResult<()> {
         Self::check(path)?;
         let _gate = self.gate.read().await;
         self.local.delete(path, condition).await
     }
 
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         Self::check(from)?;
         Self::check(to)?;
         let _gate = self.gate.read().await;
         self.local.rename(from, to).await
     }
 
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>> {
         if let Some(dir) = dir
             && let Err(e) = Self::check(dir)
         {
@@ -580,7 +625,10 @@ impl BlobStore for GitStore {
         self.local
             .list(dir)
             .filter(|entry| {
-                let keep = !matches!(entry, Ok(e) if e.path.segments().next() == Some(GIT_DIR));
+                let keep = !matches!(
+                    entry,
+                    Ok(e) if e.path.segments().next() == Some(GIT_DIR)
+                );
                 async move { keep }
             })
             .boxed()

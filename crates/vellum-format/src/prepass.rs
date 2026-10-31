@@ -26,7 +26,11 @@ struct Line<'a> {
 }
 
 /// Parses `body`, whose first line is line `first_line` of the file.
-pub fn blocks(body: &str, first_line: usize, diagnostics: &mut Vec<Diagnostic>) -> Vec<Block> {
+pub fn blocks(
+    body: &str,
+    first_line: usize,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Vec<Block> {
     let code = convert::code_lines(body);
     let lines: Vec<Line<'_>> = body
         .split_inclusive('\n')
@@ -72,7 +76,11 @@ struct Opener {
 impl Scanner<'_, '_, '_> {
     /// Scans until a closing colon line (when `nested`) or the end. Returns
     /// the sections and whether a closing line was found.
-    fn scan(&mut self, split_columns: bool, top: bool) -> (Vec<Vec<Block>>, bool) {
+    fn scan(
+        &mut self,
+        split_columns: bool,
+        top: bool,
+    ) -> (Vec<Vec<Block>>, bool) {
         let mut sections = vec![Vec::new()];
         let mut run: Vec<Line<'_>> = Vec::new();
         while let Some(&line) = self.lines.get(self.next) {
@@ -90,7 +98,8 @@ impl Scanner<'_, '_, '_> {
                     return (sections, true);
                 }
             } else if colons >= 3
-                && let Some(opener) = parse_opener(bare.get(colons..).unwrap_or_default())
+                && let Some(opener) =
+                    parse_opener(bare.get(colons..).unwrap_or_default())
             {
                 if self.depth >= crate::MAX_NESTING {
                     // Too deep: the opening line is read as text.
@@ -126,19 +135,22 @@ impl Scanner<'_, '_, '_> {
                 line,
                 DiagnosticCode::UnknownContainer,
                 format!(
-                    "`::: {}` is not a Vellum container; its content is shown as is",
+                    "`::: {}` is not a Vellum container; its content is shown \
+                        as is",
                     opener.name
                 ),
             ));
         }
         self.depth += 1;
-        let (mut sections, closed) = self.scan(kind == ContainerKind::Columns, false);
+        let (mut sections, closed) =
+            self.scan(kind == ContainerKind::Columns, false);
         self.depth -= 1;
         if !closed {
             self.diagnostics.push(Diagnostic::new(
                 line,
                 DiagnosticCode::UnclosedContainer,
-                "container has no closing `:::` line; it runs to the end of its parent",
+                "container has no closing `:::` line; it runs to the end of \
+                    its parent",
             ));
         }
         // A column split before any content does not make an empty column.
@@ -191,7 +203,12 @@ impl Scanner<'_, '_, '_> {
                 }
             })
             .collect();
-        let blocks = convert::markdown(&text, first.number, self.depth, self.diagnostics);
+        let blocks = convert::markdown(
+            &text,
+            first.number,
+            self.depth,
+            self.diagnostics,
+        );
         if let Some(section) = sections.last_mut() {
             section.extend(blocks);
         }
@@ -202,22 +219,30 @@ impl Scanner<'_, '_, '_> {
 /// Longest run of `>` handed to comrak unchanged.
 const MAX_QUOTE_RUN: usize = 32;
 
-/// Breaks runs of more than [`MAX_QUOTE_RUN`] `>` with a space.
+/// Breaks runs of more than [`MAX_QUOTE_RUN`] `>` with a space in a
+/// line's leading quote markers.
 ///
 /// comrak's alert check rescans the rest of a `>` run at every quote
 /// level, so one line of 100 000 `>` takes seconds. A space between quote
 /// markers changes nothing in Markdown, and content that deep is shown
-/// as plain text anyway. Code lines never reach this function.
+/// as plain text anyway. Only the markers are touched: a `>` run after the
+/// first other character is text, and a space there would change it.
+/// Code lines never reach this function.
 fn space_quote_runs(line: &str) -> std::borrow::Cow<'_, str> {
-    let too_long = line
+    let markers = line
+        .find(|c| !matches!(c, '>' | ' ' | '\t'))
+        .unwrap_or(line.len());
+    let (prefix, rest) = line.split_at(markers);
+    let too_long = prefix
         .split(|c| c != '>')
         .any(|run| run.len() > MAX_QUOTE_RUN);
     if !too_long {
         return std::borrow::Cow::Borrowed(line);
     }
-    let mut out = String::with_capacity(line.len() + line.len() / MAX_QUOTE_RUN);
+    let mut out =
+        String::with_capacity(line.len() + prefix.len() / MAX_QUOTE_RUN);
     let mut run = 0;
-    for c in line.chars() {
+    for c in prefix.chars() {
         if c == '>' {
             if run == MAX_QUOTE_RUN {
                 out.push(' ');
@@ -229,6 +254,7 @@ fn space_quote_runs(line: &str) -> std::borrow::Cow<'_, str> {
         }
         out.push(c);
     }
+    out.push_str(rest);
     std::borrow::Cow::Owned(out)
 }
 
@@ -238,7 +264,8 @@ pub fn too_deep(line: usize) -> Diagnostic {
         line,
         DiagnosticCode::NestingTooDeep,
         format!(
-            "content nests more than {} levels deep; the deeper part is shown as plain text",
+            "content nests more than {} levels deep; the deeper part is shown \
+                as plain text",
             crate::MAX_NESTING
         ),
     )
@@ -254,7 +281,8 @@ fn push(sections: &mut [Vec<Block>], block: Block) {
 /// `Some(None)` for `$$`, `Some(Some(id))` for `$$ ^blk-…`.
 #[expect(
     clippy::option_option,
-    reason = "the outer option says whether the line opens math, the inner one holds its ID"
+    reason = "the outer option says whether the line opens math, the inner one \
+        holds its ID"
 )]
 fn math_opener(line: &str) -> Option<Option<vellum_kernel::BlockId>> {
     let rest = line.strip_prefix("$$")?;
@@ -270,12 +298,14 @@ fn parse_opener(rest: &str) -> Option<Opener> {
     let rest = rest.trim();
     let (head, attrs) = attrs::split_trailing(rest);
     let (head, id) = crate::extras::split_block_id(head);
-    let (name, arg) = head.split_once(char::is_whitespace).unwrap_or((head, ""));
+    let (name, arg) =
+        head.split_once(char::is_whitespace).unwrap_or((head, ""));
     let valid_name = name.starts_with(|c: char| c.is_ascii_alphabetic())
         && name
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'));
-    if !(valid_name || (name.is_empty() && (!attrs.is_empty() || id.is_some()))) {
+    if !(valid_name || (name.is_empty() && (!attrs.is_empty() || id.is_some())))
+    {
         return None;
     }
     Some(Opener {

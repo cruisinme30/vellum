@@ -66,7 +66,9 @@ pub struct MathError(pub String);
 /// longer than 10 000 characters.
 pub fn parse(tex: &str) -> Result<Node, MathError> {
     if tex.len() > 10_000 {
-        return Err(MathError("formula is longer than 10 000 characters".into()));
+        return Err(MathError(
+            "formula is longer than 10 000 characters".into(),
+        ));
     }
     let tokens = lex(tex)?;
     let mut parser = Parser {
@@ -409,21 +411,38 @@ impl Parser<'_> {
                 };
                 Node::Root(index, Box::new(self.argument()?))
             }
-            "text" | "textrm" | "mathrm" if name != "mathrm" => Node::Text(self.braced_text()?),
+            "text" | "textrm" | "mathrm" if name != "mathrm" => {
+                Node::Text(self.braced_text()?)
+            }
             "mathrm" | "operatorname" => Node::Func(self.braced_text()?),
-            "mathbf" | "boldsymbol" | "bm" => Node::Font("bold", Box::new(self.argument()?)),
+            "mathbf" | "boldsymbol" | "bm" => {
+                Node::Font("bold", Box::new(self.argument()?))
+            }
             "mathit" => Node::Font("italic", Box::new(self.argument()?)),
             "mathcal" => Node::Font("cal", Box::new(self.argument()?)),
             "mathbb" => Node::Font("bb", Box::new(self.argument()?)),
-            "hat" | "widehat" => Node::Accent("hat", '\u{302}', Box::new(self.argument()?)),
-            "bar" | "overline" => Node::Accent("overline", '\u{305}', Box::new(self.argument()?)),
-            "vec" => Node::Accent("arrow", '\u{20D7}', Box::new(self.argument()?)),
+            "hat" | "widehat" => {
+                Node::Accent("hat", '\u{302}', Box::new(self.argument()?))
+            }
+            "bar" | "overline" => {
+                Node::Accent("overline", '\u{305}', Box::new(self.argument()?))
+            }
+            "vec" => {
+                Node::Accent("arrow", '\u{20D7}', Box::new(self.argument()?))
+            }
             "dot" => Node::Accent("dot", '\u{307}', Box::new(self.argument()?)),
-            "ddot" => Node::Accent("dot.double", '\u{308}', Box::new(self.argument()?)),
-            "tilde" | "widetilde" => Node::Accent("tilde", '\u{303}', Box::new(self.argument()?)),
-            "sin" | "cos" | "tan" | "cot" | "sec" | "csc" | "log" | "ln" | "exp" | "lim"
-            | "max" | "min" | "sup" | "inf" | "det" | "arg" | "deg" | "dim" | "gcd" | "ker"
-            | "Pr" | "sinh" | "cosh" | "tanh" | "arcsin" | "arccos" | "arctan" | "mod" => {
+            "ddot" => Node::Accent(
+                "dot.double",
+                '\u{308}',
+                Box::new(self.argument()?),
+            ),
+            "tilde" | "widetilde" => {
+                Node::Accent("tilde", '\u{303}', Box::new(self.argument()?))
+            }
+            "sin" | "cos" | "tan" | "cot" | "sec" | "csc" | "log" | "ln"
+            | "exp" | "lim" | "max" | "min" | "sup" | "inf" | "det" | "arg"
+            | "deg" | "dim" | "gcd" | "ker" | "Pr" | "sinh" | "cosh"
+            | "tanh" | "arcsin" | "arccos" | "arctan" | "mod" => {
                 Node::Func(name.to_owned())
             }
             "left" => {
@@ -431,13 +450,19 @@ impl Parser<'_> {
                 let body = self.row(&[])?;
                 match self.next() {
                     Some(Tok::Cmd(c)) if c == "right" => {}
-                    _ => return Err(MathError("`\\left` without `\\right`".into())),
+                    _ => {
+                        return Err(MathError(
+                            "`\\left` without `\\right`".into(),
+                        ));
+                    }
                 }
                 let close = self.delimiter()?;
                 Node::Fenced(open, close, Box::new(body))
             }
             "begin" => self.environment()?,
-            "," | ";" | ":" | " " | "quad" | "qquad" | "!" => Node::Text(" ".into()),
+            "," | ";" | ":" | " " | "quad" | "qquad" | "!" => {
+                Node::Text(" ".into())
+            }
             "{" => Node::Sym("brace.l", '{'),
             "}" => Node::Sym("brace.r", '}'),
             "%" => Node::Sym("percent", '%'),
@@ -445,7 +470,9 @@ impl Parser<'_> {
             "_" => Node::Sym("underscore", '_'),
             "#" => Node::Sym("hash", '#'),
             "&" => Node::Sym("amp", '&'),
-            "displaystyle" | "textstyle" | "limits" | "nolimits" => Node::Row(Vec::new()),
+            "displaystyle" | "textstyle" | "limits" | "nolimits" => {
+                Node::Row(Vec::new())
+            }
             other => return Err(MathError(format!("`\\{other}`"))),
         })
     }
@@ -464,7 +491,9 @@ impl Parser<'_> {
                 "rfloor" => "⌋".into(),
                 "lceil" => "⌈".into(),
                 "rceil" => "⌉".into(),
-                other => return Err(MathError(format!("delimiter `\\{other}`"))),
+                other => {
+                    return Err(MathError(format!("delimiter `\\{other}`")));
+                }
             }),
             _ => Err(MathError("missing delimiter".into())),
         }
@@ -473,7 +502,8 @@ impl Parser<'_> {
     fn environment(&mut self) -> Result<Node, MathError> {
         let env = self.braced_text()?;
         let (open, close) = match env.as_str() {
-            "matrix" | "cases" | "aligned" | "align" | "align*" | "gathered" => ("", ""),
+            "matrix" | "cases" | "aligned" | "align" | "align*"
+            | "gathered" => ("", ""),
             "pmatrix" => ("(", ")"),
             "bmatrix" => ("[", "]"),
             "Bmatrix" => ("{", "}"),
@@ -492,7 +522,11 @@ impl Parser<'_> {
                     let _ = self.braced_text()?;
                     break;
                 }
-                _ => return Err(MathError(format!("`\\begin{{{env}}}` is not closed"))),
+                _ => {
+                    return Err(MathError(format!(
+                        "`\\begin{{{env}}}` is not closed"
+                    )));
+                }
             }
         }
         if row.iter().any(|cell| cell != &Node::Row(Vec::new())) {
@@ -617,7 +651,9 @@ fn symbol(name: &str) -> Option<(&'static str, char)> {
 
 const fn is_big_operator(node: &Node) -> Option<char> {
     match node {
-        Node::Sym(_, c @ ('∑' | '∏' | '∫' | '∬' | '∮' | '⋃' | '⋂')) => Some(*c),
+        Node::Sym(_, c @ ('∑' | '∏' | '∫' | '∬' | '∮' | '⋃' | '⋂')) => {
+            Some(*c)
+        }
         _ => None,
     }
 }
@@ -818,7 +854,9 @@ fn omml(node: &Node, out: &mut String) {
         Node::Root(index, body) => {
             out.push_str("<m:rad>");
             match index {
-                None => out.push_str("<m:radPr><m:degHide m:val=\"1\"/></m:radPr><m:deg/>"),
+                None => out.push_str(
+                    "<m:radPr><m:degHide m:val=\"1\"/></m:radPr><m:deg/>",
+                ),
                 Some(index) => {
                     out.push_str("<m:deg>");
                     omml(index, out);
@@ -857,7 +895,10 @@ fn omml(node: &Node, out: &mut String) {
             out.push_str("</m:bar>");
         }
         Node::Accent(_, chr, body) => {
-            let _ = write!(out, "<m:acc><m:accPr><m:chr m:val=\"{chr}\"/></m:accPr>");
+            let _ = write!(
+                out,
+                "<m:acc><m:accPr><m:chr m:val=\"{chr}\"/></m:accPr>"
+            );
             omml_e(body, out);
             out.push_str("</m:acc>");
         }
@@ -882,14 +923,18 @@ fn omml(node: &Node, out: &mut String) {
             if let Some(sty) = sty {
                 let _ = write!(props, "<m:sty m:val=\"{sty}\"/>");
             }
-            out.push_str(&inner.replace("<m:r>", &format!("<m:r><m:rPr>{props}</m:rPr>")));
+            out.push_str(
+                &inner
+                    .replace("<m:r>", &format!("<m:r><m:rPr>{props}</m:rPr>")),
+            );
         }
         Node::Fenced(open, close, body) => {
             let open = if open == "." { "" } else { open };
             let close = if close == "." { "" } else { close };
             let _ = write!(
                 out,
-                "<m:d><m:dPr><m:begChr m:val=\"{}\"/><m:endChr m:val=\"{}\"/></m:dPr>",
+                "<m:d><m:dPr><m:begChr m:val=\"{}\"/><m:endChr \
+                    m:val=\"{}\"/></m:dPr>",
                 xml_escape(open),
                 xml_escape(close)
             );
@@ -901,7 +946,8 @@ fn omml(node: &Node, out: &mut String) {
             if delimited {
                 let _ = write!(
                     out,
-                    "<m:d><m:dPr><m:begChr m:val=\"{}\"/><m:endChr m:val=\"{}\"/></m:dPr><m:e>",
+                    "<m:d><m:dPr><m:begChr m:val=\"{}\"/><m:endChr \
+                        m:val=\"{}\"/></m:dPr><m:e>",
                     xml_escape(open),
                     xml_escape(close)
                 );
@@ -912,7 +958,10 @@ fn omml(node: &Node, out: &mut String) {
             }
         }
         Node::Cases(rows) => {
-            out.push_str("<m:d><m:dPr><m:begChr m:val=\"{\"/><m:endChr m:val=\"\"/></m:dPr><m:e>");
+            out.push_str(
+                "<m:d><m:dPr><m:begChr m:val=\"{\"/><m:endChr \
+                m:val=\"\"/></m:dPr><m:e>",
+            );
             omml_matrix(rows, out);
             out.push_str("</m:e></m:d>");
         }
@@ -970,7 +1019,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn fractions_scripts_and_symbols_convert_to_typst() -> Result<(), MathError> {
+    fn fractions_scripts_and_symbols_convert_to_typst() -> Result<(), MathError>
+    {
         assert_eq!(
             to_typst(r"F_1 = 2 \cdot \frac{P \cdot R}{P + R}")?,
             "attach(F, b: 1) eq 2 dot.op frac(P dot.op R, P plus R)"
@@ -987,7 +1037,12 @@ mod tests {
             "mat(delim: \"(\", a, b; c, d)"
         );
         assert_eq!(to_typst(r"\left( x \right.")?, "lr(( x \"\")");
-        assert!(to_typst(r"\begin{cases} 1 & x > 0 \\ 0 & \text{otherwise} \end{cases}").is_ok());
+        assert!(
+            to_typst(
+                r"\begin{cases} 1 & x > 0 \\ 0 & \text{otherwise} \end{cases}"
+            )
+            .is_ok()
+        );
         Ok(())
     }
 

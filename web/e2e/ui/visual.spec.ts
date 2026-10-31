@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { expect, test } from "./fixtures";
-import { settle } from "./harness";
+import { openPanel, settle } from "./harness";
 import { fakeServer } from "./server";
 import { TARGETS } from "./targets";
 
@@ -25,6 +25,7 @@ for (const target of TARGETS.filter((candidate) => candidate.visual)) {
       await fakeServer(page, target.server);
       await page.goto(target.url);
       await settle(page);
+      await openPanel(page, target);
       const name = `${target.name.replaceAll(/[^\w.-]+/g, "_")}-${scheme}.png`;
       await expect(page).toHaveScreenshot(name, { fullPage: true });
     });

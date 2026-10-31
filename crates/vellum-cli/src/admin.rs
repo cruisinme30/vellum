@@ -27,7 +27,10 @@ pub fn profile(args: &ProfileArgs) -> ExitCode {
 pub fn budgets(args: &BudgetsArgs) -> ExitCode {
     match budgets::run(args) {
         Ok(verdict) if verdict.passed() => {
-            tracing::info!(judged = verdict.judged, "every route is within budget");
+            tracing::info!(
+                judged = verdict.judged,
+                "every route is within budget"
+            );
             ExitCode::SUCCESS
         }
         Ok(verdict) => {

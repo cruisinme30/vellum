@@ -15,7 +15,8 @@ pub const ROWS_COMPUTED_TOTAL: &str = "vellum_collections_rows_computed_total";
 /// Histogram of compute batch latency in seconds.
 pub const COMPUTE_SECONDS: &str = "vellum_collections_compute_duration_seconds";
 /// Counter of formula cells that evaluated to an error.
-pub const FORMULA_ERRORS_TOTAL: &str = "vellum_collections_formula_errors_total";
+pub const FORMULA_ERRORS_TOTAL: &str =
+    "vellum_collections_formula_errors_total";
 /// Histogram of view query latency in seconds, labelled `kind`.
 pub const QUERY_SECONDS: &str = "vellum_collections_query_duration_seconds";
 /// Counter of CSV rows imported or exported, labelled `direction`.
@@ -68,7 +69,9 @@ fn instruments() -> &'static Instruments {
             load: meter
                 .f64_histogram(LOAD_SECONDS)
                 .with_unit("s")
-                .with_description("Time to load every collection from the blob store")
+                .with_description(
+                    "Time to load every collection from the blob store",
+                )
                 .build(),
             rows_loaded: meter
                 .u64_counter(ROWS_LOADED_TOTAL)

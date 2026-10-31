@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: 2026 The Vellum contributors
+# SPDX-License-Identifier: AGPL-3.0-only
+#
+# sqlfluff 4 flags keywords used as identifiers (RF04). The shipped
+# migrations already name columns `key`, `name` and `value`, and a
+# released migration can't change, so the rule stays off.
+
+[sqlfluff]
+dialect = postgres
+exclude_rules = RF04

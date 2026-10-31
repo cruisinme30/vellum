@@ -19,8 +19,11 @@ pub enum Error {
     /// Reading the workspace failed outside any single file.
     #[error("index I/O error: {0}")]
     Io(#[from] std::io::Error),
-    /// The SQLite file could not be opened with the given key (wrong key, or not an index).
-    #[error("the index at {path} could not be unlocked with the configured key")]
+    /// The SQLite file could not be opened with the given key (wrong key, or
+    /// not an index).
+    #[error(
+        "the index at {path} could not be unlocked with the configured key"
+    )]
     Locked {
         /// Path of the SQLite file.
         path: String,
@@ -31,4 +34,12 @@ pub enum Error {
     /// A space is assigned to a shard this deployment does not have.
     #[error("no shard named {0:?} is configured")]
     UnknownShard(String),
+    /// A job queue holds its limit of unfinished jobs.
+    #[error("the {queue:?} job queue is full ({limit} unfinished jobs)")]
+    QueueFull {
+        /// The queue.
+        queue: String,
+        /// Its bound.
+        limit: u64,
+    },
 }

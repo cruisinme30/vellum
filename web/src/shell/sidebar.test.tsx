@@ -14,7 +14,11 @@ function renderSidebar(compact: boolean) {
   const onNavigate = vi.fn<() => void>();
   return {
     ...renderWithProviders(
-      <Sidebar currentId={undefined} compact={compact} onNavigate={onNavigate} />,
+      <Sidebar
+        currentId={undefined}
+        compact={compact}
+        onNavigate={onNavigate}
+      />,
     ),
     onNavigate,
   };
@@ -25,13 +29,15 @@ describe("Sidebar", () => {
     renderSidebar(false);
     expect(screen.getByText("Northstar")).toBeDefined();
     expect(
-      screen.getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent),
+      screen
+        .getAllByRole("heading", { level: 2 })
+        .map((heading) => heading.textContent),
     ).toEqual(["🛰 Engineering", "📐 Product", "📘 Handbook"]);
-    expect(screen.getAllByRole("tree").map((tree) => tree.getAttribute("aria-label"))).toEqual([
-      "Engineering pages",
-      "Product pages",
-      "Handbook pages",
-    ]);
+    expect(
+      screen
+        .getAllByRole("tree")
+        .map((tree) => tree.getAttribute("aria-label")),
+    ).toEqual(["Engineering pages", "Product pages", "Handbook pages"]);
     expect(screen.getByRole("region", { name: "Engineering" })).toBeDefined();
     expect(screen.queryByRole("navigation")).toBeNull();
     expect(screen.queryByRole("radio")).toBeNull();
@@ -39,7 +45,9 @@ describe("Sidebar", () => {
 
   it("adds a page to a space and opens it", async () => {
     const { user, store, location, onNavigate } = renderSidebar(false);
-    await user.click(screen.getByRole("button", { name: "Add a page to Handbook" }));
+    await user.click(
+      screen.getByRole("button", { name: "Add a page to Handbook" }),
+    );
     const created = store.getSnapshot().pages.at(-1);
     expect(created).toMatchObject({ spaceId: HANDBOOK, parentId: undefined });
     await waitFor(() => {

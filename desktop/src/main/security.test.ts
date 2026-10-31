@@ -31,7 +31,9 @@ describe("security", () => {
 
   it("grants a short list of permissions to app pages", () => {
     expect(allowPermission("notifications", "app://vellum/")).toBe(true);
-    expect(allowPermission("notifications", "https://evil.example/")).toBe(false);
+    expect(allowPermission("notifications", "https://evil.example/")).toBe(
+      false,
+    );
     expect(allowPermission("media", "app://vellum/")).toBe(false);
   });
 
@@ -42,7 +44,9 @@ describe("security", () => {
     expect(contentSecurityPolicy("http://127.0.0.1:7700")).toContain(
       "connect-src 'self' ws://127.0.0.1:7700",
     );
-    expect(contentSecurityPolicy("https://a.dev")).toContain("object-src 'none'");
+    expect(contentSecurityPolicy("https://a.dev")).toContain(
+      "object-src 'none'",
+    );
   });
 
   it("sandboxes the renderer and passes the version to the preload", () => {

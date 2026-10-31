@@ -43,15 +43,21 @@ describe("TokenStore", () => {
     await store.save(tokens);
     expect(disk.bytes).toBeUndefined();
     expect(await store.load()).toEqual(tokens);
-    expect(await new TokenStore(vault("os", false), memoryDisk()).load()).toBeUndefined();
+    expect(
+      await new TokenStore(vault("os", false), memoryDisk()).load(),
+    ).toBeUndefined();
   });
 
   it("drops a file it cannot decrypt or understand", async () => {
     const unreadable = memoryDisk("garbage");
     expect(await new TokenStore(vault(), unreadable).load()).toBeUndefined();
     expect(unreadable.bytes).toBeUndefined();
-    expect(await new TokenStore(vault(), memoryDisk('sealed:{"server":1}')).load()).toBeUndefined();
-    expect(await new TokenStore(vault(), memoryDisk("sealed:null")).load()).toBeUndefined();
+    expect(
+      await new TokenStore(vault(), memoryDisk('sealed:{"server":1}')).load(),
+    ).toBeUndefined();
+    expect(
+      await new TokenStore(vault(), memoryDisk("sealed:null")).load(),
+    ).toBeUndefined();
     expect(await new TokenStore(vault(), memoryDisk()).load()).toBeUndefined();
   });
 

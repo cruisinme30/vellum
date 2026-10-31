@@ -33,7 +33,18 @@ pub enum Tab {
 }
 
 /// The focus buckets, in display order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Focus {
     /// Urgent priority.
@@ -66,7 +77,9 @@ pub fn focus(issue: &Issue, graph: &WorkGraph, ctx: &Ctx) -> Focus {
         Focus::Sla
     } else if is_blocked(issue, graph) {
         Focus::Blocked
-    } else if issue.cycle.is_some() && issue.cycle == graph.current_cycle(&issue.team, ctx.today) {
+    } else if issue.cycle.is_some()
+        && issue.cycle == graph.current_cycle(&issue.team, ctx.today)
+    {
         Focus::Cycle
     } else if category.is_active() {
         Focus::Active

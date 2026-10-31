@@ -92,8 +92,9 @@ async fn principals(
         _ => return Ok(None),
     };
     let parse = |text: String| {
-        Principal::parse(&text)
-            .map_err(|err| DriveError::Invalid(format!("principal {text}: {err}")))
+        Principal::parse(&text).map_err(|err| {
+            DriveError::Invalid(format!("principal {text}: {err}"))
+        })
     };
     let mut out = BTreeSet::from([parse(format!("user:{user}"))?]);
     for group in access.groups_of(user).await? {
@@ -114,7 +115,8 @@ pub(super) fn never_copied(book: &BlobPath, path: &BlobPath) -> bool {
 /// True for the files a book view replaces: `book.yaml` and every
 /// Markdown file of the book.
 pub(super) fn from_view(book: &BlobPath, path: &BlobPath) -> bool {
-    relative(book, path).is_some_and(|rel| rel == MANIFEST || layout::has_ext(rel, "md"))
+    relative(book, path)
+        .is_some_and(|rel| rel == MANIFEST || layout::has_ext(rel, "md"))
 }
 
 impl Drive {
@@ -126,7 +128,11 @@ impl Drive {
     /// # Errors
     /// `Invalid` when the book cannot be loaded (refusing is the safe
     /// answer), or a store or authorization failure.
-    pub(super) async fn book_view(&self, actor: &Actor, node: &Node) -> DriveResult<BookView> {
+    pub(super) async fn book_view(
+        &self,
+        actor: &Actor,
+        node: &Node,
+    ) -> DriveResult<BookView> {
         let root = &node.path;
         let mut texts: BTreeMap<String, String> = BTreeMap::new();
         for (path, _) in self.blobs_under(root).await? {
@@ -137,7 +143,8 @@ impl Drive {
                 continue;
             };
             let blob = self.store.get(&path).await?;
-            let text = String::from_utf8(blob.bytes.to_vec()).map_err(|_| unreadable(root))?;
+            let text = String::from_utf8(blob.bytes.to_vec())
+                .map_err(|_| unreadable(root))?;
             let _ = texts.insert(rel, text);
         }
         let manifest = texts.get(MANIFEST).ok_or_else(|| unreadable(root))?;
@@ -201,6 +208,7 @@ fn relative<'a>(dir: &BlobPath, path: &'a BlobPath) -> Option<&'a str> {
 
 fn unreadable(root: &BlobPath) -> DriveError {
     DriveError::Invalid(format!(
-        "the book at {root} could not be read; repair it before copying or opening it"
+        "the book at {root} could not be read; repair it before copying or \
+            opening it"
     ))
 }

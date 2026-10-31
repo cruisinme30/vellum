@@ -25,7 +25,11 @@ impl ErrorResponse {
 
     /// Shorthand for an error of `kind` with a caller-safe message.
     #[must_use]
-    pub fn of(kind: ErrorKind, message: &'static str, request_id: RequestId) -> Self {
+    pub fn of(
+        kind: ErrorKind,
+        message: &'static str,
+        request_id: RequestId,
+    ) -> Self {
         Self::new(Error::new(kind, message), request_id)
     }
 }
@@ -33,15 +37,31 @@ impl ErrorResponse {
 /// The HTTP status for an error kind.
 #[must_use]
 pub fn status_of(kind: ErrorKind) -> StatusCode {
-    StatusCode::from_u16(ApiError::status(kind)).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
+    StatusCode::from_u16(ApiError::status(kind))
+        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 impl IntoResponse for ErrorResponse {
     fn into_response(self) -> Response {
         let kind = self.error.kind();
-        let status = status_of(kind);
+        // A save refused for the secrets in it (R-SE-6): the request was
+        // well formed, its content is what cannot be accepted.
+        let status = if kind == ErrorKind::InvalidInput
+            && self
+                .error
+                .message()
+                .starts_with(vellum_security::secrets::SECRETS_FOUND)
+        {
+            StatusCode::UNPROCESSABLE_ENTITY
+        } else {
+            status_of(kind)
+        };
         if kind == ErrorKind::Internal {
-            tracing::error!(error = %self.error, source = ?std::error::Error::source(&self.error), "internal error");
+            tracing::error!(
+                error = %self.error,
+                source = ?std::error::Error::source(&self.error),
+                "internal error"
+            );
         } else {
             tracing::debug!(error = %self.error, "request failed");
         }
@@ -50,18 +70,22 @@ impl IntoResponse for ErrorResponse {
         let headers = response.headers_mut();
         match kind {
             ErrorKind::Unauthenticated => {
-                let challenge = if self.error.message() == REAUTHENTICATION_REQUIRED {
-                    "Bearer error=\"insufficient_user_authentication\""
-                } else {
-                    "Bearer"
-                };
+                let challenge =
+                    if self.error.message() == REAUTHENTICATION_REQUIRED {
+                        "Bearer error=\"insufficient_user_authentication\""
+                    } else {
+                        "Bearer"
+                    };
                 let _ = headers.insert(
                     http::header::WWW_AUTHENTICATE,
                     HeaderValue::from_static(challenge),
                 );
             }
             ErrorKind::RateLimited | ErrorKind::Unavailable => {
-                let _ = headers.insert(http::header::RETRY_AFTER, HeaderValue::from_static("1"));
+                let _ = headers.insert(
+                    http::header::RETRY_AFTER,
+                    HeaderValue::from_static("1"),
+                );
             }
             _ => {}
         }

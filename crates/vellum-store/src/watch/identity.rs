@@ -29,13 +29,16 @@ pub fn identity(path: &BlobPath, bytes: &[u8]) -> Option<ObjectId> {
             if lines.next()?.trim_end() != "---" {
                 return None;
             }
-            let mut front = lines.take_while(|l| !matches!(l.trim_end(), "---" | "..."));
+            let mut front =
+                lines.take_while(|l| !matches!(l.trim_end(), "---" | "..."));
             front.find_map(id_value)
         }
         Kind::FolderMeta | Kind::CollectionSchema { .. } | Kind::Shortcut => {
             lines.find_map(id_value)
         }
-        Kind::BookManifest { .. } if path.file_name() == "book.yaml" => lines.find_map(id_value),
+        Kind::BookManifest { .. } if path.file_name() == "book.yaml" => {
+            lines.find_map(id_value)
+        }
         _ => None,
     }
 }
@@ -61,8 +64,13 @@ mod tests {
 
     #[test]
     fn reads_markdown_front_matter() {
-        let doc = format!("---\ntitle: Plan\nid: \"{ID}\" # immutable\n---\n# Plan\n");
-        assert_eq!(id_of("drives/users/ana/Plan.md", &doc).as_deref(), Some(ID));
+        let doc = format!(
+            "---\ntitle: Plan\nid: \"{ID}\" # immutable\n---\n# Plan\n"
+        );
+        assert_eq!(
+            id_of("drives/users/ana/Plan.md", &doc).as_deref(),
+            Some(ID)
+        );
         let crlf = format!("\u{feff}---\r\nid: {ID}\r\n---\r\n");
         assert_eq!(
             id_of("teams/ENG/issues/ENG-1.md", &crlf).as_deref(),

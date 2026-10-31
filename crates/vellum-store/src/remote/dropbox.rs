@@ -103,7 +103,11 @@ impl DropboxConfig {
 
     /// Points the store at other base URLs, such as a fake server.
     #[must_use]
-    pub fn with_urls(mut self, api_url: impl Into<String>, content_url: impl Into<String>) -> Self {
+    pub fn with_urls(
+        mut self,
+        api_url: impl Into<String>,
+        content_url: impl Into<String>,
+    ) -> Self {
         self.api_url = api_url.into();
         self.content_url = content_url.into();
         self
@@ -240,36 +244,50 @@ impl ApiError {
                 "not_file" => Some(Reason::NotFile),
                 "not_folder" => Some(Reason::NotFolder),
                 "conflict" => Some(Reason::Conflict),
-                "malformed_path" | "disallowed_name" => Some(Reason::InvalidPath),
+                "malformed_path" | "disallowed_name" => {
+                    Some(Reason::InvalidPath)
+                }
                 _ => None,
             })
             .unwrap_or(Reason::Other)
     }
 
     /// The [`StoreError`] for this error on `path`.
-    fn to_store_error(&self, path: &BlobPath, on_conflict: OnConflict) -> StoreError {
+    fn to_store_error(
+        &self,
+        path: &BlobPath,
+        on_conflict: OnConflict,
+    ) -> StoreError {
         match (self.reason(), on_conflict) {
-            (Reason::NotFound | Reason::NotFile, _) => StoreError::NotFound(path.clone()),
+            (Reason::NotFound | Reason::NotFile, _) => {
+                StoreError::NotFound(path.clone())
+            }
             (Reason::Conflict, OnConflict::AlreadyExists) => {
                 StoreError::AlreadyExists(path.clone())
             }
-            (Reason::Conflict, OnConflict::PreconditionFailed) => StoreError::PreconditionFailed {
-                path: path.clone(),
-                current: None,
-            },
+            (Reason::Conflict, OnConflict::PreconditionFailed) => {
+                StoreError::PreconditionFailed {
+                    path: path.clone(),
+                    current: None,
+                }
+            }
             (Reason::InvalidPath, _) => StoreError::InvalidPath {
                 path: path.to_string(),
                 reason: "rejected by Dropbox",
             },
-            (Reason::NotFolder | Reason::Other, _) => {
-                StoreError::Backend(format!("{BACKEND}: {} on {path}", self.summary))
-            }
+            (Reason::NotFolder | Reason::Other, _) => StoreError::Backend(
+                format!("{BACKEND}: {} on {path}", self.summary),
+            ),
         }
     }
 }
 
 impl Fail {
-    fn into_store(self, path: &BlobPath, on_conflict: OnConflict) -> StoreError {
+    fn into_store(
+        self,
+        path: &BlobPath,
+        on_conflict: OnConflict,
+    ) -> StoreError {
         match self {
             Self::Api(e) => e.to_store_error(path, on_conflict),
             Self::Store(e) => e,
@@ -331,7 +349,11 @@ impl Inner {
             if response.status() != StatusCode::UNAUTHORIZED {
                 return Ok(response);
             }
-            tracing::debug!(backend = BACKEND, attempt, "access token rejected");
+            tracing::debug!(
+                backend = BACKEND,
+                attempt,
+                "access token rejected"
+            );
             self.tokens.invalidate().await;
         }
         Err(StoreError::Backend(format!(
@@ -341,7 +363,10 @@ impl Inner {
     }
 
     /// Passes a success through and turns anything else into a [`Fail`].
-    async fn check(response: Response, path: Option<&BlobPath>) -> Result<Response, Fail> {
+    async fn check(
+        response: Response,
+        path: Option<&BlobPath>,
+    ) -> Result<Response, Fail> {
         let status = response.status();
         if status.is_success() {
             return Ok(response);
@@ -364,7 +389,9 @@ impl Inner {
     ) -> Result<T, Fail> {
         let url = format!("{}/2/{endpoint}", self.api);
         let response = self
-            .send(|token| self.http.client().post(&url).bearer_auth(token).json(arg))
+            .send(|token| {
+                self.http.client().post(&url).bearer_auth(token).json(arg)
+            })
             .await
             .map_err(Fail::Store)?;
         let response = Self::check(response, path).await?;
@@ -409,7 +436,8 @@ impl Inner {
         body: Bytes,
         path: &BlobPath,
     ) -> Result<T, Fail> {
-        let response = self.content(endpoint, arg, Some(body), Some(path)).await?;
+        let response =
+            self.content(endpoint, arg, Some(body), Some(path)).await?;
         response.json().await.map_err(|e| Fail::Store(bad_body(&e)))
     }
 
@@ -445,7 +473,9 @@ impl Inner {
         commit: &Value,
     ) -> Result<Metadata, Fail> {
         if bytes.len() <= self.single_upload_limit {
-            return self.content_json("files/upload", commit, bytes, path).await;
+            return self
+                .content_json("files/upload", commit, bytes, path)
+                .await;
         }
         let chunk = self.upload_chunk;
         let first = bytes.slice(..chunk.min(bytes.len()));
@@ -496,7 +526,8 @@ impl Inner {
         let result: Result<ListPage, Fail> = match page {
             Page::Done => return Ok(None),
             Page::First => {
-                let path = dir.map_or_else(|| self.root.clone(), |d| self.remote(d));
+                let path =
+                    dir.map_or_else(|| self.root.clone(), |d| self.remote(d));
                 let arg = json!({
                     "path": path,
                     "recursive": true,
@@ -534,7 +565,9 @@ impl Inner {
                             size: m.size,
                             modified: m.modified,
                         }),
-                        Err(StoreError::NotFound(_)) => return Ok(Some((Vec::new(), Page::Done))),
+                        Err(StoreError::NotFound(_)) => {
+                            return Ok(Some((Vec::new(), Page::Done)));
+                        }
                         Err(e) => Err(e),
                     };
                     Ok(Some((vec![entry], Page::Done)))
@@ -564,7 +597,13 @@ impl Inner {
         {
             return None;
         }
-        let skip = |e: &StoreError| tracing::warn!(backend = BACKEND, error = %e, "skipping file");
+        let skip = |e: &StoreError| {
+            tracing::warn!(
+                backend = BACKEND,
+                error = %e,
+                "skipping file"
+            );
+        };
         let path = BlobPath::new(rel).inspect_err(skip).ok()?;
         Some(file_meta(&path, meta).map(|m| BlobEntry {
             path: m.path,
@@ -592,9 +631,14 @@ impl BlobStore for DropboxStore {
             .headers()
             .get(API_RESULT)
             .map(|v| v.as_bytes().to_vec())
-            .ok_or_else(|| StoreError::Backend(format!("{BACKEND}: no {API_RESULT} header")))?;
-        let meta: Metadata = serde_json::from_slice(&header)
-            .map_err(|e| StoreError::Backend(format!("{BACKEND}: bad {API_RESULT}: {e}")))?;
+            .ok_or_else(|| {
+                StoreError::Backend(format!(
+                    "{BACKEND}: no {API_RESULT} header"
+                ))
+            })?;
+        let meta: Metadata = serde_json::from_slice(&header).map_err(|e| {
+            StoreError::Backend(format!("{BACKEND}: bad {API_RESULT}: {e}"))
+        })?;
         let bytes = response.bytes().await.map_err(|e| bad_body(&e))?;
         let meta = file_meta(path, meta)?;
         Ok(Blob { bytes, meta })
@@ -605,7 +649,11 @@ impl BlobStore for DropboxStore {
         self.0.head(path).await
     }
 
-    #[instrument(skip(self, bytes), fields(backend = "dropbox", path = %path, size = bytes.len()), err)]
+    #[instrument(
+        skip(self, bytes),
+        fields(backend = "dropbox", path = %path, size = bytes.len()),
+        err
+    )]
     async fn put(
         &self,
         path: &BlobPath,
@@ -630,7 +678,10 @@ impl BlobStore for DropboxStore {
             Ok(meta) => file_meta(path, meta),
             Err(Fail::Api(e))
                 if matches!(condition, Precondition::IfMatch(_))
-                    && matches!(e.reason(), Reason::Conflict | Reason::NotFound) =>
+                    && matches!(
+                        e.reason(),
+                        Reason::Conflict | Reason::NotFound
+                    ) =>
             {
                 Err(self.0.precondition_failed(path).await)
             }
@@ -639,7 +690,11 @@ impl BlobStore for DropboxStore {
     }
 
     #[instrument(skip(self), fields(backend = "dropbox", path = %path), err)]
-    async fn delete(&self, path: &BlobPath, condition: Precondition) -> StoreResult<()> {
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        condition: Precondition,
+    ) -> StoreResult<()> {
         let remote = self.0.remote(path);
         let arg = match &condition {
             // Fails either way, as the trait documents.
@@ -655,7 +710,9 @@ impl BlobStore for DropboxStore {
                 let _ = self.0.head(path).await?;
                 json!({ "path": remote })
             }
-            Precondition::IfMatch(rev) => json!({ "path": remote, "parent_rev": rev.as_str() }),
+            Precondition::IfMatch(rev) => {
+                json!({ "path": remote, "parent_rev": rev.as_str() })
+            }
         };
         match self
             .0
@@ -676,8 +733,16 @@ impl BlobStore for DropboxStore {
         }
     }
 
-    #[instrument(skip(self), fields(backend = "dropbox", from = %from, to = %to), err)]
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    #[instrument(
+        skip(self),
+        fields(backend = "dropbox", from = %from, to = %to),
+        err
+    )]
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         // `move_v2` also moves folders; only blobs (files) may move here.
         let _ = self.0.head(from).await?;
         let arg = json!({
@@ -704,12 +769,20 @@ impl BlobStore for DropboxStore {
         }
     }
 
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>> {
         let inner = Arc::clone(&self.0);
         let dir = dir.cloned();
-        let span = tracing::info_span!("list", backend = BACKEND, dir = ?dir.as_ref().map(BlobPath::as_str));
+        let span = tracing::info_span!(
+            "list",
+            backend = BACKEND,
+            dir = ?dir.as_ref().map(BlobPath::as_str)
+        );
         futures::stream::try_unfold(Page::First, move |page| {
-            let (inner, dir, span) = (Arc::clone(&inner), dir.clone(), span.clone());
+            let (inner, dir, span) =
+                (Arc::clone(&inner), dir.clone(), span.clone());
             async move { inner.page(dir.as_ref(), page).instrument(span).await }
         })
         .map_ok(futures::stream::iter)
@@ -756,8 +829,11 @@ fn file_meta(path: &BlobPath, meta: Metadata) -> StoreResult<BlobMeta> {
     if meta.tag.as_deref().is_some_and(|t| t != "file") {
         return Err(StoreError::NotFound(path.clone()));
     }
-    let missing =
-        |field| StoreError::Backend(format!("{BACKEND}: metadata for {path} lacks {field}"));
+    let missing = |field| {
+        StoreError::Backend(format!(
+            "{BACKEND}: metadata for {path} lacks {field}"
+        ))
+    };
     let rev = meta.rev.ok_or_else(|| missing("rev"))?;
     let stamp = meta
         .server_modified
@@ -786,12 +862,17 @@ fn parse_time(s: &str) -> Option<SystemTime> {
         (16, ":"),
         (19, "Z"),
     ];
-    if s.len() != 20 || separators.iter().any(|&(i, c)| s.get(i..=i) != Some(c)) {
+    if s.len() != 20 || separators.iter().any(|&(i, c)| s.get(i..=i) != Some(c))
+    {
         return None;
     }
     let (year, month, day) = (num(0, 4)?, num(5, 7)?, num(8, 10)?);
     let (hour, minute, second) = (num(11, 13)?, num(14, 16)?, num(17, 19)?);
-    if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || minute > 59 {
+    if !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || hour > 23
+        || minute > 59
+    {
         return None;
     }
     if second > 60 {
@@ -815,16 +896,23 @@ const fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
     let year_of_era = year - era * 400;
     let month_from_march = (month + 9) % 12;
     let day_of_year = (153 * month_from_march + 2) / 5 + day - 1;
-    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let day_of_era =
+        year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
     era * 146_097 + day_of_era - 719_468
 }
 
 /// A non-success response that is not a Dropbox API error.
-fn http_error(path: Option<&BlobPath>, status: StatusCode, body: &Bytes) -> StoreError {
+fn http_error(
+    path: Option<&BlobPath>,
+    status: StatusCode,
+    body: &Bytes,
+) -> StoreError {
     if let Some(path) = path {
         return backend_error(BACKEND, path, status, body);
     }
-    let excerpt = String::from_utf8_lossy(body.get(..body.len().min(300)).unwrap_or_default());
+    let excerpt = String::from_utf8_lossy(
+        body.get(..body.len().min(300)).unwrap_or_default(),
+    );
     StoreError::Backend(format!("{BACKEND}: {status}: {}", excerpt.trim()))
 }
 
@@ -841,8 +929,10 @@ mod tests {
     }
 
     fn api(summary: &str) -> ApiError {
-        let body = json!({ "error_summary": summary, "error": { ".tag": "path" } });
-        ApiError::parse(body.to_string().as_bytes()).unwrap_or_else(|| unreachable!())
+        let body =
+            json!({ "error_summary": summary, "error": { ".tag": "path" } });
+        ApiError::parse(body.to_string().as_bytes())
+            .unwrap_or_else(|| unreachable!())
     }
 
     #[test]
@@ -887,9 +977,11 @@ mod tests {
             map("path/malformed_path/", OnConflict::AlreadyExists),
             StoreError::InvalidPath { .. }
         ));
-        let other = map("path/insufficient_space/..", OnConflict::AlreadyExists);
+        let other =
+            map("path/insufficient_space/..", OnConflict::AlreadyExists);
         assert!(
-            matches!(&other, StoreError::Backend(m) if m.contains("insufficient_space")),
+            matches!(&other, StoreError::Backend(m) if m.contains("insufficient\
+                _space")),
             "{other:?}"
         );
     }
@@ -914,7 +1006,8 @@ mod tests {
         let arg = api_arg(&json!({ "path": "/Apps/Vellum/Notes – ü.md" }));
         assert_eq!(arg, r#"{"path":"/Apps/Vellum/Notes \u2013 \u00fc.md"}"#);
         assert_eq!(ascii_json("😀\u{7f}"), r"\ud83d\ude00\u007f");
-        let back: Value = serde_json::from_str(&ascii_json("\"😀 ü\"")).unwrap_or_default();
+        let back: Value =
+            serde_json::from_str(&ascii_json("\"😀 ü\"")).unwrap_or_default();
         assert_eq!(back, json!("😀 ü"));
     }
 
@@ -988,7 +1081,10 @@ mod tests {
         };
         let meta = file_meta(&p, file);
         assert!(
-            matches!(&meta, Ok(m) if m.etag.as_str() == "015f1c2b3d4e5f6a7" && m.size == 3),
+            matches!(
+                &meta,
+                Ok(m) if m.etag.as_str() == "015f1c2b3d4e5f6a7" && m.size == 3
+            ),
             "{meta:?}"
         );
     }

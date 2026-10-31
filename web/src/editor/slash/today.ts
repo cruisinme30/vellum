@@ -4,5 +4,6 @@
 /** Today's date as `YYYY-MM-DD` in the user's time zone. */
 export function formatToday(now: Date = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${String(now.getFullYear())}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  const month = pad(now.getMonth() + 1);
+  return `${String(now.getFullYear())}-${month}-${pad(now.getDate())}`;
 }

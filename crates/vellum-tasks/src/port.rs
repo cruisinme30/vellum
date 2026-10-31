@@ -12,10 +12,11 @@
 use jiff::Timestamp;
 use jiff::tz::TimeZone;
 use vellum_contracts::BoxFuture;
-use vellum_kernel::{DocId, Error, ShareTokenHash, UserId};
+use vellum_kernel::{CommentId, DocId, Error, ShareTokenHash, UserId};
 
 use crate::model::Task;
 use crate::projection::FileContext;
+use crate::settings::Preferences;
 
 /// A signed-in person as My Work needs them.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -26,8 +27,11 @@ pub struct Profile {
     pub handle: String,
     /// Their display name.
     pub display_name: String,
-    /// Their time zone; "today" is their local date.
+    /// The zone My Work counts in for them: their own choice, else the
+    /// server's. "Today" is their local date.
     pub time_zone: TimeZone,
+    /// Their My Work settings.
+    pub preferences: Preferences,
 }
 
 /// A Markdown file that may hold checklist tasks.
@@ -59,14 +63,23 @@ pub trait Workspace: Send + Sync + 'static {
 
     /// The files whose checklists can hold the user's tasks: their Inbox
     /// and lists, lists shared with them, and documents that mention them.
-    fn task_files(&self, user: UserId) -> BoxFuture<'_, Result<Vec<Document>, Error>>;
+    fn task_files(
+        &self,
+        user: UserId,
+    ) -> BoxFuture<'_, Result<Vec<Document>, Error>>;
 
-    /// Issues assigned to the user, comments that assign them and review
-    /// requests, already projected as tasks (R-MW-1's union).
-    fn assigned(&self, user: UserId) -> BoxFuture<'_, Result<Vec<Task>, Error>>;
+    /// Issues assigned to the user, comments that assign them, comments
+    /// that mention them and that they have not answered or dismissed, and
+    /// review requests, already projected as tasks (R-MW-1's union).
+    fn assigned(&self, user: UserId)
+    -> BoxFuture<'_, Result<Vec<Task>, Error>>;
 
     /// Reads a file the user can open.
-    fn read(&self, user: UserId, doc: DocId) -> BoxFuture<'_, Result<Document, Error>>;
+    fn read(
+        &self,
+        user: UserId,
+        doc: DocId,
+    ) -> BoxFuture<'_, Result<Document, Error>>;
 
     /// Replaces a file's text if it is still at `version`, returning the
     /// new version. A newer version fails with `conflict`.
@@ -117,10 +130,74 @@ pub trait Workspace: Send + Sync + 'static {
         hash: ShareTokenHash,
     ) -> BoxFuture<'_, Result<Option<UserId>, Error>>;
 
+    /// Stores the user's My Work settings.
+    fn save_preferences(
+        &self,
+        user: UserId,
+        preferences: Preferences,
+    ) -> BoxFuture<'_, Result<(), Error>>;
+
+    /// Takes a mention out of the user's My Work without answering it.
+    fn dismiss_mention(
+        &self,
+        user: UserId,
+        comment: CommentId,
+    ) -> BoxFuture<'_, Result<(), Error>>;
+
+    /// Everyone whose reminders and digest the server sends.
+    fn people(&self) -> BoxFuture<'_, Result<Vec<UserId>, Error>>;
+
+    /// Whether the person with this handle is linked to a Slack user, so
+    /// "Save as task" in Slack reaches their Inbox. `false` by default.
+    fn slack_linked(
+        &self,
+        handle: String,
+    ) -> BoxFuture<'_, Result<bool, Error>> {
+        let _ = handle;
+        Box::pin(async { Ok(false) })
+    }
+
     /// The Vellum user linked to a Slack user in a Slack workspace.
     fn slack_user(
         &self,
         team: String,
         slack_user: String,
     ) -> BoxFuture<'_, Result<Option<UserId>, Error>>;
+
+    /// Links a Slack user to `user`, replacing any earlier link of that
+    /// Slack user (#163). The caller has checked the Slack user's code.
+    fn link_slack(
+        &self,
+        user: UserId,
+        team: String,
+        slack_user: String,
+    ) -> BoxFuture<'_, Result<(), Error>> {
+        let _ = (user, team, slack_user);
+        Box::pin(async {
+            Err(Error::new(
+                vellum_kernel::ErrorKind::Unavailable,
+                "Slack linking is not available here",
+            ))
+        })
+    }
+
+    /// Removes every Slack link of `user`; returns how many there were.
+    fn unlink_slack(
+        &self,
+        user: UserId,
+    ) -> BoxFuture<'_, Result<usize, Error>> {
+        let _ = user;
+        Box::pin(async { Ok(0) })
+    }
+
+    /// Posts a reply only the Slack user sees to a Slack `response_url`
+    /// (always under `https://hooks.slack.com/`). Best effort.
+    fn slack_say(
+        &self,
+        response_url: String,
+        text: String,
+    ) -> BoxFuture<'_, ()> {
+        let _ = (response_url, text);
+        Box::pin(async {})
+    }
 }

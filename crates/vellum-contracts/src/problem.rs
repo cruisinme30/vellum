@@ -30,7 +30,8 @@ impl ApiError {
     #[must_use]
     pub fn from_error(error: &Error, request_id: RequestId) -> Self {
         let message = if error.kind() == ErrorKind::Internal {
-            "something went wrong; quote the request ID when reporting it".to_owned()
+            "something went wrong; quote the request ID when reporting it"
+                .to_owned()
         } else {
             error.message().to_owned()
         };
@@ -66,11 +67,15 @@ mod tests {
     #[test]
     fn internal_errors_are_redacted() {
         let id = RequestId::generate();
-        let body = ApiError::from_error(&Error::new(ErrorKind::Internal, "db password wrong"), id);
+        let body = ApiError::from_error(
+            &Error::new(ErrorKind::Internal, "db password wrong"),
+            id,
+        );
         assert!(!body.message.contains("password"));
         assert_eq!(body.code, "internal");
         assert_eq!(body.request_id, id.to_string());
-        let body = ApiError::from_error(&Error::new(ErrorKind::Timeout, "slow"), id);
+        let body =
+            ApiError::from_error(&Error::new(ErrorKind::Timeout, "slow"), id);
         assert!(body.retryable);
         assert_eq!(body.message, "slow");
     }

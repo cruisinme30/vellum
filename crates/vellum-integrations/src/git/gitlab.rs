@@ -25,7 +25,10 @@ pub const EVENT_HEADER: &str = "X-Gitlab-Event";
 /// [`InboundError::Unauthenticated`] if it is missing or wrong.
 pub fn verify(token: &str, header: Option<&str>) -> Result<(), InboundError> {
     match header {
-        Some(given) if !token.is_empty() && mac::equal(given.as_bytes(), token.as_bytes()) => {
+        Some(given)
+            if !token.is_empty()
+                && mac::equal(given.as_bytes(), token.as_bytes()) =>
+        {
             Ok(())
         }
         _ => Err(InboundError::Unauthenticated),
@@ -37,8 +40,12 @@ pub fn verify(token: &str, header: Option<&str>) -> Result<(), InboundError> {
 /// # Errors
 ///
 /// [`InboundError::Malformed`] if the JSON is invalid.
-pub fn parse(event: &str, body: &[u8]) -> Result<Option<GitEvent>, InboundError> {
-    let json: Value = serde_json::from_slice(body).map_err(InboundError::malformed)?;
+pub fn parse(
+    event: &str,
+    body: &[u8],
+) -> Result<Option<GitEvent>, InboundError> {
+    let json: Value =
+        serde_json::from_slice(body).map_err(InboundError::malformed)?;
     let repo = text(&json, "/project/path_with_namespace").to_owned();
     if repo.is_empty() {
         return Err(InboundError::malformed(
@@ -66,7 +73,10 @@ fn parse_push(json: &Value, repo: String) -> Option<GitEvent> {
                 .map(|c| Commit {
                     sha: text(c, "/id").to_owned(),
                     message: text(c, "/message").to_owned(),
-                    url: c.get("url").and_then(Value::as_str).map(str::to_owned),
+                    url: c
+                        .get("url")
+                        .and_then(Value::as_str)
+                        .map(str::to_owned),
                 })
                 .collect()
         })
@@ -80,7 +90,10 @@ fn parse_push(json: &Value, repo: String) -> Option<GitEvent> {
     })
 }
 
-fn parse_merge_request(json: &Value, repo: String) -> Result<Option<GitEvent>, InboundError> {
+fn parse_merge_request(
+    json: &Value,
+    repo: String,
+) -> Result<Option<GitEvent>, InboundError> {
     let attrs = json
         .get("object_attributes")
         .ok_or_else(|| InboundError::malformed("object_attributes missing"))?;
@@ -104,10 +117,9 @@ fn parse_merge_request(json: &Value, repo: String) -> Result<Option<GitEvent>, I
         ("close", _) => PullRequestAction::ClosedUnmerged,
         _ => return Ok(None),
     };
-    let number = attrs
-        .get("iid")
-        .and_then(Value::as_u64)
-        .ok_or_else(|| InboundError::malformed("object_attributes.iid missing"))?;
+    let number = attrs.get("iid").and_then(Value::as_u64).ok_or_else(|| {
+        InboundError::malformed("object_attributes.iid missing")
+    })?;
     Ok(Some(GitEvent::PullRequest {
         pr: PrRef {
             provider: Provider::GitLab,
@@ -145,14 +157,21 @@ mod tests {
 
     fn mr(action: &str, extra: &Value) -> Value {
         let mut value = json!({
-            "project": {"path_with_namespace": "northstar/web", "default_branch": "main"},
+            "project": {
+                "path_with_namespace": "northstar/web",
+                "default_branch": "main"
+            },
             "object_attributes": {
-                "iid": 5, "action": action, "title": "ENG-9 Speed up", "description": "",
-                "url": "https://gitlab.northstar.dev/northstar/web/-/merge_requests/5",
+                "iid": 5, "action": action, "title": "ENG-9 Speed up",
+                    "description": "",
+                "url": "https://gitlab.northstar.dev/northstar/web/-/merge_requ\
+                    ests/5",
                 "source_branch": "bo/eng-9-speed-up", "draft": false
             }
         });
-        if let (Some(target), Some(extra)) = (value.as_object_mut(), extra.as_object()) {
+        if let (Some(target), Some(extra)) =
+            (value.as_object_mut(), extra.as_object())
+        {
             for (k, v) in extra {
                 let _ = target.insert(k.clone(), v.clone());
             }
@@ -175,7 +194,10 @@ mod tests {
             action(&mr("approved", &none)),
             Some(PullRequestAction::Approved)
         );
-        assert_eq!(action(&mr("merge", &none)), Some(PullRequestAction::Merged));
+        assert_eq!(
+            action(&mr("merge", &none)),
+            Some(PullRequestAction::Merged)
+        );
         assert_eq!(
             action(&mr("close", &none)),
             Some(PullRequestAction::ClosedUnmerged)
@@ -184,12 +206,14 @@ mod tests {
             action(&mr("update", &none)),
             Some(PullRequestAction::Edited)
         );
-        let to_draft = json!({"changes": {"draft": {"previous": false, "current": true}}});
+        let to_draft =
+            json!({"changes": {"draft": {"previous": false, "current": true}}});
         assert_eq!(
             action(&mr("update", &to_draft)),
             Some(PullRequestAction::Draft)
         );
-        let ready = json!({"changes": {"draft": {"previous": true, "current": false}}});
+        let ready =
+            json!({"changes": {"draft": {"previous": true, "current": false}}});
         assert_eq!(
             action(&mr("update", &ready)),
             Some(PullRequestAction::ReadyForReview)
@@ -200,9 +224,14 @@ mod tests {
     #[test]
     fn pushes_and_deletions() -> Result<(), InboundError> {
         let push = json!({
-            "ref": "refs/heads/bo/eng-9-speed-up", "after": "da1560886d4f094c3e6c9ef40349f7d38b5d27d7",
-            "project": {"path_with_namespace": "northstar/web", "default_branch": "main"},
-            "commits": [{"id": "da15", "message": "Speed up", "url": "https://gitlab.northstar.dev/c"}]
+            "ref": "refs/heads/bo/eng-9-speed-up", "after": "da1560886d4f094c3e\
+                6c9ef40349f7d38b5d27d7",
+            "project": {
+                "path_with_namespace": "northstar/web",
+                "default_branch": "main"
+            },
+            "commits": [{"id": "da15", "message": "Speed up", "url": "https://g\
+                itlab.northstar.dev/c"}]
         });
         let event = parse("Push Hook", &body(&push))?;
         assert!(matches!(
@@ -213,7 +242,8 @@ mod tests {
             })
         ));
         let deleted = json!({
-            "ref": "refs/heads/x", "after": "0000000000000000000000000000000000000000",
+            "ref": "refs/heads/x", "after": "0000000000000000000000000000000000\
+                000000",
             "project": {"path_with_namespace": "northstar/web"}
         });
         assert_eq!(parse("Push Hook", &body(&deleted))?, None);

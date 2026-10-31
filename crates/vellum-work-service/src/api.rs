@@ -11,12 +11,12 @@
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
 use time::format_description::well_known::Rfc3339;
+use time::{Date, OffsetDateTime};
 use vellum_kernel::{Error, ErrorKind};
 use vellum_work::comment::{Assignment, Comment, Target, Thread};
 use vellum_work::cycle::Cycle;
-use vellum_work::project::{Project, ProjectProgress};
+use vellum_work::project::{Project, ProjectProgress, ProjectUpdate};
 use vellum_work::{Issue, Team, WorkGraph};
 
 // ----- shared helpers -----
@@ -40,7 +40,10 @@ pub(crate) fn name_of<T: Serialize>(value: &T) -> String {
 }
 
 /// Reads an engine enum from its serde name.
-pub(crate) fn parse_name<T: DeserializeOwned>(field: &str, text: &str) -> Result<T, Error> {
+pub(crate) fn parse_name<T: DeserializeOwned>(
+    field: &str,
+    text: &str,
+) -> Result<T, Error> {
     serde_json::from_value(serde_json::Value::String(text.to_owned()))
         .map_err(|_| invalid(&format!("{field}: unknown value {text:?}")))
 }
@@ -79,6 +82,8 @@ pub struct TeamOut {
     pub labels: Vec<String>,
     /// Template names.
     pub templates: Vec<String>,
+    /// Archived teams keep their issues but take no new ones (D303).
+    pub archived: bool,
 }
 
 /// A status in a team's workflow.
@@ -121,6 +126,7 @@ impl TeamOut {
                 .map(vellum_work::label::Label::reference)
                 .collect(),
             templates: team.templates.iter().map(|t| t.name.clone()).collect(),
+            archived: team.archived,
         }
     }
 }
@@ -168,6 +174,8 @@ pub struct IssueOut {
     pub links: Vec<LinkOut>,
     /// Due date.
     pub due: Option<String>,
+    /// How often it repeats (`1w`, `2w`, `1m`, `3d`).
+    pub repeat: Option<String>,
     /// The running or last SLA.
     pub sla: Option<SlaOut>,
     /// Created.
@@ -219,7 +227,12 @@ pub struct SlaOut {
 }
 
 impl IssueOut {
-    pub(crate) fn of(issue: &Issue, graph: &WorkGraph, now: OffsetDateTime, full: bool) -> Self {
+    pub(crate) fn of(
+        issue: &Issue,
+        graph: &WorkGraph,
+        now: OffsetDateTime,
+        full: bool,
+    ) -> Self {
         let key_of = |id: &vellum_work::IssueId| {
             graph
                 .issue(id)
@@ -252,7 +265,11 @@ impl IssueOut {
                     issue: key_of(&r.issue),
                 })
                 .collect(),
-            subscribers: issue.subscribers.iter().map(ToString::to_string).collect(),
+            subscribers: issue
+                .subscribers
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
             aliases: issue.aliases.iter().map(ToString::to_string).collect(),
             links: issue
                 .links
@@ -264,6 +281,7 @@ impl IssueOut {
                 })
                 .collect(),
             due: issue.due.map(|d| d.to_string()),
+            repeat: issue.repeat.map(|r| r.to_string()),
             sla: issue.sla.as_ref().map(|s| SlaOut {
                 kind: s.kind.clone(),
                 breaches_at: rfc3339(s.breaches_at),
@@ -391,40 +409,111 @@ impl CycleOut {
     }
 }
 
-/// A project with its computed progress.
+/// A project with its computed progress and latest health.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 pub struct ProjectOut {
     /// Project ID.
     pub id: String,
     /// Title.
     pub title: String,
-    /// planned, started, paused, completed or canceled.
+    /// backlog, planned, in-progress, completed or canceled.
     pub status: String,
     /// Lead handle.
     pub lead: Option<String>,
+    /// Member handles.
+    pub members: Vec<String>,
     /// Team keys.
     pub teams: Vec<String>,
+    /// Start date.
+    pub start_date: Option<String>,
     /// Target date.
     pub target_date: Option<String>,
     /// Issues in the project.
     pub issues: u32,
+    /// Completed issues.
+    pub completed_issues: u32,
+    /// Points in scope.
+    pub scope: u32,
+    /// Completed points.
+    pub completed: u32,
     /// Percent complete by points.
     pub percent: u8,
+    /// on-track, at-risk or off-track, from the latest update.
+    pub health: Option<String>,
+    /// When the latest update was posted.
+    pub updated_at: Option<String>,
+    /// Whether the lead owes an update by the project's cadence.
+    pub update_due: bool,
+    /// weekly, biweekly, monthly or never.
+    pub update_cadence: String,
+    /// Milestones in order, with progress.
+    pub milestones: Vec<MilestoneOut>,
     /// The project file, front matter and spec.
     pub markdown: String,
 }
 
+/// A milestone with its progress.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct MilestoneOut {
+    /// Milestone ID.
+    pub id: String,
+    /// Name.
+    pub name: String,
+    /// Target date.
+    pub target_date: Option<String>,
+    /// Issues in the milestone.
+    pub issues: u32,
+    /// Completed issues.
+    pub completed_issues: u32,
+    /// Percent complete by points.
+    pub percent: u8,
+}
+
 impl ProjectOut {
-    pub(crate) fn of(p: &Project, progress: &ProjectProgress) -> Self {
+    pub(crate) fn of(
+        p: &Project,
+        progress: &ProjectProgress,
+        latest: Option<&ProjectUpdate>,
+        today: Date,
+    ) -> Self {
+        let overall = progress.overall;
         Self {
             id: p.id.to_string(),
             title: p.title.clone(),
             status: name_of(&p.status),
             lead: p.lead.as_ref().map(ToString::to_string),
+            members: p.members.iter().map(ToString::to_string).collect(),
             teams: p.teams.iter().map(ToString::to_string).collect(),
+            start_date: p.start_date.map(|d| d.to_string()),
             target_date: p.target_date.map(|d| d.to_string()),
-            issues: progress.overall.issues,
-            percent: progress.overall.percent(),
+            issues: overall.issues,
+            completed_issues: overall.completed_issues,
+            scope: overall.scope,
+            completed: overall.completed,
+            percent: overall.percent(),
+            health: latest.map(|u| name_of(&u.health)),
+            updated_at: latest.map(|u| rfc3339(u.created_at)),
+            update_due: p.update_due(latest.map(|u| u.created_at), today),
+            update_cadence: name_of(&p.update_cadence),
+            milestones: p
+                .milestones
+                .iter()
+                .map(|m| {
+                    let done = progress
+                        .milestones
+                        .get(&m.id)
+                        .copied()
+                        .unwrap_or_default();
+                    MilestoneOut {
+                        id: m.id.to_string(),
+                        name: m.name.clone(),
+                        target_date: m.target_date.map(|d| d.to_string()),
+                        issues: done.issues,
+                        completed_issues: done.completed_issues,
+                        percent: done.percent(),
+                    }
+                })
+                .collect(),
             markdown: p.to_markdown().unwrap_or_default(),
         }
     }
@@ -494,11 +583,10 @@ impl TargetOut {
     pub(crate) fn of(t: &Target, graph: &WorkGraph) -> Self {
         match t {
             Target::Issue { issue } => Self {
-                issue: Some(
-                    graph
-                        .issue(issue)
-                        .map_or_else(|| issue.to_string(), |i| i.key().to_string()),
-                ),
+                issue: Some(graph.issue(issue).map_or_else(
+                    || issue.to_string(),
+                    |i| i.key().to_string(),
+                )),
                 doc: None,
                 block: None,
             },
@@ -608,6 +696,15 @@ pub struct Done {
 #[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
 pub struct NoInput {}
 
+/// Which teams to list.
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ListTeams {
+    /// Include archived teams; by default only active teams are listed.
+    #[serde(default)]
+    pub include_archived: bool,
+}
+
 /// A team by key.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct TeamRef {
@@ -647,10 +744,14 @@ pub struct CreateIssue {
     pub labels: Vec<String>,
     /// Project ID.
     pub project: Option<String>,
+    /// Milestone ID within the project.
+    pub milestone: Option<String>,
     /// Parent issue key.
     pub parent: Option<String>,
     /// Due date, `YYYY-MM-DD`.
     pub due: Option<String>,
+    /// Repeat after the due date passes: `3d`, `1w`, `2w`, `1m`.
+    pub repeat: Option<String>,
     /// `<doc id>#blk-…` when filed from a page.
     pub source_block: Option<String>,
     /// The selected text, for a block.
@@ -685,6 +786,10 @@ pub struct UpdateIssue {
     pub remove_labels: Vec<String>,
     /// Project ID; empty clears.
     pub project: Option<String>,
+    /// Milestone ID; empty clears.
+    pub milestone: Option<String>,
+    /// How often it repeats (`1w`); empty stops it.
+    pub repeat: Option<String>,
     /// Cycle key; empty clears.
     pub cycle: Option<String>,
     /// Parent issue key; empty clears.
@@ -877,4 +982,153 @@ pub struct AssignThread {
     pub thread_id: String,
     /// Handle; unset or empty unassigns.
     pub assignee: Option<String>,
+}
+
+// ----- saved views -----
+
+/// A saved view.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct ViewOut {
+    /// The view ID.
+    pub id: String,
+    /// The name.
+    pub name: String,
+    /// Who made it; only they can change or delete it.
+    pub owner: String,
+    /// The team it is scoped to, or none for every team.
+    pub team: Option<String>,
+    /// `private`, `team` or `workspace`.
+    pub visibility: String,
+    /// `list` or `board`.
+    pub layout: String,
+    /// The filter as JSON text, in the shape `query_issues` takes.
+    pub filter: String,
+    /// status, assignee, priority, project, cycle, label, team or none.
+    pub group_by: String,
+    /// priority, updated, created, due, estimate or title.
+    pub order_by: String,
+    /// `all`, `past_week`, `past_month` or `none`.
+    pub show_closed: String,
+    /// Whether sub-issues show alongside their parents.
+    pub show_sub_issues: bool,
+}
+
+impl ViewOut {
+    pub(crate) fn of(view: &vellum_work::view::View) -> Self {
+        Self {
+            id: view.id.to_string(),
+            name: view.name.clone(),
+            owner: view.owner.to_string(),
+            team: view.team.as_ref().map(ToString::to_string),
+            visibility: name_of(&view.visibility),
+            layout: name_of(&view.layout),
+            filter: serde_json::to_string(&view.filter)
+                .unwrap_or_else(|_| "{}".to_owned()),
+            group_by: name_of(&view.group_by),
+            order_by: name_of(&view.order_by),
+            show_closed: name_of(&view.show_closed),
+            show_sub_issues: view.show_sub_issues,
+        }
+    }
+}
+
+/// The saved views the caller can open.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct ViewsOut {
+    /// Views, by name.
+    pub views: Vec<ViewOut>,
+}
+
+/// Which saved views to list.
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+pub struct ListViews {
+    /// Only views scoped to this team, plus views that span every team.
+    pub team: Option<String>,
+}
+
+/// A saved view's settings.
+#[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
+pub struct ViewIn {
+    /// The name, 1 to 120 characters.
+    pub name: String,
+    /// Scope the view to one team.
+    pub team: Option<String>,
+    /// `private` (default), `team` or `workspace`.
+    pub visibility: Option<String>,
+    /// `list` (default) or `board`.
+    pub layout: Option<String>,
+    /// A Work filter as JSON text.
+    pub filter: Option<String>,
+    /// status (default), assignee, priority, project, cycle, label, team or
+    /// none.
+    pub group_by: Option<String>,
+    /// priority (default), updated, created, due, estimate or title.
+    pub order_by: Option<String>,
+    /// `all`, `past_week` (default), `past_month` or `none`.
+    pub show_closed: Option<String>,
+    /// Whether sub-issues show alongside their parents (default true).
+    pub show_sub_issues: Option<bool>,
+}
+
+/// Replace a saved view the caller owns.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct PutView {
+    /// The view ID.
+    pub view_id: String,
+    /// The name, 1 to 120 characters.
+    pub name: String,
+    /// Scope the view to one team.
+    pub team: Option<String>,
+    /// `private` (default), `team` or `workspace`.
+    pub visibility: Option<String>,
+    /// `list` (default) or `board`.
+    pub layout: Option<String>,
+    /// A Work filter as JSON text.
+    pub filter: Option<String>,
+    /// status (default), assignee, priority, project, cycle, label, team or
+    /// none.
+    pub group_by: Option<String>,
+    /// priority (default), updated, created, due, estimate or title.
+    pub order_by: Option<String>,
+    /// `all`, `past_week` (default), `past_month` or `none`.
+    pub show_closed: Option<String>,
+    /// Whether sub-issues show alongside their parents (default true).
+    pub show_sub_issues: Option<bool>,
+}
+
+impl PutView {
+    /// The settings, without the ID.
+    pub(crate) fn settings(self) -> ViewIn {
+        ViewIn {
+            name: self.name,
+            team: self.team,
+            visibility: self.visibility,
+            layout: self.layout,
+            filter: self.filter,
+            group_by: self.group_by,
+            order_by: self.order_by,
+            show_closed: self.show_closed,
+            show_sub_issues: self.show_sub_issues,
+        }
+    }
+}
+
+/// A saved view by ID.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct ViewRef {
+    /// The view ID.
+    pub view_id: String,
+}
+
+// ----- team settings -----
+
+/// A team's whole settings file, for the settings screen.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+pub struct TeamSettingsOut {
+    /// `team.yaml` as JSON: statuses, estimates, cycles, triage rules, SLAs,
+    /// labels, templates, forms and the Git mapping. Send it back, edited,
+    /// as the `yaml` of `PUT /v1/work/teams/{team}` (JSON is valid YAML).
+    pub settings: serde_json::Value,
+    /// The same file as YAML text.
+    pub yaml: String,
 }

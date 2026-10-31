@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-help"
-description = "The user, admin and developer help books, embedded in the binary for `vellum docs` and in-app help."
+description = """\
+    The user, admin and developer help books, embedded in the binary for \
+    `vellum docs` and in-app help."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

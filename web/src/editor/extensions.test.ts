@@ -7,9 +7,19 @@ import { describe, expect, it } from "vitest";
 
 import { vellumExtensions } from "./extensions";
 import { MARKS, NODES } from "./schema/blocks.gen";
-import { BLOCK_ID_TYPES, nodeSpec, SCHEMA_NAMES, tiptapAttributes } from "./schema/spec";
+import {
+  BLOCK_ID_TYPES,
+  nodeSpec,
+  SCHEMA_NAMES,
+  tiptapAttributes,
+} from "./schema/spec";
 import type { AttributeData } from "./schema/types";
-import { createTestEditor, english, resolveGateway, typeText } from "./test-editor";
+import {
+  createTestEditor,
+  english,
+  resolveGateway,
+  typeText,
+} from "./test-editor";
 
 const byName = (left: string, right: string) => left.localeCompare(right);
 
@@ -19,8 +29,13 @@ const schema = getSchema(
 
 /** The default of every attribute ProseMirror knows for a type. */
 function defaults(type: NodeType | MarkType): Record<string, unknown> {
-  const attributes = (type.spec.attrs ?? {}) as Record<string, { default?: unknown }>;
-  return Object.fromEntries(Object.entries(attributes).map(([key, value]) => [key, value.default]));
+  const attributes = (type.spec.attrs ?? {}) as Record<
+    string,
+    { default?: unknown }
+  >;
+  return Object.fromEntries(
+    Object.entries(attributes).map(([key, value]) => [key, value.default]),
+  );
 }
 
 /** Stock Tiptap extensions mark an empty string attribute as unset. */
@@ -43,9 +58,14 @@ describe("schema parity with blocks.gen.ts", () => {
       expect(type.spec.content ?? "").toBe(spec.content);
       expect(type.spec.group ?? "").toBe(spec.group);
       const actual = defaults(type);
-      for (const [key, attribute] of Object.entries(spec.attrs as Record<string, AttributeData>)) {
+      for (const [key, attribute] of Object.entries(
+        spec.attrs as Record<string, AttributeData>,
+      )) {
         expect(key in actual, `${name}.${key}`).toBe(true);
-        expect(sameDefault(actual[key], attribute), `${name}.${key} default`).toBe(true);
+        expect(
+          sameDefault(actual[key], attribute),
+          `${name}.${key} default`,
+        ).toBe(true);
       }
       if ("inline" in spec) {
         expect(type.isInline).toBe(spec.inline);
@@ -65,8 +85,13 @@ describe("schema parity with blocks.gen.ts", () => {
         return;
       }
       const actual = defaults(type);
-      for (const [key, attribute] of Object.entries(spec.attrs as Record<string, AttributeData>)) {
-        expect(sameDefault(actual[key], attribute), `${name}.${key} default`).toBe(true);
+      for (const [key, attribute] of Object.entries(
+        spec.attrs as Record<string, AttributeData>,
+      )) {
+        expect(
+          sameDefault(actual[key], attribute),
+          `${name}.${key} default`,
+        ).toBe(true);
       }
       if ("excludes" in spec) {
         expect(type.spec.excludes).toBe(spec.excludes);
@@ -78,7 +103,9 @@ describe("schema parity with blocks.gen.ts", () => {
     const withIds = Object.values(schema.nodes)
       .filter((type) => "blockId" in (type.spec.attrs ?? {}))
       .map((type) => type.name);
-    expect(withIds.toSorted(byName)).toEqual([...BLOCK_ID_TYPES].toSorted(byName));
+    expect(withIds.toSorted(byName)).toEqual(
+      [...BLOCK_ID_TYPES].toSorted(byName),
+    );
   });
 
   it("lists every node and mark name", () => {
@@ -108,49 +135,68 @@ const task = (attributes?: string): JSONContent => ({
   content: [
     {
       type: "taskItem",
-      attrs: { checked: false, ...(attributes === undefined ? {} : { attributes }) },
-      content: [{ type: "paragraph", content: [{ type: "text", text: "Ship" }] }],
+      attrs: {
+        checked: false,
+        ...(attributes === undefined ? {} : { attributes }),
+      },
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "Ship" }] },
+      ],
     },
   ],
 });
-const itemAttributes = (editor: Editor) => editor.state.doc.firstChild?.firstChild?.attrs;
+const itemAttributes = (editor: Editor) =>
+  editor.state.doc.firstChild?.firstChild?.attrs;
 
 describe("task item attributes", () => {
-  it("keeps a task's {…} attribute span through getJSON and an HTML round trip", () => {
-    const editor = createTestEditor({
-      content: { type: "doc", content: [task("{due=2026-11-24}")] },
-    });
-    expect(itemAttributes(editor)?.["attributes"]).toBe("{due=2026-11-24}");
-    const html = editor.getHTML();
-    expect(html).toContain('data-attributes="{due=2026-11-24}"');
-    editor.commands.setContent(html);
-    expect(itemAttributes(editor)?.["attributes"]).toBe("{due=2026-11-24}");
-    editor.destroy();
-  });
+  it(
+    "keeps a task's {…} attribute span through getJSON and an HTML round " +
+      "trip",
+    () => {
+      const editor = createTestEditor({
+        content: { type: "doc", content: [task("{due=2026-11-24}")] },
+      });
+      expect(itemAttributes(editor)?.["attributes"]).toBe("{due=2026-11-24}");
+      const html = editor.getHTML();
+      expect(html).toContain('data-attributes="{due=2026-11-24}"');
+      editor.commands.setContent(html);
+      expect(itemAttributes(editor)?.["attributes"]).toBe("{due=2026-11-24}");
+      editor.destroy();
+    },
+  );
 
-  it("writes no data-attributes for a task without a span, and reads it back empty", () => {
-    const editor = createTestEditor({ content: { type: "doc", content: [task()] } });
-    expect(itemAttributes(editor)?.["attributes"]).toBe("");
-    const html = editor.getHTML();
-    expect(html).not.toContain("data-attributes");
-    editor.commands.setContent(html);
-    expect(itemAttributes(editor)?.["attributes"]).toBe("");
-    editor.commands.command(({ tr }) => {
-      // eslint-disable-next-line unicorn/no-null -- ProseMirror's unset attribute
-      tr.setNodeAttribute(1, "attributes", null);
-      return true;
-    });
-    expect(editor.getHTML()).not.toContain("data-attributes");
-    editor.destroy();
-  });
+  it(
+    "writes no data-attributes for a task without a span, and reads it back " +
+      "empty",
+    () => {
+      const editor = createTestEditor({
+        content: { type: "doc", content: [task()] },
+      });
+      expect(itemAttributes(editor)?.["attributes"]).toBe("");
+      const html = editor.getHTML();
+      expect(html).not.toContain("data-attributes");
+      editor.commands.setContent(html);
+      expect(itemAttributes(editor)?.["attributes"]).toBe("");
+      editor.commands.command(({ tr }) => {
+        // ProseMirror's unset attribute is null.
+        // eslint-disable-next-line unicorn/no-null
+        tr.setNodeAttribute(1, "attributes", null);
+        return true;
+      });
+      expect(editor.getHTML()).not.toContain("data-attributes");
+      editor.destroy();
+    },
+  );
 });
 
 describe("links", () => {
   it("keeps http, https, mailto and relative links and drops other schemes", () => {
     const editor = createTestEditor({
       content:
-        '<p><a href="https://a.example">a</a> <a href="mailto:x@a.example">m</a> ' +
-        '<a href="/p/1">r</a> <a href="javascript:alert(1)">j</a> <a href="ftp://a.example">f</a></p>',
+        '<p><a href="https://a.example">a</a> <a ' +
+        'href="mailto:x@a.example">m</a> ' +
+        '<a href="/p/1">r</a> <a href="javascript:alert(1)">j</a> <a ' +
+        'href="ftp://a.example">f</a></p>',
     });
     const hrefs: unknown[] = [];
     editor.state.doc.descendants((node) => {
@@ -178,7 +224,9 @@ describe("links", () => {
   ])("gives the empty block %s the placeholder %j", (content, text) => {
     const editor = createTestEditor({ content });
     expect(
-      editor.view.dom.querySelector<HTMLElement>("[data-placeholder]")?.dataset["placeholder"],
+      editor.view.dom.querySelector<HTMLElement>("[data-placeholder]")?.dataset[
+        "placeholder"
+      ],
     ).toBe(text);
     editor.destroy();
   });
@@ -202,7 +250,10 @@ function element(attributes: Record<string, string>) {
   return div;
 }
 
-/** Parses one attribute of a node from an element with the given HTML attributes. */
+/**
+ * Parses one attribute of a node from an element with the given HTML
+ * attributes.
+ */
 function parse(
   name: Parameters<typeof nodeSpec>[0],
   key: string,

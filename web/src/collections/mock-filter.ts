@@ -22,7 +22,11 @@ const SYMBOLS = ["!=", "==", "<=", ">=", "=", "<", ">"];
 function firstOperator(lower: string) {
   let best: { at: number; op: string; length: number } | undefined;
   const candidates = [
-    ...WORDS.map((op) => ({ at: lower.indexOf(` ${op} `), op, length: op.length + 2 })),
+    ...WORDS.map((op) => ({
+      at: lower.indexOf(` ${op} `),
+      op,
+      length: op.length + 2,
+    })),
     ...SYMBOLS.map((op) => ({ at: lower.indexOf(op), op, length: op.length })),
   ];
   for (const candidate of candidates) {
@@ -46,7 +50,11 @@ export function parseFilter(collection: MockCollection, raw: string): Filter {
   const found =
     unary === undefined
       ? firstOperator(lower)
-      : { at: source.length - unary.length - 1, op: unary, length: unary.length + 1 };
+      : {
+          at: source.length - unary.length - 1,
+          op: unary,
+          length: unary.length + 1,
+        };
   const property = found && resolve(collection, source.slice(0, found.at));
   if (!found || !property) {
     throw new Error(`cannot read filter ${JSON.stringify(raw)}`);
@@ -58,7 +66,10 @@ export function parseFilter(collection: MockCollection, raw: string): Filter {
   };
 }
 
-function compareTo(value: Value | undefined, operand: string): number | undefined {
+function compareTo(
+  value: Value | undefined,
+  operand: string,
+): number | undefined {
   if (value?.type === "number") {
     return value.value - Number(operand);
   }
@@ -81,9 +92,14 @@ function equals(
   }
   if (property.type === "checkbox") {
     const checked = value?.type === "bool" && value.value;
-    return ["true", "yes", "checked"].includes(operand.toLowerCase()) === checked;
+    return (
+      ["true", "yes", "checked"].includes(operand.toLowerCase()) === checked
+    );
   }
-  const own = value?.type === "number" || value?.type === "date" ? [inputText(value)] : items;
+  const own =
+    value?.type === "number" || value?.type === "date"
+      ? [inputText(value)]
+      : items;
   return own.some((item) => item.toLowerCase() === operand.toLowerCase());
 }
 
@@ -125,5 +141,8 @@ export function matches(
   filter: Filter,
 ): boolean {
   const items = itemTexts(world, property, value);
-  return TESTS[filter.op]?.({ property, value, items, operand: filter.operand }) ?? false;
+  return (
+    TESTS[filter.op]?.({ property, value, items, operand: filter.operand }) ??
+    false
+  );
 }

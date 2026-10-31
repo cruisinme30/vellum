@@ -12,7 +12,10 @@
 use super::{Builder, Source, archive, markdown_title};
 use crate::error::ImportError;
 
-pub(super) fn import(source: Source, bytes: &[u8]) -> Result<Builder, ImportError> {
+pub(super) fn import(
+    source: Source,
+    bytes: &[u8],
+) -> Result<Builder, ImportError> {
     let mut entries = archive::read(source.name(), bytes, false)?;
     archive::strip_common_root(&mut entries);
     let mut builder = Builder::new(source.name());
@@ -65,9 +68,9 @@ fn obsidian(text: &str) -> String {
         let inner = rest.get(start + 3..start + 3 + len).unwrap_or_default();
         let (target, _) = inner.split_once('|').unwrap_or((inner, ""));
         let target = target.trim();
-        let is_file = target
-            .rsplit_once('.')
-            .is_some_and(|(_, ext)| !ext.eq_ignore_ascii_case("md") && ext.len() <= 5);
+        let is_file = target.rsplit_once('.').is_some_and(|(_, ext)| {
+            !ext.eq_ignore_ascii_case("md") && ext.len() <= 5
+        });
         if is_file {
             out.push_str("![](<");
             out.push_str(target);

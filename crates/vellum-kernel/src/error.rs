@@ -139,7 +139,8 @@ impl From<ShareTokenError> for Error {
                 Self::new(ErrorKind::NotFound, "share link not found")
             }
             ShareTokenError::Random(_) => {
-                Self::new(ErrorKind::Internal, "could not create share link").with_source(err)
+                Self::new(ErrorKind::Internal, "could not create share link")
+                    .with_source(err)
             }
         }
     }
@@ -155,7 +156,10 @@ mod tests {
     fn display_and_source() {
         let parse = "nope".parse::<crate::DocId>().err();
         let err = parse.map(Error::from);
-        assert_eq!(err.as_ref().map(Error::kind), Some(ErrorKind::InvalidInput));
+        assert_eq!(
+            err.as_ref().map(Error::kind),
+            Some(ErrorKind::InvalidInput)
+        );
         assert_eq!(
             err.as_ref().map(ToString::to_string).as_deref(),
             Some("invalid_input: DocId must be 26 characters, got 4")

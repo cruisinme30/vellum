@@ -23,7 +23,8 @@ performance suite fails the build when a p95 regresses by more than 10%.
 
 ::: facts
 
-- Availability: 99.9% a month on the org profile, with no single point of failure
+- Availability: 99.9% a month on the org profile, with no single point of
+  failure
 - Database recovery point: zero (synchronous replica)
 - Content recovery point: 15 minutes or less
 - Recovery time: under 15 minutes

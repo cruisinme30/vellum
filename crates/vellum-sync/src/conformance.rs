@@ -15,7 +15,9 @@ use crate::ports::SyncStore;
 /// # Errors
 ///
 /// A description of the first behaviour that does not hold.
-pub async fn check_store<S: SyncStore, F: Fn() -> S>(make: F) -> Result<(), String> {
+pub async fn check_store<S: SyncStore, F: Fn() -> S>(
+    make: F,
+) -> Result<(), String> {
     clients_bind_and_advance(&make()).await?;
     log_keeps_latest_version(&make()).await?;
     reads_page_and_skip_tombstones(&make()).await?;
@@ -35,7 +37,9 @@ fn client(id: &str) -> Result<ClientId, String> {
     ClientId::parse(id).map_err(|err| err.to_string())
 }
 
-async fn clients_bind_and_advance<S: SyncStore>(store: &S) -> Result<(), String> {
+async fn clients_bind_and_advance<S: SyncStore>(
+    store: &S,
+) -> Result<(), String> {
     let id = client("device-1")?;
     let (ada, bob) = (UserId::generate(), UserId::generate());
     ensure(
@@ -66,7 +70,9 @@ async fn clients_bind_and_advance<S: SyncStore>(store: &S) -> Result<(), String>
     Ok(())
 }
 
-async fn log_keeps_latest_version<S: SyncStore>(store: &S) -> Result<(), String> {
+async fn log_keeps_latest_version<S: SyncStore>(
+    store: &S,
+) -> Result<(), String> {
     let space = SpaceId::generate();
     store
         .append(vec![
@@ -99,7 +105,9 @@ async fn log_keeps_latest_version<S: SyncStore>(store: &S) -> Result<(), String>
     Ok(())
 }
 
-async fn reads_page_and_skip_tombstones<S: SyncStore>(store: &S) -> Result<(), String> {
+async fn reads_page_and_skip_tombstones<S: SyncStore>(
+    store: &S,
+) -> Result<(), String> {
     let space = SpaceId::generate();
     store
         .append(vec![
@@ -113,7 +121,8 @@ async fn reads_page_and_skip_tombstones<S: SyncStore>(store: &S) -> Result<(), S
     let all = store.read(0, 10, false).await.map_err(|e| e.to_string())?;
     ensure(all.len() == 3, "the delete replaced the put")?;
     let live = store.read(0, 10, true).await.map_err(|e| e.to_string())?;
-    let live_keys: Vec<_> = live.iter().map(|r| r.change.key.as_str()).collect();
+    let live_keys: Vec<_> =
+        live.iter().map(|r| r.change.key.as_str()).collect();
     ensure(live_keys == ["b", "c"], "live reads skip tombstones")?;
     let first = all.first().map_or(0, |r| r.seq);
     let page = store
@@ -131,8 +140,10 @@ async fn reads_page_and_skip_tombstones<S: SyncStore>(store: &S) -> Result<(), S
 
 async fn records_round_trip<S: SyncStore>(store: &S) -> Result<(), String> {
     let (space, object) = (SpaceId::generate(), ObjectId::generate());
-    let value = json!({"title": "Ship sync", "tags": ["a", "b"], "n": 1.5, "z": null});
-    let change = Change::put(space, "issues", "ENG-7", value).governed_by(object);
+    let value =
+        json!({"title": "Ship sync", "tags": ["a", "b"], "n": 1.5, "z": null});
+    let change =
+        Change::put(space, "issues", "ENG-7", value).governed_by(object);
     store
         .append(vec![
             change.clone(),

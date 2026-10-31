@@ -65,9 +65,11 @@ impl MemoryStore {
             .collect();
         for position in dead {
             if let Some(change) = state.log.remove(&position) {
-                let _ = state
-                    .positions
-                    .remove(&(change.space, change.collection, change.key));
+                let _ = state.positions.remove(&(
+                    change.space,
+                    change.collection,
+                    change.key,
+                ));
             }
         }
         state.horizon = state.horizon.max(seq);
@@ -75,7 +77,10 @@ impl MemoryStore {
 }
 
 impl SyncStore for MemoryStore {
-    async fn client(&self, client: &ClientId) -> Result<Option<ClientState>, Error> {
+    async fn client(
+        &self,
+        client: &ClientId,
+    ) -> Result<Option<ClientState>, Error> {
         Ok(self.lock().clients.get(client).copied())
     }
 
@@ -86,13 +91,15 @@ impl SyncStore for MemoryStore {
         last_mutation_id: u64,
     ) -> Result<(), Error> {
         let mut state = self.lock();
-        let entry = state.clients.entry(client.clone()).or_insert(ClientState {
-            user,
-            last_mutation_id: 0,
-        });
+        let entry =
+            state.clients.entry(client.clone()).or_insert(ClientState {
+                user,
+                last_mutation_id: 0,
+            });
         let bound = entry.user == user;
         if bound {
-            entry.last_mutation_id = entry.last_mutation_id.max(last_mutation_id);
+            entry.last_mutation_id =
+                entry.last_mutation_id.max(last_mutation_id);
         }
         drop(state);
         if bound {
@@ -110,7 +117,8 @@ impl SyncStore for MemoryStore {
         for change in changes {
             state.head += 1;
             let seq = state.head;
-            let key = (change.space, change.collection.clone(), change.key.clone());
+            let key =
+                (change.space, change.collection.clone(), change.key.clone());
             if let Some(previous) = state.positions.insert(key, seq) {
                 let _ = state.log.remove(&previous);
             }
@@ -120,7 +128,12 @@ impl SyncStore for MemoryStore {
         Ok(())
     }
 
-    async fn read(&self, after: u64, limit: usize, live_only: bool) -> Result<Vec<Record>, Error> {
+    async fn read(
+        &self,
+        after: u64,
+        limit: usize,
+        live_only: bool,
+    ) -> Result<Vec<Record>, Error> {
         let state = self.lock();
         Ok(state
             .log

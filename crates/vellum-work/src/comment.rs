@@ -35,7 +35,9 @@ pub const MAX_BODY: usize = 64 * 1024;
 pub const MAX_REACTIONS: usize = 20;
 
 /// A block in a document: `01JB…#blk-a1b2c3d4`.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub struct BlockRef {
     /// The document.
     pub doc: DocId,
@@ -87,11 +89,12 @@ impl FromStr for BlockRef {
     type Err = WorkError;
 
     fn from_str(text: &str) -> Result<Self> {
-        let (doc, block) = text.split_once('#').ok_or_else(|| WorkError::Invalid {
-            what: "block reference",
-            value: text.to_owned(),
-            reason: "must be <document id>#blk-…",
-        })?;
+        let (doc, block) =
+            text.split_once('#').ok_or_else(|| WorkError::Invalid {
+                what: "block reference",
+                value: text.to_owned(),
+                reason: "must be <document id>#blk-…",
+            })?;
         let doc = doc.parse::<DocId>().map_err(|_| WorkError::Invalid {
             what: "document ID",
             value: doc.to_owned(),
@@ -102,7 +105,9 @@ impl FromStr for BlockRef {
 }
 
 /// What a thread is attached to.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[serde(untagged)]
 pub enum Target {
     /// An issue (its description and activity).
@@ -167,7 +172,9 @@ impl Target {
 }
 
 /// Who wrote a comment.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum AuthoredBy {
     /// The author typed it.
@@ -310,9 +317,12 @@ impl Thread {
             path: path.to_owned(),
             reason,
         };
-        let thread: Self = serde_saphyr::from_str(text).map_err(|e| file(e.to_string()))?;
+        let thread: Self =
+            serde_saphyr::from_str(text).map_err(|e| file(e.to_string()))?;
         if thread.comments.first().map(|c| c.id) != Some(thread.id) {
-            return Err(file("the thread ID must be its first comment's ID".into()));
+            return Err(file(
+                "the thread ID must be its first comment's ID".into(),
+            ));
         }
         if thread.path() != path {
             return Err(file(format!(
@@ -352,6 +362,25 @@ pub struct Assignment {
     #[serde(with = "crate::timestamp::option")]
     pub assigned_at: Option<OffsetDateTime>,
     /// The quoted text, or the start of the root comment.
+    pub summary: String,
+}
+
+/// An unanswered mention of someone in an open thread, as My Work lists
+/// it (#472).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Mention {
+    /// The comment that mentions the person.
+    pub comment: CommentId,
+    /// Its thread.
+    pub thread: CommentId,
+    /// Where the thread is.
+    pub target: Target,
+    /// Who wrote the comment.
+    pub author: UserRef,
+    /// When it was posted.
+    #[serde(with = "crate::timestamp")]
+    pub at: OffsetDateTime,
+    /// The first line of the comment.
     pub summary: String,
 }
 
@@ -516,7 +545,11 @@ impl Comments {
     /// Open block threads on `doc` whose block no longer exists; the UI
     /// lists them as "original text deleted".
     #[must_use]
-    pub fn orphaned(&self, doc: &DocId, live_blocks: &BTreeSet<&str>) -> Vec<&Thread> {
+    pub fn orphaned(
+        &self,
+        doc: &DocId,
+        live_blocks: &BTreeSet<&str>,
+    ) -> Vec<&Thread> {
         self.on(&doc.to_string())
             .into_iter()
             .filter(|t| !t.is_resolved())
@@ -546,6 +579,36 @@ impl Comments {
             })
             .collect();
         out.sort_by_key(|a| (a.assigned_at, a.thread));
+        out
+    }
+
+    /// Open threads where someone else mentioned `user` and `user` has not
+    /// written since, newest first, one per thread. Threads assigned to
+    /// `user` are left out: [`Self::assignments`] lists them.
+    #[must_use]
+    pub fn mentions_of(&self, user: &UserRef) -> Vec<Mention> {
+        let mut out: Vec<Mention> = self
+            .threads
+            .values()
+            .filter(|t| !t.is_resolved() && t.assignee.as_ref() != Some(user))
+            .filter_map(|t| {
+                let live: Vec<&Comment> = t.live().collect();
+                let answered = live.iter().rposition(|c| &c.author == user);
+                let start = answered.map_or(0, |i| i + 1);
+                let comment = live.get(start..)?.iter().rev().find(|c| {
+                    &c.author != user && c.mentions().iter().any(|m| m == user)
+                })?;
+                Some(Mention {
+                    comment: comment.id,
+                    thread: t.id,
+                    target: t.target.clone(),
+                    author: comment.author.clone(),
+                    at: comment.created_at,
+                    summary: first_line(&comment.body),
+                })
+            })
+            .collect();
+        out.sort_by(|a, b| b.at.cmp(&a.at).then(b.comment.cmp(&a.comment)));
         out
     }
 
@@ -594,11 +657,12 @@ impl Comments {
             self.threads.get(&id).cloned().ok_or_else(|| unknown(&id))?
         } else {
             {
-                let target = draft.target.ok_or_else(|| WorkError::Invalid {
-                    what: "comment",
-                    value: draft.id.to_string(),
-                    reason: "a new thread needs a target",
-                })?;
+                let target =
+                    draft.target.ok_or_else(|| WorkError::Invalid {
+                        what: "comment",
+                        value: draft.id.to_string(),
+                        reason: "a new thread needs a target",
+                    })?;
                 target.check()?;
                 Thread {
                     id: draft.id,
@@ -670,10 +734,16 @@ impl Comments {
     /// [`WorkError::InvalidState`] if the actor is not the author or the
     /// comment was deleted, and [`WorkError::Invalid`] for a bad body.
     #[instrument(skip_all, fields(comment = %id))]
-    pub fn edit(&mut self, id: &CommentId, body: &str, ctx: &Ctx) -> Result<CommentChanges> {
+    pub fn edit(
+        &mut self,
+        id: &CommentId,
+        body: &str,
+        ctx: &Ctx,
+    ) -> Result<CommentChanges> {
         let me = actor(ctx)?;
         check_body(body)?;
-        let mut thread = self.thread_of(id).cloned().ok_or_else(|| unknown(id))?;
+        let mut thread =
+            self.thread_of(id).cloned().ok_or_else(|| unknown(id))?;
         let comment = thread
             .comments
             .iter_mut()
@@ -682,7 +752,8 @@ impl Comments {
         if comment.author != me || comment.deleted {
             return Err(refused(id, "only the author can edit a comment"));
         }
-        let before: BTreeSet<UserRef> = comment.mentions().into_iter().collect();
+        let before: BTreeSet<UserRef> =
+            comment.mentions().into_iter().collect();
         body.clone_into(&mut comment.body);
         comment.edited_at = Some(ctx.now);
         let added: Vec<UserRef> = comment
@@ -716,15 +787,23 @@ impl Comments {
     /// Returns [`WorkError::UnknownIssue`] for an unknown comment and
     /// [`WorkError::InvalidState`] if the actor may not delete it.
     #[instrument(skip_all, fields(comment = %id))]
-    pub fn delete(&mut self, id: &CommentId, moderator: bool, ctx: &Ctx) -> Result<CommentChanges> {
+    pub fn delete(
+        &mut self,
+        id: &CommentId,
+        moderator: bool,
+        ctx: &Ctx,
+    ) -> Result<CommentChanges> {
         let me = actor(ctx)?;
-        let mut thread = self.thread_of(id).cloned().ok_or_else(|| unknown(id))?;
+        let mut thread =
+            self.thread_of(id).cloned().ok_or_else(|| unknown(id))?;
         let index = thread
             .comments
             .iter()
             .position(|c| c.id == *id && !c.deleted)
             .ok_or_else(|| unknown(id))?;
-        if !moderator && thread.comments.get(index).map(|c| &c.author) != Some(&me) {
+        if !moderator
+            && thread.comments.get(index).map(|c| &c.author) != Some(&me)
+        {
             return Err(refused(
                 id,
                 "only the author or a manager can delete a comment",
@@ -780,7 +859,9 @@ impl Comments {
     ) -> Result<CommentChanges> {
         let me = actor(ctx)?;
         let emoji = emoji.trim();
-        if emoji.is_empty() || emoji.chars().count() > 16 || emoji.chars().any(char::is_whitespace)
+        if emoji.is_empty()
+            || emoji.chars().count() > 16
+            || emoji.chars().any(char::is_whitespace)
         {
             return Err(WorkError::Invalid {
                 what: "reaction",
@@ -788,14 +869,17 @@ impl Comments {
                 reason: "must be one emoji or shortcode",
             });
         }
-        let mut thread = self.thread_of(id).cloned().ok_or_else(|| unknown(id))?;
+        let mut thread =
+            self.thread_of(id).cloned().ok_or_else(|| unknown(id))?;
         let comment = thread
             .comments
             .iter_mut()
             .find(|c| c.id == *id && !c.deleted)
             .ok_or_else(|| unknown(id))?;
         let changed = if on {
-            if !comment.reactions.contains_key(emoji) && comment.reactions.len() >= MAX_REACTIONS {
+            if !comment.reactions.contains_key(emoji)
+                && comment.reactions.len() >= MAX_REACTIONS
+            {
                 return Err(WorkError::Invalid {
                     what: "reaction",
                     value: emoji.to_owned(),
@@ -838,8 +922,14 @@ impl Comments {
     ///
     /// Returns [`WorkError::UnknownIssue`] for an unknown thread.
     #[instrument(skip_all, fields(thread = %id))]
-    pub fn resolve(&mut self, id: &CommentId, resolved: bool, ctx: &Ctx) -> Result<CommentChanges> {
-        let mut thread = self.thread_of(id).cloned().ok_or_else(|| unknown(id))?;
+    pub fn resolve(
+        &mut self,
+        id: &CommentId,
+        resolved: bool,
+        ctx: &Ctx,
+    ) -> Result<CommentChanges> {
+        let mut thread =
+            self.thread_of(id).cloned().ok_or_else(|| unknown(id))?;
         if thread.is_resolved() == resolved {
             return Ok(CommentChanges::default());
         }
@@ -876,7 +966,8 @@ impl Comments {
         to: Option<UserRef>,
         ctx: &Ctx,
     ) -> Result<CommentChanges> {
-        let mut thread = self.thread_of(id).cloned().ok_or_else(|| unknown(id))?;
+        let mut thread =
+            self.thread_of(id).cloned().ok_or_else(|| unknown(id))?;
         if thread.assignee == to {
             return Ok(CommentChanges::default());
         }
@@ -973,6 +1064,11 @@ fn summary(thread: &Thread) -> String {
         .as_deref()
         .or_else(|| thread.live().next().map(|c| c.body.as_str()))
         .unwrap_or_default();
+    first_line(text)
+}
+
+/// The first line of `text`, cut to 120 characters.
+fn first_line(text: &str) -> String {
     let line = text.lines().next().unwrap_or_default().trim();
     if line.chars().count() > 120 {
         let cut: String = line.chars().take(119).collect();
@@ -1012,7 +1108,8 @@ impl crate::graph::WorkGraph {
             .map_err(|_| WorkError::Invalid {
                 what: "comment target",
                 value: text.to_owned(),
-                reason: "must be an issue key, a document ID or <document id>#blk-…",
+                reason: "must be an issue key, a document ID or <document \
+                    id>#blk-…",
             })
     }
 

@@ -15,8 +15,13 @@ function CheckMark({ checked }: { readonly checked: boolean }) {
   const t = useT();
   return (
     <span className="vl-check" data-checked={checked}>
-      <Icon name={checked ? "check_box" : "check_box_outline_blank"} size={20} />
-      <span className="vl-visually-hidden">{t(checked ? "collection-yes" : "collection-no")}</span>
+      <Icon
+        name={checked ? "check_box" : "check_box_outline_blank"}
+        size={20}
+      />
+      <span className="vl-visually-hidden">
+        {t(checked ? "collection-yes" : "collection-no")}
+      </span>
     </span>
   );
 }
@@ -33,9 +38,13 @@ export function Chips({
     <span className="vl-chips">
       {names.map((name, index) => (
         <Fragment key={name}>
-          {/* A space between chips keeps their names apart for screen readers. */}
+          {/* A space between chips keeps their names apart for screen
+              readers. */}
           {index > 0 && " "}
-          <span className="vl-chip" data-color={options.find((o) => o.name === name)?.color}>
+          <span
+            className="vl-chip"
+            data-color={options.find((o) => o.name === name)?.color}
+          >
             {name}
           </span>
         </Fragment>

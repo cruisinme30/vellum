@@ -22,8 +22,10 @@ anywhere else.
 
 ## Exports
 
-- **PDF** has two profiles: *print* (Typst; page numbers, running heads, a table of contents) and *screen* (looks exactly like the page).
-- **Word** keeps headings, lists, tables and comments; charts and diagrams become vector images.
+- **PDF** has two profiles: *print* (Typst; page numbers, running heads, a table
+  of contents) and *screen* (looks exactly like the page).
+- **Word** keeps headings, lists, tables and comments; charts and diagrams
+  become vector images.
 - **Markdown** is the file itself, with assets in a zip.
 - **HTML** is a single self-contained file.
 

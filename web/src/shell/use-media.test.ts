@@ -40,7 +40,10 @@ function controllableMedia() {
   };
 }
 
-/** Removes matchMedia, as on an engine without it; returns the step that puts it back. */
+/**
+ * Removes matchMedia, as on an engine without it; returns the step that puts it
+ * back.
+ */
 function removeMatchMedia() {
   const original = Object.getOwnPropertyDescriptor(globalThis, "matchMedia");
   Reflect.deleteProperty(globalThis, "matchMedia");

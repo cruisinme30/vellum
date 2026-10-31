@@ -12,7 +12,9 @@ const paragraph = (text: string): JSONContent => ({
   content: [{ type: "text", text }],
 });
 
-/** Loads content, writes it to HTML and reads that back, as copy and paste do. */
+/**
+ * Loads content, writes it to HTML and reads that back, as copy and paste do.
+ */
 function roundTrip(content: JSONContent[]): JSONContent[] {
   const first = createTestEditor({ content: { type: "doc", content } });
   const second = createTestEditor({ content: first.getHTML() });
@@ -25,7 +27,10 @@ function roundTrip(content: JSONContent[]): JSONContent[] {
 describe("schema attributes on stock nodes", () => {
   it("adds only what Tiptap lacks", () => {
     const byType = new Map(
-      missingAttributes().map((entry) => [entry.types[0], Object.keys(entry.attributes)]),
+      missingAttributes().map((entry) => [
+        entry.types[0],
+        Object.keys(entry.attributes),
+      ]),
     );
     expect(byType.get("heading")).toEqual(["attributes"]);
     expect(byType.get("bulletList")).toEqual(["tight"]);
@@ -47,7 +52,10 @@ describe("schema attributes on stock nodes", () => {
         content: [{ type: "listItem", content: [paragraph("One")] }],
       },
     ]);
-    expect(heading?.attrs).toMatchObject({ level: 2, attributes: "{#intro .lead}" });
+    expect(heading?.attrs).toMatchObject({
+      level: 2,
+      attributes: "{#intro .lead}",
+    });
     expect(list?.attrs).toMatchObject({ tight: false });
   });
 
@@ -57,11 +65,18 @@ describe("schema attributes on stock nodes", () => {
         type: "orderedList",
         content: [
           { type: "listItem", content: [paragraph("Plain")] },
-          { type: "taskItem", attrs: { checked: true }, content: [paragraph("Done")] },
+          {
+            type: "taskItem",
+            attrs: { checked: true },
+            content: [paragraph("Done")],
+          },
         ],
       },
     ]);
-    expect(list?.content?.map((item) => item.type)).toEqual(["listItem", "taskItem"]);
+    expect(list?.content?.map((item) => item.type)).toEqual([
+      "listItem",
+      "taskItem",
+    ]);
     expect(list?.content?.[1]?.attrs).toMatchObject({ checked: true });
   });
 
@@ -69,7 +84,11 @@ describe("schema attributes on stock nodes", () => {
     const [code] = roundTrip([
       {
         type: "codeBlock",
-        attrs: { language: "rust", args: "title=main.rs", attributes: "{.wide}" },
+        attrs: {
+          language: "rust",
+          args: "title=main.rs",
+          attributes: "{.wide}",
+        },
         content: [{ type: "text", text: "fn main() {}" }],
       },
     ]);
@@ -87,9 +106,17 @@ describe("schema attributes on stock nodes", () => {
         attrs: { name: "aside", arg: "left", attributes: "{.muted}" },
         content: [paragraph("Body")],
       },
-      { type: "callout", attrs: { kind: "warn", title: "Heads up" }, content: [paragraph("Hi")] },
+      {
+        type: "callout",
+        attrs: { kind: "warn", title: "Heads up" },
+        content: [paragraph("Hi")],
+      },
     ]);
-    expect(container?.attrs).toMatchObject({ name: "aside", arg: "left", attributes: "{.muted}" });
+    expect(container?.attrs).toMatchObject({
+      name: "aside",
+      arg: "left",
+      attributes: "{.muted}",
+    });
     expect(callout?.attrs).toMatchObject({ kind: "warn", title: "Heads up" });
   });
 });
@@ -98,7 +125,10 @@ const image = (source: string): JSONContent => ({
   type: "paragraph",
   content: [
     { type: "text", text: "See " },
-    { type: "inlineImage", attrs: { src: source, alt: "logo", title: "Our logo" } },
+    {
+      type: "inlineImage",
+      attrs: { src: source, alt: "logo", title: "Our logo" },
+    },
   ],
 });
 
@@ -112,7 +142,9 @@ describe("inline images", () => {
   });
 
   it("renders a safe image and its Markdown text", () => {
-    const editor = createTestEditor({ content: { type: "doc", content: [image("/a.png")] } });
+    const editor = createTestEditor({
+      content: { type: "doc", content: [image("/a.png")] },
+    });
     const element = editor.view.dom.querySelector("img.vl-inline-image");
     expect(element?.getAttribute("src")).toBe("/a.png");
     expect(element?.getAttribute("title")).toBe("Our logo");
@@ -127,7 +159,12 @@ describe("inline images", () => {
         content: [
           {
             type: "paragraph",
-            content: [{ type: "inlineImage", attrs: { src: "javascript:alert(1)", alt: "x" } }],
+            content: [
+              {
+                type: "inlineImage",
+                attrs: { src: "javascript:alert(1)", alt: "x" },
+              },
+            ],
           },
         ],
       },

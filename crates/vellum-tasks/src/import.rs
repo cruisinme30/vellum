@@ -151,7 +151,9 @@ fn write_items(out: &mut String, items: &[Item], indent: usize) {
         );
         out.push_str(&line);
         out.push('\n');
-        if let Some(notes) = item.notes.as_deref().filter(|n| !n.trim().is_empty()) {
+        if let Some(notes) =
+            item.notes.as_deref().filter(|n| !n.trim().is_empty())
+        {
             for note in notes.lines() {
                 let note = note.trim_end();
                 if note.trim().is_empty() {
@@ -172,7 +174,8 @@ fn write_items(out: &mut String, items: &[Item], indent: usize) {
 fn escape_note(text: &str) -> String {
     let mut out = String::new();
     // A note line must not start a list item or a heading of its own.
-    if text.starts_with(['-', '*', '+', '#', '>']) || text.starts_with(|c: char| c.is_ascii_digit())
+    if text.starts_with(['-', '*', '+', '#', '>'])
+        || text.starts_with(|c: char| c.is_ascii_digit())
     {
         out.push('\\');
     }
@@ -278,7 +281,9 @@ fn merge_item(
             if !item.done {
                 fields.done = None;
             }
-            if let Ok(next) = checklist::append(out, Some(parent), &title, &fields, block) {
+            if let Ok(next) =
+                checklist::append(out, Some(parent), &title, &fields, block)
+            {
                 *out = next;
             }
             1 + item
@@ -336,7 +341,10 @@ struct GoogleTask {
     deleted: bool,
 }
 
-fn google_list(title: &str, items: &[serde_json::Value]) -> Result<List, ImportError> {
+fn google_list(
+    title: &str,
+    items: &[serde_json::Value],
+) -> Result<List, ImportError> {
     let mut tasks: Vec<GoogleTask> = items
         .iter()
         .map(|v| serde_json::from_value(v.clone()))
@@ -480,7 +488,8 @@ fn todoist_item(
             None => words.push(word),
         }
     }
-    let mut notes = Some(cell(record, columns.description).to_owned()).filter(|d| !d.is_empty());
+    let mut notes = Some(cell(record, columns.description).to_owned())
+        .filter(|d| !d.is_empty());
     let mut fields = TaskFields {
         labels,
         src: Some(format!(
@@ -498,12 +507,16 @@ fn todoist_item(
     let lang = cell(record, columns.lang);
     if !date.is_empty() {
         let parsed = quickadd::parse(date, now);
-        if (lang.is_empty() || lang.eq_ignore_ascii_case("en")) && parsed.title.is_empty() {
+        if (lang.is_empty() || lang.eq_ignore_ascii_case("en"))
+            && parsed.title.is_empty()
+        {
             fields.due = parsed.fields.due;
             fields.recurrence = parsed.fields.recurrence;
         } else {
             let line = format!("Todoist date: {date}");
-            notes = Some(notes.map_or_else(|| line.clone(), |n| format!("{n}\n{line}")));
+            notes = Some(
+                notes.map_or_else(|| line.clone(), |n| format!("{n}\n{line}")),
+            );
         }
     }
     if let Ok(deadline) = cell(record, columns.deadline).parse::<Date>() {
@@ -534,7 +547,11 @@ fn todoist_item(
 /// # Errors
 ///
 /// Returns [`ImportError`] for malformed CSV or missing columns.
-pub fn todoist_csv(project: &str, csv_text: &str, now: DateTime) -> Result<Vec<List>, ImportError> {
+pub fn todoist_csv(
+    project: &str,
+    csv_text: &str,
+    now: DateTime,
+) -> Result<Vec<List>, ImportError> {
     let _span = tracing::info_span!("tasks.import.todoist").entered();
     let mut reader = csv::ReaderBuilder::new()
         .flexible(true)
@@ -551,7 +568,9 @@ pub fn todoist_csv(project: &str, csv_text: &str, now: DateTime) -> Result<Vec<L
         match cell(&record, Some(columns.kind)) {
             "section" => {
                 sections.push(Section {
-                    heading: Some(cell(&record, Some(columns.content)).to_owned()),
+                    heading: Some(
+                        cell(&record, Some(columns.content)).to_owned(),
+                    ),
                     items: Vec::new(),
                 });
                 stack.clear();
@@ -569,12 +588,14 @@ pub fn todoist_csv(project: &str, csv_text: &str, now: DateTime) -> Result<Vec<L
                 }
             }
             "task" => {
-                let (item, level) = todoist_item(&columns, &record, project, row, now);
+                let (item, level) =
+                    todoist_item(&columns, &record, project, row, now);
                 stack.truncate(level - 1);
                 let parent = stack.last().cloned();
                 let path = if let Some((mut path, parent)) =
-                    parent.and_then(|p| item_at(&mut section.items, &p).map(|i| (p, i)))
-                {
+                    parent.and_then(|p| {
+                        item_at(&mut section.items, &p).map(|i| (p, i))
+                    }) {
                     parent.children.push(item);
                     path.push(parent.children.len() - 1);
                     path
@@ -654,12 +675,19 @@ fn things_when(when: &str, today: Date, fields: &mut TaskFields) {
     };
     fields.start = date;
     // Things' "when@time" is a reminder at that time.
-    if let (Some(date), Some(time)) = (date, time.and_then(|t| t.trim().parse::<Time>().ok())) {
+    if let (Some(date), Some(time)) =
+        (date, time.and_then(|t| t.trim().parse::<Time>().ok()))
+    {
         fields.reminders.push(Reminder::At(date.to_datetime(time)));
     }
 }
 
-fn things_todo(object: &ThingsObject, today: Date, scope: &str, index: usize) -> Item {
+fn things_todo(
+    object: &ThingsObject,
+    today: Date,
+    scope: &str,
+    index: usize,
+) -> Item {
     let a = &object.attributes;
     let id = object
         .id
@@ -704,8 +732,8 @@ fn things_todo(object: &ThingsObject, today: Date, scope: &str, index: usize) ->
 
 /// Reads Things JSON (the documented `things:///json` schema).
 ///
-/// To-dos at the top level go to a "Things" list; each project becomes a list, its
-/// headings become headings, and checklist items become subtasks.
+/// To-dos at the top level go to a "Things" list; each project becomes a list,
+/// its headings become headings, and checklist items become subtasks.
 ///
 /// # Errors
 ///
@@ -736,7 +764,9 @@ pub fn things_json(json: &str, today: Date) -> Result<Vec<List>, ImportError> {
                         }),
                         "to-do" => {
                             if let Some(section) = sections.last_mut() {
-                                section.items.push(things_todo(child, today, title, i));
+                                section
+                                    .items
+                                    .push(things_todo(child, today, title, i));
                             }
                         }
                         _ => {}
@@ -771,19 +801,31 @@ mod tests {
     #[test]
     fn google_takeout() {
         let json = r#"{"kind":"tasks#taskLists","items":[{"kind":"tasks#tasks","title":"Errands","items":[
-          {"id":"b","title":"Child","status":"needsAction","parent":"a","position":"001"},
-          {"id":"a","title":"Buy <milk> {soon}","notes":"- semi-skimmed\n2 litres","status":"needsAction","due":"2026-11-03T00:00:00.000Z","position":"000"},
-          {"id":"c","title":"Done one","status":"completed","completed":"2026-10-01T10:00:00.000Z","position":"002"},
+          {"id":"b","title":"Child","status":"needsAction","parent":"a",
+            "position":"001"},
+          {"id":"a","title":"Buy <milk> {soon}",
+            "notes":"- semi-skimmed\n2 litres","status":"needsAction",
+              "due":"2026-11-03T00:00:00.000Z","position":"000"},
+          {"id":"c","title":"Done one","status":"completed",
+            "completed":"2026-10-01T10:00:00.000Z","position":"002"},
           {"id":"d","title":"Gone","status":"needsAction","deleted":true,"position":"003"}]}]}"#;
         let lists = google_tasks(json).unwrap();
         assert_eq!(lists.len(), 1);
         let text = render_list(&lists[0], doc(), "gourav");
-        assert!(text.starts_with("---\nid: 01M639NFH15EBMG6C7NX1ZK4KA\ntitle: \"Errands\"\nowner: \"@gourav\"\nvellum: 1\n---\n\n"));
-        assert!(text.contains("- [ ] Buy \\<milk> \\{soon} {due=2026-11-03 src=gtasks:a} ^blk-"));
-        assert!(
-            text.contains("\n  \\- semi-skimmed\n  \\2 litres\n  - [ ] Child {src=gtasks:b} ^blk-")
-        );
-        assert!(text.contains("- [x] Done one {done=2026-10-01T10:00:00Z src=gtasks:c} ^blk-"));
+        assert!(text.starts_with(
+            "---\nid: 01M639NFH15EBMG6C7NX1ZK4KA\n\
+            title: \"Errands\"\nowner: \"@gourav\"\nvellum: 1\n---\n\n"
+        ));
+        assert!(text.contains(
+            "- [ ] Buy \\<milk> \\{soon} {due=2026-11-03 src=gtasks:a} ^blk-"
+        ));
+        assert!(text.contains(
+            "\n  \\- semi-skimmed\n  \\2 litres\n  - [ ] Child \
+                {src=gtasks:b} ^blk-"
+        ));
+        assert!(text.contains(
+            "- [x] Done one {done=2026-10-01T10:00:00Z src=gtasks:c} ^blk-"
+        ));
         assert!(!text.contains("Gone"));
         // The file reads back as tasks with the right shape.
         let context = FileContext {
@@ -800,16 +842,26 @@ mod tests {
         // Importing again adds nothing; a new task is appended.
         assert_eq!(append_new(&text, &lists[0]), None);
         let more = json.replace(
-            r#"{"id":"d","title":"Gone","status":"needsAction","deleted":true,"position":"003"}"#,
-            r#"{"id":"e","title":"New","status":"needsAction","position":"004"}"#,
+            "{\"id\":\"d\",\"title\":\"Gone\",\"status\":\"needsAction\",\"dele\
+                ted\":true,\"position\":\"003\"}",
+            "{\"id\":\"e\",\"title\":\"New\",\"status\":\"needsAction\",\"posit\
+                ion\":\"004\"}",
         );
-        let (updated, added) = append_new(&text, &google_tasks(&more).unwrap()[0]).unwrap();
+        let (updated, added) =
+            append_new(&text, &google_tasks(&more).unwrap()[0]).unwrap();
         assert_eq!(added, 1);
         assert!(updated.starts_with(&text));
         assert!(updated.contains("\n\n- [ ] New {src=gtasks:e} ^blk-"));
         // A new subtask of a known task goes under it.
-        let child = more.replace(r#"{"id":"e","#, r#"{"id":"f","title":"Second child","status":"needsAction","parent":"a","position":"0015"},{"id":"e","#);
-        let (nested, added) = append_new(&updated, &google_tasks(&child).unwrap()[0]).unwrap();
+        let child = more.replace(
+            r#"{"id":"e","#,
+            "{\"id\":\"f\",\"title\":\"Se\
+            cond \
+            child\",\"status\":\"needsAction\",\"parent\":\"a\",\"position\":\"\
+            0015\"},{\"id\":\"e\",",
+        );
+        let (nested, added) =
+            append_new(&updated, &google_tasks(&child).unwrap()[0]).unwrap();
         assert_eq!(added, 1);
         assert!(nested.contains("  - [ ] Child {src=gtasks:b} ^blk-"));
         assert!(nested.contains("  - [ ] Second child {src=gtasks:f} ^blk-"));
@@ -824,7 +876,8 @@ mod tests {
 
     #[test]
     fn google_api_list_and_bad_json() {
-        let json = r#"{"kind":"tasks#tasks","items":[{"id":"x","title":"One","status":"needsAction","position":"0"}]}"#;
+        let json = "{\"kind\":\"tasks#tasks\",\"items\":[{\"id\":\"x\",\"title\
+            \":\"One\",\"status\":\"needsAction\",\"position\":\"0\"}]}";
         let lists = google_tasks(json).unwrap();
         assert_eq!(lists[0].title, "Google Tasks");
         assert!(google_tasks("[1,2]").is_err());
@@ -832,13 +885,10 @@ mod tests {
 
     #[test]
     fn todoist_template() {
-        let csv = "TYPE,CONTENT,DESCRIPTION,PRIORITY,INDENT,AUTHOR,RESPONSIBLE,DATE,DATE_LANG,TIMEZONE\n\
-task,Water plants @home,,4,1,,,every! 3 days,en,\n\
-task,Pick pots,,1,2,,,,,\n\
-note,Terracotta,,,,,,,,\n\
-section,Later,,,,,,,,\n\
-task,Plan trip,Ideas,2,1,,,Nov 20 2026,en,\n\
-task,Fête,,,1,,,demain,fr,\n";
+        let csv = "TYPE,CONTENT,DESCRIPTION,PRIORITY,INDENT,AUTHOR,RESPONSIBLE,\
+DATE,DATE_LANG,TIMEZONE\ntask,Water plants @home,,4,1,,,every! 3 days,en,\n\
+task,Pick pots,,1,2,,,,,\nnote,Terracotta,,,,,,,,\nsection,Later,,,,,,,,\n\
+task,Plan trip,Ideas,2,1,,,Nov 20 2026,en,\ntask,Fête,,,1,,,demain,fr,\n";
         let now = date(2026, 11, 2).at(9, 0, 0, 0);
         let lists = todoist_csv("Garden", csv, now).unwrap();
         let list = &lists[0];
@@ -853,23 +903,31 @@ task,Fête,,,1,,,demain,fr,\n";
         assert_eq!(water.children[0].notes.as_deref(), Some("Terracotta"));
         let later = &list.sections[1];
         assert_eq!(later.heading.as_deref(), Some("Later"));
-        assert_eq!(later.items[0].fields.due.unwrap().to_string(), "2026-11-20");
+        assert_eq!(
+            later.items[0].fields.due.unwrap().to_string(),
+            "2026-11-20"
+        );
         assert_eq!(
             later.items[1].notes.as_deref(),
             Some("Todoist date: demain")
         );
         let text = render_list(list, doc(), "gourav");
-        assert!(text.contains("\n## Later\n\n- [ ] Plan trip {due=2026-11-20 p=2 src=todoist:"));
+        assert!(text.contains(
+            "\n## Later\n\n- [ ] Plan trip {due=2026-11-20 p=2 src=todoist:"
+        ));
         assert!(todoist_csv("x", "A,B\n1,2\n", now).is_err());
     }
 
     #[test]
     fn things_projects_headings_and_checklists() {
         let json = r#"[
-          {"type":"to-do","attributes":{"title":"Loose","when":"evening","tags":["Home"]}},
+          {"type":"to-do","attributes":{"title":"Loose","when":"evening",
+            "tags":["Home"]}},
           {"type":"project","attributes":{"title":"Launch","items":[
-            {"type":"to-do","id":"T1","attributes":{"title":"Draft","when":"2026-11-04@09:30","deadline":"2026-11-06",
-              "checklist-items":[{"type":"checklist-item","attributes":{"title":"Outline","completed":true}}]}},
+            {"type":"to-do","id":"T1","attributes":{"title":"Draft",
+              "when":"2026-11-04@09:30","deadline":"2026-11-06",
+              "checklist-items":[{"type":"checklist-item",
+                "attributes":{"title":"Outline","completed":true}}]}},
             {"type":"heading","attributes":{"title":"Ship"}},
             {"type":"to-do","attributes":{"title":"Post","when":"someday","completed":true}}]}}]"#;
         let today = date(2026, 11, 2);

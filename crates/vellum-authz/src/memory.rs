@@ -41,10 +41,16 @@ fn live(valid_until: Option<i64>, now_ms: i64) -> bool {
     valid_until.is_none_or(|at| at > now_ms)
 }
 
-fn live_rows(space: &Space, p: Id, now_ms: i64) -> impl Iterator<Item = (Id, Relation)> + '_ {
+fn live_rows(
+    space: &Space,
+    p: Id,
+    now_ms: i64,
+) -> impl Iterator<Item = (Id, Relation)> + '_ {
     space
         .effective
-        .range((p, Id(0), Relation::Viewer)..=(p, Id(u128::MAX), Relation::Owner))
+        .range(
+            (p, Id(0), Relation::Viewer)..=(p, Id(u128::MAX), Relation::Owner),
+        )
         .filter(move |(_, (_, until))| live(*until, now_ms))
         .map(|((_, o, r), _)| (*o, *r))
 }
@@ -71,7 +77,11 @@ impl MemoryStore {
     /// # Errors
     ///
     /// Fails only if the lock is poisoned.
-    pub fn set_tree(&self, space: Id, parents: BTreeMap<Id, Option<Id>>) -> Result<(), StoreError> {
+    pub fn set_tree(
+        &self,
+        space: Id,
+        parents: BTreeMap<Id, Option<Id>>,
+    ) -> Result<(), StoreError> {
         self.lock()?.spaces.entry(space).or_default().parents = parents;
         Ok(())
     }
@@ -125,15 +135,21 @@ impl AuthzStore for MemoryStore {
         Ok(())
     }
 
-    async fn spaces_granting(&self, groups: &BTreeSet<Id>) -> Result<Vec<Id>, StoreError> {
+    async fn spaces_granting(
+        &self,
+        groups: &BTreeSet<Id>,
+    ) -> Result<Vec<Id>, StoreError> {
         let state = self.lock()?;
         Ok(state
             .spaces
             .iter()
             .filter(|(_, s)| {
-                s.tuples
-                    .values()
-                    .any(|t| matches!(t.subject, Subject::Group(g) if groups.contains(&g)))
+                s.tuples.values().any(|t| {
+                    matches!(
+                        t.subject,
+                        Subject::Group(g) if groups.contains(&g)
+                    )
+                })
             })
             .map(|(id, _)| *id)
             .collect())
@@ -157,7 +173,9 @@ impl AuthzStore for MemoryStore {
         }
         match commit.scope {
             Scope::All => s.effective.clear(),
-            Scope::Objects(objects) => s.effective.retain(|(_, o, _), _| !objects.contains(o)),
+            Scope::Objects(objects) => {
+                s.effective.retain(|(_, o, _), _| !objects.contains(o));
+            }
         }
         for row in commit.rows {
             let _ = s.effective.insert(
@@ -183,7 +201,10 @@ impl AuthzStore for MemoryStore {
             .get(&space)
             .map(|s| {
                 s.effective
-                    .range((p, object, Relation::Viewer)..=(p, object, Relation::Owner))
+                    .range(
+                        (p, object, Relation::Viewer)
+                            ..=(p, object, Relation::Owner),
+                    )
                     .filter(|(_, (_, until))| live(*until, now_ms))
                     .map(|((_, _, r), (epoch, _))| (*r, *epoch))
                     .collect()
@@ -222,7 +243,11 @@ impl AuthzStore for MemoryStore {
             .collect())
     }
 
-    async fn spaces_of(&self, principal: Principal, now_ms: i64) -> Result<Vec<Id>, StoreError> {
+    async fn spaces_of(
+        &self,
+        principal: Principal,
+        now_ms: i64,
+    ) -> Result<Vec<Id>, StoreError> {
         let state = self.lock()?;
         let p = principal.id();
         Ok(state

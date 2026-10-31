@@ -12,11 +12,14 @@ that stays the single source of truth while the team builds.
 
 ## Steps
 
-1. Create a page from **New → From template → PRD** and title it "PRD: Policy simulator".
+1. Create a page from **New → From template → PRD** and title it "PRD: Policy
+   simulator".
 2. Fill in the facts panel: owner, status and target.
-3. Write the requirements as a table. Select a requirement and choose **Create issue**: the issue is created in ENG and the table gets a live chip.
+3. Write the requirements as a table. Select a requirement and choose **Create
+   issue**: the issue is created in ENG and the table gets a live chip.
 4. Add a roadmap with `/roadmap` and a risk matrix with `/risk`.
-5. Request review from the reviewers in **⋯ → Request review**; set the status to verified when they approve.
+5. Request review from the reviewers in **⋯ → Request review**; set the status
+   to verified when they approve.
 
 As the team works, each chip shows the issue's current status, so the
 PRD never needs a status update by hand.

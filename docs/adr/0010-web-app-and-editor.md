@@ -11,11 +11,11 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D58, D59, D60, D172
+- Decisions: D58, D59, D60, D172, D232
 - Issues: #70 (block schema), #90 (app shell), #92 (block editor),
   #79 (themes), #128 and #129 (collection views); the Yjs binding refs
   #97 (collab rooms); #392 (API clients); #89 (pages on the server's
-  drive)
+  drive); #94 and R-WK-7 (comments, issue from a page)
 - Pull requests: #262 (shell and editor), #378 (collection views), #417
   (sign-in and live collections)
 
@@ -110,6 +110,15 @@ start before the API and the collab server exist.
   room's source of truth, so otherwise the room would write its old text
   back. The file's text wins over log edits it never held. A page never
   edited live has no log and is left alone.
+
+### D232: comments and issues from a page go through the work core
+
+- The comments panel lists the work core's threads on the page (a block
+  thread targets `<doc id>#blk-…` with the quote); replies, reactions,
+  resolve and assign are its calls. Open threads tint their blocks.
+- Create issue sends `source_block` and the quote, then writes the
+  returned key chip into that block; Create doc from issue starts a page
+  whose Markdown links the issue. A block without an ID gets one first.
 
 ## Alternatives
 

@@ -2,10 +2,7 @@
   "uid": "vellum-client",
   "title": "Vellum: browser experience",
   "description": "Core Web Vitals reported by browsers, per page.",
-  "tags": [
-    "vellum",
-    "client"
-  ],
+  "tags": ["vellum", "client"],
   "schemaVersion": 39,
   "version": 1,
   "editable": true,

@@ -8,7 +8,18 @@ use serde::{Deserialize, Serialize};
 use super::refs::{Collector, Location};
 
 /// Which provider sent the event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Provider {
     /// GitHub or GitHub Enterprise.
@@ -18,7 +29,9 @@ pub enum Provider {
 }
 
 /// Identifies a pull or merge request across providers.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
 pub struct PrRef {
     /// The provider.
     pub provider: Provider,

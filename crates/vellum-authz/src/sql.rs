@@ -17,10 +17,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use vellum_db::sqlx::types::Uuid;
 use vellum_db::sqlx::{self, QueryBuilder};
-use vellum_db::{Index, IndexPool, traced};
+use vellum_db::{BeginWrite as _, Index, IndexPool, traced};
 
 use crate::graph::SpaceGraph;
-use crate::model::{Id, Object, Principal, Relation, Subject, Tuple, TupleRelation};
+use crate::model::{
+    Id, Object, Principal, Relation, Subject, Tuple, TupleRelation,
+};
 use crate::store::{AuthzStore, Commit, Scope, StoreError, TupleKey};
 
 /// How many effective rows one `INSERT` carries.
@@ -64,29 +66,43 @@ fn signed(value: u64) -> Result<i64, StoreError> {
 type GrantRow = (String, Uuid, String, String, Uuid, String, Option<i64>);
 
 fn tuple(row: GrantRow) -> Result<Tuple, StoreError> {
-    let (object_type, object_id, rel, subject_type, subject_id, subject_rel, expires_at) = row;
+    let (
+        object_type,
+        object_id,
+        rel,
+        subject_type,
+        subject_id,
+        subject_rel,
+        expires_at,
+    ) = row;
     Ok(Tuple {
         object: Object::from_columns(&object_type, id(object_id))
             .ok_or_else(|| corrupt(&object_type))?,
         relation: TupleRelation::parse(&rel).ok_or_else(|| corrupt(&rel))?,
-        subject: Subject::from_columns(&subject_type, id(subject_id), &subject_rel)
-            .ok_or_else(|| corrupt(&subject_type))?,
+        subject: Subject::from_columns(
+            &subject_type,
+            id(subject_id),
+            &subject_rel,
+        )
+        .ok_or_else(|| corrupt(&subject_type))?,
         expires_at,
     })
 }
 
-const SELECT_GRANTS: &str = "SELECT object_type, object_id, relation, subject_type, subject_id, \
-     subject_relation, expires_at FROM grants WHERE space_id = $1";
+const SELECT_GRANTS: &str = "SELECT object_type, object_id, relation, \
+     subject_type, subject_id, subject_relation, expires_at FROM grants WHERE \
+     space_id = $1";
 
-const UPSERT_GRANT: &str = "INSERT INTO grants (space_id, object_type, object_id, relation, \
-     subject_type, subject_id, subject_relation, expires_at, created_at) \
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
-     ON CONFLICT (space_id, object_type, object_id, relation, subject_type, subject_id, \
-     subject_relation) DO UPDATE SET expires_at = excluded.expires_at";
+const UPSERT_GRANT: &str = "INSERT INTO grants (space_id, object_type, \
+     object_id, relation, subject_type, subject_id, subject_relation, \
+     expires_at, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) ON \
+     CONFLICT (space_id, object_type, object_id, relation, subject_type, \
+     subject_id, subject_relation) DO UPDATE SET expires_at = \
+     excluded.expires_at";
 
-const DELETE_GRANT: &str = "DELETE FROM grants WHERE space_id = $1 AND object_type = $2 \
-     AND object_id = $3 AND relation = $4 AND subject_type = $5 AND subject_id = $6 \
-     AND subject_relation = $7";
+const DELETE_GRANT: &str = "DELETE FROM grants WHERE space_id = $1 AND \
+     object_type = $2 AND object_id = $3 AND relation = $4 AND subject_type = \
+     $5 AND subject_id = $6 AND subject_relation = $7";
 
 /// Writes tuple upserts and deletes inside a transaction. A macro because
 /// the two pools have different connection types but identical SQL.
@@ -135,9 +151,11 @@ macro_rules! load_space {
         let row: Option<i64> = traced(
             $system,
             "authz.load_epoch",
-            sqlx::query_scalar("SELECT authz_epoch FROM spaces WHERE space_id = $1")
-                .bind(space)
-                .fetch_optional($pool),
+            sqlx::query_scalar(
+                "SELECT authz_epoch FROM spaces WHERE space_id = $1",
+            )
+            .bind(space)
+            .fetch_optional($pool),
         )
         .await
         .map_err(backend)?;
@@ -187,7 +205,7 @@ macro_rules! commit {
     ($pool:expr, $system:expr, $db:ty, $commit:expr) => {{
         let c: Commit = $commit;
         let space = uuid(c.space);
-        let mut tx = $pool.begin().await.map_err(backend)?;
+        let mut tx = $pool.begin_write().await.map_err(backend)?;
         let bumped = traced(
             $system,
             "authz.bump_epoch",
@@ -205,9 +223,12 @@ macro_rules! commit {
             let exists: Option<i64> = traced(
                 $system,
                 "authz.load_epoch",
-                sqlx::query_scalar("SELECT authz_epoch FROM spaces WHERE space_id = $1")
-                    .bind(space)
-                    .fetch_optional(&mut *tx),
+                sqlx::query_scalar(
+                    "SELECT authz_epoch FROM spaces WHERE \
+                    space_id = $1",
+                )
+                .bind(space)
+                .fetch_optional(&mut *tx),
             )
             .await
             .map_err(backend)?;
@@ -223,9 +244,12 @@ macro_rules! commit {
                 let _ = traced(
                     $system,
                     "authz.clear_rows",
-                    sqlx::query("DELETE FROM effective_access WHERE space_id = $1")
-                        .bind(space)
-                        .execute(&mut *tx),
+                    sqlx::query(
+                        "DELETE FROM effective_access WHERE space_id = \
+                        $1",
+                    )
+                    .bind(space)
+                    .execute(&mut *tx),
                 )
                 .await
                 .map_err(backend)?;
@@ -236,7 +260,8 @@ macro_rules! commit {
                         $system,
                         "authz.clear_object_rows",
                         sqlx::query(
-                            "DELETE FROM effective_access WHERE space_id = $1 AND object_id = $2",
+                            "DELETE FROM effective_access WHERE space_id = $1 \
+                                AND object_id = $2",
                         )
                         .bind(space)
                         .bind(uuid(*object))
@@ -249,8 +274,8 @@ macro_rules! commit {
         }
         for chunk in c.rows.chunks(INSERT_BATCH) {
             let mut q: QueryBuilder<$db> = QueryBuilder::new(
-                "INSERT INTO effective_access \
-                 (space_id, subject_id, object_id, relation, authz_epoch, valid_until) ",
+                "INSERT INTO effective_access (space_id, subject_id, \
+                 object_id, relation, authz_epoch, valid_until) ",
             );
             let _ = q.push_values(chunk, |mut b, row| {
                 let _ = b
@@ -261,9 +286,13 @@ macro_rules! commit {
                     .push_bind(new_epoch)
                     .push_bind(row.valid_until);
             });
-            let _ = traced($system, "authz.insert_rows", q.build().execute(&mut *tx))
-                .await
-                .map_err(backend)?;
+            let _ = traced(
+                $system,
+                "authz.insert_rows",
+                q.build().execute(&mut *tx),
+            )
+            .await
+            .map_err(backend)?;
         }
         tx.commit().await.map_err(backend)?;
         epoch(new_epoch)
@@ -271,11 +300,19 @@ macro_rules! commit {
 }
 
 macro_rules! lookup_many {
-    ($pool:expr, $system:expr, $db:ty, $principal:expr, $objects:expr, $now:expr) => {{
+    (
+        $pool:expr,
+        $system:expr,
+        $db:ty,
+        $principal:expr,
+        $objects:expr,
+        $now:expr
+    ) => {{
         let mut out = Vec::new();
         for chunk in $objects.chunks(INSERT_BATCH) {
             let mut q: QueryBuilder<$db> = QueryBuilder::new(
-                "SELECT object_id, relation FROM effective_access WHERE subject_id = ",
+                "SELECT object_id, relation FROM effective_access WHERE \
+                    subject_id = ",
             );
             let _ = q
                 .push_bind(uuid($principal.id()))
@@ -341,8 +378,9 @@ const LOOKUP: &str = "SELECT relation, authz_epoch FROM effective_access \
      WHERE space_id = $1 AND subject_id = $2 AND object_id = $3 \
      AND (valid_until IS NULL OR valid_until > $4)";
 
-const LIST: &str = "SELECT object_id, relation FROM effective_access \
-     WHERE space_id = $1 AND subject_id = $2 AND (valid_until IS NULL OR valid_until > $3)";
+const LIST: &str = "SELECT object_id, relation FROM effective_access WHERE \
+     space_id = $1 AND subject_id = $2 AND (valid_until IS NULL OR valid_until \
+     > $3)";
 
 const SPACES_OF: &str = "SELECT DISTINCT space_id FROM effective_access \
      WHERE subject_id = $1 AND (valid_until IS NULL OR valid_until > $2)";
@@ -383,19 +421,22 @@ impl AuthzStore for SqlStore {
         let system = self.system();
         match self.pool()? {
             Pool::Sqlite(pool) => {
-                let mut tx = pool.begin().await.map_err(backend)?;
+                let mut tx = pool.begin_write().await.map_err(backend)?;
                 write_tuples!(tx, system, Id::DIRECTORY, &upsert, &delete);
                 tx.commit().await.map_err(backend)
             }
             Pool::Postgres(pool) => {
-                let mut tx = pool.begin().await.map_err(backend)?;
+                let mut tx = pool.begin_write().await.map_err(backend)?;
                 write_tuples!(tx, system, Id::DIRECTORY, &upsert, &delete);
                 tx.commit().await.map_err(backend)
             }
         }
     }
 
-    async fn spaces_granting(&self, groups: &BTreeSet<Id>) -> Result<Vec<Id>, StoreError> {
+    async fn spaces_granting(
+        &self,
+        groups: &BTreeSet<Id>,
+    ) -> Result<Vec<Id>, StoreError> {
         let system = self.system();
         let mut out = BTreeSet::new();
         for group in groups {
@@ -404,13 +445,15 @@ impl AuthzStore for SqlStore {
                     let q = sqlx::query_scalar(SPACES_GRANTING)
                         .bind(uuid(*group))
                         .bind(uuid(Id::DIRECTORY));
-                    traced(system, "authz.spaces_granting", q.fetch_all(pool)).await
+                    traced(system, "authz.spaces_granting", q.fetch_all(pool))
+                        .await
                 }
                 Pool::Postgres(pool) => {
                     let q = sqlx::query_scalar(SPACES_GRANTING)
                         .bind(uuid(*group))
                         .bind(uuid(Id::DIRECTORY));
-                    traced(system, "authz.spaces_granting", q.fetch_all(pool)).await
+                    traced(system, "authz.spaces_granting", q.fetch_all(pool))
+                        .await
                 }
             }
             .map_err(backend)?;
@@ -423,7 +466,9 @@ impl AuthzStore for SqlStore {
         let system = self.system();
         match self.pool()? {
             Pool::Sqlite(pool) => commit!(pool, system, sqlx::Sqlite, commit),
-            Pool::Postgres(pool) => commit!(pool, system, sqlx::Postgres, commit),
+            Pool::Postgres(pool) => {
+                commit!(pool, system, sqlx::Postgres, commit)
+            }
         }
     }
 
@@ -497,15 +542,33 @@ impl AuthzStore for SqlStore {
         let system = self.system();
         match self.pool()? {
             Pool::Sqlite(pool) => {
-                lookup_many!(pool, system, sqlx::Sqlite, principal, objects, now_ms)
+                lookup_many!(
+                    pool,
+                    system,
+                    sqlx::Sqlite,
+                    principal,
+                    objects,
+                    now_ms
+                )
             }
             Pool::Postgres(pool) => {
-                lookup_many!(pool, system, sqlx::Postgres, principal, objects, now_ms)
+                lookup_many!(
+                    pool,
+                    system,
+                    sqlx::Postgres,
+                    principal,
+                    objects,
+                    now_ms
+                )
             }
         }
     }
 
-    async fn spaces_of(&self, principal: Principal, now_ms: i64) -> Result<Vec<Id>, StoreError> {
+    async fn spaces_of(
+        &self,
+        principal: Principal,
+        now_ms: i64,
+    ) -> Result<Vec<Id>, StoreError> {
         let system = self.system();
         let rows: Vec<Uuid> = match self.pool()? {
             Pool::Sqlite(pool) => {
@@ -529,13 +592,17 @@ impl AuthzStore for SqlStore {
         let system = self.system();
         let row: Option<i64> = match self.pool()? {
             Pool::Sqlite(pool) => {
-                let q = sqlx::query_scalar("SELECT authz_epoch FROM spaces WHERE space_id = $1")
-                    .bind(uuid(space));
+                let q = sqlx::query_scalar(
+                    "SELECT authz_epoch FROM spaces WHERE space_id = $1",
+                )
+                .bind(uuid(space));
                 traced(system, "authz.epoch", q.fetch_optional(pool)).await
             }
             Pool::Postgres(pool) => {
-                let q = sqlx::query_scalar("SELECT authz_epoch FROM spaces WHERE space_id = $1")
-                    .bind(uuid(space));
+                let q = sqlx::query_scalar(
+                    "SELECT authz_epoch FROM spaces WHERE space_id = $1",
+                )
+                .bind(uuid(space));
                 traced(system, "authz.epoch", q.fetch_optional(pool)).await
             }
         }

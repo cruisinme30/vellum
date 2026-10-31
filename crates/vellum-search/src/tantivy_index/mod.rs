@@ -22,12 +22,13 @@ use tantivy::collector::{Collector, SegmentCollector, TopDocs};
 use tantivy::columnar::BytesColumn;
 use tantivy::directory::{MmapDirectory, RamDirectory};
 use tantivy::query::{
-    BooleanQuery, ConstScoreQuery, Occur, Query, QueryParser, RangeQuery, RegexQuery, TermQuery,
-    TermSetQuery,
+    BooleanQuery, ConstScoreQuery, Occur, Query, QueryParser, RangeQuery,
+    RegexQuery, TermQuery, TermSetQuery,
 };
 use tantivy::schema::IndexRecordOption;
 use tantivy::{
-    DocAddress, Index, IndexReader, ReloadPolicy, Searcher, SegmentReader, TantivyDocument, Term,
+    DocAddress, Index, IndexReader, ReloadPolicy, Searcher, SegmentReader,
+    TantivyDocument, Term,
 };
 use vellum_kernel::{BlockId, DocId};
 
@@ -115,19 +116,24 @@ impl TantivyBackend {
         let (index, fields) = match &config.location {
             Location::Memory => {
                 opened = Opened::NeedsRebuild;
-                let directory = wrap(Box::new(RamDirectory::create()), config.key.as_ref());
+                let directory =
+                    wrap(Box::new(RamDirectory::create()), config.key.as_ref());
                 create(directory, &want)?
             }
             Location::Folder(path) => {
                 std::fs::create_dir_all(path)?;
                 let directory = wrap(
-                    Box::new(MmapDirectory::open(path).map_err(|e| open_dir(&e))?),
+                    Box::new(
+                        MmapDirectory::open(path).map_err(|e| open_dir(&e))?,
+                    ),
                     config.key.as_ref(),
                 );
                 let stamp = directory
                     .atomic_read(std::path::Path::new(STAMP))
                     .ok()
-                    .and_then(|bytes| serde_json::from_slice::<Stamp>(&bytes).ok());
+                    .and_then(|bytes| {
+                        serde_json::from_slice::<Stamp>(&bytes).ok()
+                    });
                 if stamp.as_ref() == Some(&want) {
                     let index = Index::open(directory)?;
                     let fields = Fields::resolve(&index.schema())?;
@@ -140,7 +146,10 @@ impl TantivyBackend {
                     std::fs::remove_dir_all(path)?;
                     std::fs::create_dir_all(path)?;
                     let directory = wrap(
-                        Box::new(MmapDirectory::open(path).map_err(|e| open_dir(&e))?),
+                        Box::new(
+                            MmapDirectory::open(path)
+                                .map_err(|e| open_dir(&e))?,
+                        ),
                         config.key.as_ref(),
                     );
                     create(directory, &want)?
@@ -170,11 +179,15 @@ impl TantivyBackend {
         let inner = Arc::clone(&self.inner);
         tokio::task::spawn_blocking(move || work(&inner))
             .await
-            .map_err(|error| SearchError::Corrupt(format!("search task failed: {error}")))?
+            .map_err(|error| {
+                SearchError::Corrupt(format!("search task failed: {error}"))
+            })?
     }
 }
 
-fn open_dir(error: &tantivy::directory::error::OpenDirectoryError) -> SearchError {
+fn open_dir(
+    error: &tantivy::directory::error::OpenDirectoryError,
+) -> SearchError {
     SearchError::Io(std::io::Error::other(error.to_string()))
 }
 
@@ -193,9 +206,11 @@ fn create(
     stamp: &Stamp,
 ) -> Result<(Index, Fields)> {
     let (schema, fields) = schema::build();
-    let bytes = serde_json::to_vec(stamp).map_err(|e| SearchError::Corrupt(e.to_string()))?;
+    let bytes = serde_json::to_vec(stamp)
+        .map_err(|e| SearchError::Corrupt(e.to_string()))?;
     directory.atomic_write(std::path::Path::new(STAMP), &bytes)?;
-    let index = Index::create(directory, schema, tantivy::IndexSettings::default())?;
+    let index =
+        Index::create(directory, schema, tantivy::IndexSettings::default())?;
     schema::register(&index);
     Ok((index, fields))
 }
@@ -213,49 +228,55 @@ impl Inner {
     }
 
     /// The scope as filter clauses that add no score.
-    fn filter(&self, rec: &str, scope: Scope<'_>) -> Vec<(Occur, Box<dyn Query>)> {
+    fn filter(
+        &self,
+        rec: &str,
+        scope: Scope<'_>,
+    ) -> Vec<(Occur, Box<dyn Query>)> {
         let f = &self.fields;
         let mut clauses: Vec<Box<dyn Query>> = vec![
             Self::term(f.rec, rec),
-            Box::new(TermSetQuery::new(
-                scope
-                    .spaces
-                    .iter()
-                    .map(|space| Term::from_field_text(f.space, &space.to_string())),
-            )),
+            Box::new(TermSetQuery::new(scope.spaces.iter().map(|space| {
+                Term::from_field_text(f.space, &space.to_string())
+            }))),
             Box::new(TermQuery::new(
-                Term::from_field_u64(f.trashed, u64::from(scope.filters.trashed)),
+                Term::from_field_u64(
+                    f.trashed,
+                    u64::from(scope.filters.trashed),
+                ),
                 IndexRecordOption::Basic,
             )),
         ];
         if let Some(docs) = scope.docs {
-            clauses.push(Box::new(TermSetQuery::new(
-                docs.iter()
-                    .map(|doc| Term::from_field_text(f.doc, &doc.to_string())),
-            )));
+            clauses
+                .push(Box::new(TermSetQuery::new(docs.iter().map(|doc| {
+                    Term::from_field_text(f.doc, &doc.to_string())
+                }))));
         }
         if !scope.filters.owners.is_empty() {
             clauses.push(Box::new(TermSetQuery::new(
-                scope
-                    .filters
-                    .owners
-                    .iter()
-                    .map(|owner| Term::from_field_text(f.owner, &owner.to_string())),
+                scope.filters.owners.iter().map(|owner| {
+                    Term::from_field_text(f.owner, &owner.to_string())
+                }),
             )));
         }
         if !scope.filters.kinds.is_empty() {
             clauses.push(Box::new(TermSetQuery::new(
-                scope
-                    .filters
-                    .kinds
-                    .iter()
-                    .map(|kind| Term::from_field_text(f.doc_kind, kind.as_str())),
+                scope.filters.kinds.iter().map(|kind| {
+                    Term::from_field_text(f.doc_kind, kind.as_str())
+                }),
             )));
         }
         if let Some(range) = &scope.filters.modified {
             clauses.push(Box::new(RangeQuery::new(
-                std::ops::Bound::Included(Term::from_field_i64(f.modified, *range.start())),
-                std::ops::Bound::Included(Term::from_field_i64(f.modified, *range.end())),
+                std::ops::Bound::Included(Term::from_field_i64(
+                    f.modified,
+                    *range.start(),
+                )),
+                std::ops::Bound::Included(Term::from_field_i64(
+                    f.modified,
+                    *range.end(),
+                )),
             )));
         }
         if let Some(location) = scope.filters.location {
@@ -266,13 +287,18 @@ impl Inner {
             .map(|query| {
                 (
                     Occur::Must,
-                    Box::new(ConstScoreQuery::new(query, 0.0)) as Box<dyn Query>,
+                    Box::new(ConstScoreQuery::new(query, 0.0))
+                        as Box<dyn Query>,
                 )
             })
             .collect()
     }
 
-    fn stored_block(&self, searcher: &Searcher, address: DocAddress) -> Result<StoredBlock> {
+    fn stored_block(
+        &self,
+        searcher: &Searcher,
+        address: DocAddress,
+    ) -> Result<StoredBlock> {
         let document: TantivyDocument = searcher.doc(address)?;
         schema::read_block(&self.fields, &document)
     }
@@ -288,8 +314,10 @@ impl Inner {
         for change in changes {
             match change {
                 Change::Remove(doc) => {
-                    let _ = writer
-                        .delete_term(Term::from_field_text(self.fields.doc, &doc.to_string()));
+                    let _ = writer.delete_term(Term::from_field_text(
+                        self.fields.doc,
+                        &doc.to_string(),
+                    ));
                 }
                 Change::Upsert(entry) => {
                     let _ = writer.delete_term(Term::from_field_text(
@@ -323,9 +351,17 @@ impl Inner {
         Ok(())
     }
 
-    fn lexical(&self, text: &str, scope: Scope<'_>, limit: usize) -> Result<Vec<StoredBlock>> {
+    fn lexical(
+        &self,
+        text: &str,
+        scope: Scope<'_>,
+        limit: usize,
+    ) -> Result<Vec<StoredBlock>> {
         let f = &self.fields;
-        let mut parser = QueryParser::for_index(&self.index, vec![f.title, f.headings, f.body]);
+        let mut parser = QueryParser::for_index(
+            &self.index,
+            vec![f.title, f.headings, f.body],
+        );
         parser.set_field_boost(f.title, 2.0);
         parser.set_field_boost(f.headings, 1.5);
         // Lenient: whatever a person types is a query, never an error.
@@ -334,7 +370,10 @@ impl Inner {
         clauses.push((Occur::Must, user_query));
         let query = BooleanQuery::new(clauses);
         let searcher = self.searcher();
-        let top = searcher.search(&query, &TopDocs::with_limit(limit.max(1)).order_by_score())?;
+        let top = searcher.search(
+            &query,
+            &TopDocs::with_limit(limit.max(1)).order_by_score(),
+        )?;
         top.into_iter()
             .map(|(_, address)| self.stored_block(&searcher, address))
             .collect()
@@ -361,7 +400,12 @@ impl Inner {
             .collect()
     }
 
-    fn titles(&self, text: &str, scope: Scope<'_>, limit: usize) -> Result<Vec<TitleHit>> {
+    fn titles(
+        &self,
+        text: &str,
+        scope: Scope<'_>,
+        limit: usize,
+    ) -> Result<Vec<TitleHit>> {
         let f = &self.fields;
         let words = schema::plain_tokens(text);
         let Some((last, complete)) = words.split_last() else {
@@ -378,7 +422,10 @@ impl Inner {
         ));
         let query = BooleanQuery::new(clauses);
         let searcher = self.searcher();
-        let top = searcher.search(&query, &TopDocs::with_limit(limit.max(1)).order_by_score())?;
+        let top = searcher.search(
+            &query,
+            &TopDocs::with_limit(limit.max(1)).order_by_score(),
+        )?;
         top.into_iter()
             .map(|(_, address)| {
                 let document: TantivyDocument = searcher.doc(address)?;
@@ -401,13 +448,18 @@ impl Inner {
             ),
         ]);
         let searcher = self.searcher();
-        let top = searcher.search(&query, &TopDocs::with_limit(1).order_by_score())?;
+        let top = searcher
+            .search(&query, &TopDocs::with_limit(1).order_by_score())?;
         top.first()
             .map(|(_, address)| self.stored_block(&searcher, *address))
             .transpose()
     }
 
-    fn section(&self, doc: DocId, section: Option<BlockId>) -> Result<Vec<StoredBlock>> {
+    fn section(
+        &self,
+        doc: DocId,
+        section: Option<BlockId>,
+    ) -> Result<Vec<StoredBlock>> {
         let f = &self.fields;
         let key = section.map_or(NO_SECTION, BlockId::as_u64);
         let query = BooleanQuery::new(vec![
@@ -422,7 +474,10 @@ impl Inner {
             ),
         ]);
         let searcher = self.searcher();
-        let top = searcher.search(&query, &TopDocs::with_limit(MAX_SECTION).order_by_score())?;
+        let top = searcher.search(
+            &query,
+            &TopDocs::with_limit(MAX_SECTION).order_by_score(),
+        )?;
         let mut blocks = top
             .into_iter()
             .map(|(_, address)| self.stored_block(&searcher, address))
@@ -480,22 +535,37 @@ impl SearchBackend for TantivyBackend {
     ) -> Result<Vec<StoredBlock>> {
         let owned = OwnedScope::from(scope);
         let vector = vector.to_vec();
-        self.blocking(move |inner| inner.semantic(&vector, min_similarity, owned.scope(), limit))
-            .await
+        self.blocking(move |inner| {
+            inner.semantic(&vector, min_similarity, owned.scope(), limit)
+        })
+        .await
     }
 
-    async fn titles(&self, text: &str, scope: Scope<'_>, limit: usize) -> Result<Vec<TitleHit>> {
+    async fn titles(
+        &self,
+        text: &str,
+        scope: Scope<'_>,
+        limit: usize,
+    ) -> Result<Vec<TitleHit>> {
         let owned = OwnedScope::from(scope);
         let text = text.to_owned();
         self.blocking(move |inner| inner.titles(&text, owned.scope(), limit))
             .await
     }
 
-    async fn block(&self, doc: DocId, block: BlockId) -> Result<Option<StoredBlock>> {
+    async fn block(
+        &self,
+        doc: DocId,
+        block: BlockId,
+    ) -> Result<Option<StoredBlock>> {
         self.blocking(move |inner| inner.block(doc, block)).await
     }
 
-    async fn section(&self, doc: DocId, section: Option<BlockId>) -> Result<Vec<StoredBlock>> {
+    async fn section(
+        &self,
+        doc: DocId,
+        section: Option<BlockId>,
+    ) -> Result<Vec<StoredBlock>> {
         self.blocking(move |inner| inner.section(doc, section))
             .await
     }
@@ -581,7 +651,11 @@ impl Collector for Nearest {
     type Fruit = Vec<ScoredAddress>;
     type Child = SegmentNearest;
 
-    fn for_segment(&self, segment: u32, reader: &SegmentReader) -> tantivy::Result<SegmentNearest> {
+    fn for_segment(
+        &self,
+        segment: u32,
+        reader: &SegmentReader,
+    ) -> tantivy::Result<SegmentNearest> {
         Ok(SegmentNearest {
             query: self.query.clone(),
             min_similarity: self.min_similarity,
@@ -598,8 +672,12 @@ impl Collector for Nearest {
         false
     }
 
-    fn merge_fruits(&self, fruits: Vec<Vec<ScoredAddress>>) -> tantivy::Result<Vec<ScoredAddress>> {
-        let mut all: Vec<ScoredAddress> = fruits.into_iter().flatten().collect();
+    fn merge_fruits(
+        &self,
+        fruits: Vec<Vec<ScoredAddress>>,
+    ) -> tantivy::Result<Vec<ScoredAddress>> {
+        let mut all: Vec<ScoredAddress> =
+            fruits.into_iter().flatten().collect();
         // `Ord` is reversed, so ascending order is best first.
         all.sort();
         all.truncate(self.limit);

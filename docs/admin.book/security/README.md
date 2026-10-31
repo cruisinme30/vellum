@@ -11,12 +11,16 @@ never on.
 
 ::: cards
 
-- 🔐 **Encrypted at rest** Every page has its own key; keys are wrapped by a key you hold.
+- 🔐 **Encrypted at rest** Every page has its own key; keys are wrapped by a key
+  you hold.
 - 🚫 **Deny by default** Nobody can open anything until someone grants access.
-- 🧼 **Sanitised rendering** No raw HTML; every page is rendered through an allow-list.
-- 📜 **Audit log** Every sign-in, share, admin change and AI call is recorded, append-only.
+- 🧼 **Sanitised rendering** No raw HTML; every page is rendered through an
+  allow-list.
+- 📜 **Audit log** Every sign-in, share, admin change and AI call is recorded,
+  append-only.
 - ✍️ **Signed releases** Sigstore signatures, reproducible builds and an SBOM.
-- 🧪 **Tested** An OWASP ASVS level 2 self-assessment and an external penetration test before every major release.
+- 🧪 **Tested** An OWASP ASVS level 2 self-assessment and an external penetration
+  test before every major release.
 
 :::
 

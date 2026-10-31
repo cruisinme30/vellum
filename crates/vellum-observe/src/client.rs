@@ -20,7 +20,8 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use opentelemetry::KeyValue;
 use opentelemetry::metrics::Histogram;
 use opentelemetry::trace::{
-    Span as _, SpanContext, SpanKind, TraceContextExt as _, TraceFlags, TraceState, Tracer as _,
+    Span as _, SpanContext, SpanKind, TraceContextExt as _, TraceFlags,
+    TraceState, Tracer as _,
 };
 use serde::{Deserialize, Serialize};
 
@@ -157,8 +158,8 @@ impl ClientReport {
         if body.len() > MAX_REPORT_BYTES {
             return Err(ReportError::TooLarge);
         }
-        let report: Self =
-            serde_json::from_slice(body).map_err(|e| ReportError::Malformed(e.to_string()))?;
+        let report: Self = serde_json::from_slice(body)
+            .map_err(|e| ReportError::Malformed(e.to_string()))?;
         report.validate()?;
         Ok(report)
     }
@@ -183,7 +184,9 @@ impl ClientReport {
             if span.name.is_empty() || span.name.len() > MAX_NAME * 4 {
                 return Err(ReportError::Invalid("span name"));
             }
-            if !valid_ms(span.start_ms, false) || !valid_ms(span.duration_ms, false) {
+            if !valid_ms(span.start_ms, false)
+                || !valid_ms(span.duration_ms, false)
+            {
                 return Err(ReportError::Invalid("span timing"));
             }
             if span.attributes.len() > MAX_ATTRIBUTES {
@@ -284,7 +287,8 @@ impl ClientIngest {
                 ClientSpan {
                     name: clean(&s.name, MAX_NAME),
                     start_us: micros(s.start_ms - report.request_start_ms),
-                    duration_us: u64::try_from(micros(s.duration_ms)).unwrap_or(0),
+                    duration_us: u64::try_from(micros(s.duration_ms))
+                        .unwrap_or(0),
                     attributes,
                 }
             })
@@ -292,7 +296,10 @@ impl ClientIngest {
         let anchor_ms = self.store.get(parent.trace_id).map_or_else(
             || report.time_origin_ms + report.request_start_ms,
             |t| {
-                #[expect(clippy::cast_precision_loss, reason = "Unix milliseconds fit in f64")]
+                #[expect(
+                    clippy::cast_precision_loss,
+                    reason = "Unix milliseconds fit in f64"
+                )]
                 let ms = t.started_at_ms as f64;
                 ms
             },
@@ -345,7 +352,8 @@ fn export_spans(parent: &TraceParent, anchor_ms: f64, spans: &[ClientSpan]) {
         clippy::cast_sign_loss,
         reason = "anchor is a positive Unix time in milliseconds"
     )]
-    let anchor = UNIX_EPOCH + Duration::from_micros((anchor_ms.max(0.0) * 1000.0) as u64);
+    let anchor = UNIX_EPOCH
+        + Duration::from_micros((anchor_ms.max(0.0) * 1000.0) as u64);
     for s in spans {
         let start = offset(anchor, s.start_us);
         let end = start + Duration::from_micros(s.duration_us);
@@ -412,7 +420,8 @@ mod tests {
         };
         let _ = store.push(t);
         let ingest = ClientIngest::new(Arc::clone(&store));
-        let report = ClientReport::parse(body(&parent.to_string()).as_bytes()).unwrap();
+        let report =
+            ClientReport::parse(body(&parent.to_string()).as_bytes()).unwrap();
         let result = ingest.ingest(&report);
         assert_eq!(
             result,
@@ -434,8 +443,10 @@ mod tests {
     #[test]
     fn unknown_traces_are_exported_but_not_joined() {
         let ingest = ClientIngest::new(Arc::new(TraceStore::default()));
-        let report =
-            ClientReport::parse(body(&TraceParent::new_root().to_string()).as_bytes()).unwrap();
+        let report = ClientReport::parse(
+            body(&TraceParent::new_root().to_string()).as_bytes(),
+        )
+        .unwrap();
         assert!(!ingest.ingest(&report).joined);
     }
 
@@ -452,8 +463,14 @@ mod tests {
         let good = body(&TraceParent::new_root().to_string());
         let cases = [
             good.replace("\"traceparent\":\"00", "\"traceparent\":\"zz"),
-            good.replace("\"request_start_ms\":100.0", "\"request_start_ms\":-1.0"),
-            good.replace("\"duration_ms\":400.5", "\"duration_ms\":9999999999.0"),
+            good.replace(
+                "\"request_start_ms\":100.0",
+                "\"request_start_ms\":-1.0",
+            ),
+            good.replace(
+                "\"duration_ms\":400.5",
+                "\"duration_ms\":9999999999.0",
+            ),
             good.replace("\"name\":\"navigation\"", "\"name\":\"\""),
             good.replace("\"cls\":0.02", "\"cls\":1000.0"),
             good.replace("\"lcp_ms\":812.0", "\"lcp_ms\":-5.0"),

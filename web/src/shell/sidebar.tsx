@@ -13,7 +13,10 @@ import { ThemeSettings } from "./theme-menu";
 
 interface SidebarProperties {
   readonly currentId: string | undefined;
-  /** On phones the sidebar is the "More" sheet and also lists the other destinations. */
+  /**
+   * On phones the sidebar is the "More" sheet and also lists the other
+   * destinations.
+   */
   readonly compact: boolean;
   readonly onNavigate: () => void;
 }
@@ -29,18 +32,30 @@ export function Sidebar({ currentId, compact, onNavigate }: SidebarProperties) {
       <p className="vl-workspace-name">{workspace.name}</p>
       {compact && (
         <nav aria-label={t("nav-more-label")} className="vl-more-links">
-          {[DESTINATIONS.favorites, DESTINATIONS.data, DESTINATIONS.help, DESTINATIONS.admin].map(
-            (d) => (
-              <NavLink key={d.id} to={d.path} className="vl-more-link" onClick={onNavigate}>
-                <Icon name={d.icon} />
-                {t(`nav-${d.id}`)}
-              </NavLink>
-            ),
-          )}
+          {[
+            DESTINATIONS.favorites,
+            DESTINATIONS.data,
+            DESTINATIONS.help,
+            DESTINATIONS.admin,
+          ].map((d) => (
+            <NavLink
+              key={d.id}
+              to={d.path}
+              className="vl-more-link"
+              onClick={onNavigate}
+            >
+              <Icon name={d.icon} />
+              {t(`nav-${d.id}`)}
+            </NavLink>
+          ))}
         </nav>
       )}
       {workspace.spaces.map((space) => (
-        <section key={space.id} className="vl-space" aria-labelledby={`space-${space.id}`}>
+        <section
+          key={space.id}
+          className="vl-space"
+          aria-labelledby={`space-${space.id}`}
+        >
           <div className="vl-space-head">
             <h2 id={`space-${space.id}`}>
               <span aria-hidden="true">{space.icon}</span> {space.name}
@@ -50,10 +65,12 @@ export function Sidebar({ currentId, compact, onNavigate }: SidebarProperties) {
               className="vl-icon-button"
               aria-label={t("space-add-page", { space: space.name })}
               onClick={() => {
-                void store.createPage({ spaceId: space.id, parentId: undefined }).then((page) => {
-                  if (page !== undefined) void navigate(`/p/${page.id}`);
-                  onNavigate();
-                });
+                void store
+                  .createPage({ spaceId: space.id, parentId: undefined })
+                  .then((page) => {
+                    if (page !== undefined) void navigate(`/p/${page.id}`);
+                    onNavigate();
+                  });
               }}
             >
               <Icon name="add" size={20} />

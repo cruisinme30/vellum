@@ -9,7 +9,9 @@ import { NODES } from "../editor/schema/blocks.gen";
 import { DESTINATIONS } from "./destinations";
 import { hasIcon, Icon } from "./icon";
 
-const SLASH_ICONS = NODES.flatMap((node) => node.slash.map((entry) => entry.icon));
+const SLASH_ICONS = NODES.flatMap((node) =>
+  node.slash.map((entry) => entry.icon),
+);
 
 describe("hasIcon", () => {
   it("knows every icon the slash menu uses", () => {
@@ -18,7 +20,9 @@ describe("hasIcon", () => {
   });
 
   it("knows every navigation icon", () => {
-    const icons = Object.values(DESTINATIONS).map((destination) => destination.icon);
+    const icons = Object.values(DESTINATIONS).map(
+      (destination) => destination.icon,
+    );
     expect(icons.filter((name) => !hasIcon(name))).toEqual([]);
   });
 

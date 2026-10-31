@@ -10,7 +10,7 @@
 //! math, `:::` containers with one extra colon per level of nesting, and
 //! one blank line between blocks.
 
-mod inline;
+pub mod inline;
 
 use crate::ast::{Alignment, Block, Container, Document, Fence, List, Table};
 use crate::{attrs, front_matter};
@@ -18,7 +18,11 @@ use inline::Place;
 
 /// Writes `document` as canonical Vellum Markdown.
 #[must_use]
-#[tracing::instrument(level = "debug", skip_all, fields(blocks = document.blocks.len()))]
+#[tracing::instrument(
+    level = "debug",
+    skip_all,
+    fields(blocks = document.blocks.len())
+)]
 pub fn serialize(document: &Document) -> String {
     let mut out = String::new();
     if let Some(fm) = &document.front_matter {
@@ -35,6 +39,11 @@ pub fn serialize(document: &Document) -> String {
         after_dash: false,
     };
     out.push_str(&blocks(&document.blocks, pos, "\n"));
+    // A byte order mark at the very start is dropped when the file is
+    // read, so text that starts with one keeps it as a character reference.
+    if let Some(rest) = out.strip_prefix('\u{feff}') {
+        out = format!("&#65279;{rest}");
+    }
     out
 }
 
@@ -75,10 +84,14 @@ fn blocks(blocks: &[Block], pos: Pos, separator: &str) -> String {
         // two would be read as one.
         let adjacent = matches!(
             (previous, block),
-            (Some(Block::List(a)), Block::List(b)) if a.start.is_some() == b.start.is_some()
+            (
+                Some(Block::List(a)),
+                Block::List(b)
+            ) if a.start.is_some() == b.start.is_some()
         ) && !previous_alternate;
-        let alternate =
-            adjacent || (pos.after_dash && matches!(block, Block::List(l) if l.start.is_none()));
+        let alternate = adjacent
+            || (pos.after_dash
+                && matches!(block, Block::List(l) if l.start.is_none()));
         out.push_str(&self::block(block, pos, alternate));
         previous = Some(block);
         previous_alternate = alternate;
@@ -115,7 +128,9 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
             text.push('\n');
             text
         }
-        Block::ThematicBreak if pos.columns || pos.file_start || pos.nested => "***\n".to_owned(),
+        Block::ThematicBreak if pos.columns || pos.file_start || pos.nested => {
+            "***\n".to_owned()
+        }
         Block::ThematicBreak => "---\n".to_owned(),
         Block::BlockQuote { blocks: inner, id } => {
             let body = blocks(
@@ -138,7 +153,13 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
         }
         Block::List(list) => self::list(list, alternate),
         Block::Fence(fence) => self::fence(fence),
-        Block::Math { literal, id } if !pos.nested && !literal.lines().any(|l| l == "$$") => {
+        // The container pass does not skip `$$` blocks, so a literal line
+        // that opens a code fence or a container would swallow or split
+        // the blocks after it when read back. The code fence form keeps
+        // such lines literal.
+        Block::Math { literal, id }
+            if !pos.nested && !literal.lines().any(fence_like) =>
+        {
             let mut open = "$$".to_owned();
             push_block_id(&mut open, id.as_ref());
             format!("{open}\n{literal}$$\n")
@@ -158,6 +179,13 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
         Block::Container(container) if pos.nested => alert(container),
         Block::Container(container) => self::container(container),
     }
+}
+
+/// Whether a math line would read as `$$`, a code fence or a container
+/// fence outside a code fence.
+fn fence_like(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    line == "$$" || ["```", "~~~", ":::"].iter().any(|f| trimmed.starts_with(f))
 }
 
 /// Writes a table's or quote's block ID on its own line after a blank one.
@@ -190,7 +218,8 @@ fn list(list: &List, alternate: bool) -> String {
             None if alternate => "*".to_owned(),
             None => "-".to_owned(),
             Some(start) => {
-                let n = start.saturating_add(u64::try_from(i).unwrap_or(u64::MAX));
+                let n =
+                    start.saturating_add(u64::try_from(i).unwrap_or(u64::MAX));
                 format!("{n}{}", if alternate { ')' } else { '.' })
             }
         };
@@ -220,7 +249,8 @@ fn list(list: &List, alternate: bool) -> String {
             }
             _ => blocks(&item.blocks, pos, separator),
         };
-        let paragraph_first = matches!(item.blocks.first(), Some(Block::Paragraph { .. }));
+        let paragraph_first =
+            matches!(item.blocks.first(), Some(Block::Paragraph { .. }));
         if body.is_empty() {
             out.push_str(&marker);
             out.push('\n');

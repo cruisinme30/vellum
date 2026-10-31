@@ -46,9 +46,16 @@ log:
 # OTLP/HTTP collector base URL; empty means no export.
 otlpEndpoint: ""
 
-# The passphrase that wraps the key-encryption key. Create the secret before
-# installing: kubectl create secret generic vellum-kek --from-literal=passphrase=...
+# Encryption at rest (ADR 0025, D260). Workspace files are sealed under a
+# key-encryption key. Prefer a key service: set kms to its KEK id, for
+# example aws-kms:eu-west-1:arn:aws:kms:eu-west-1:111122223333:key/<id>,
+# gcp-kms:projects/<p>/locations/<l>/keyRings/<r>/cryptoKeys/<k> or
+# vault:transit/<key>, and give the pod a role (EKS IRSA or Pod Identity,
+# GKE workload identity) through serviceAccount annotations. With kms empty,
+# the KEK comes from a passphrase. Create its secret before installing:
+#   kubectl create secret generic vellum-kek --from-literal=passphrase=...
 encryption:
+  kms: ""
   kekSecret:
     name: vellum-kek
     key: passphrase
@@ -56,8 +63,19 @@ encryption:
 # The key that signs CSRF tokens, shared by every replica. Leave name empty
 # and the chart creates <release>-csrf with a random key, kept across
 # upgrades. To manage it yourself:
-#   kubectl create secret generic vellum-csrf --from-literal=key="$(openssl rand -base64 32)"
+# kubectl create secret generic vellum-csrf --from-literal=key="$(openssl rand
+# -base64 32)"
 csrf:
+  secret:
+    name: ""
+    key: key
+
+# The key replicas sign forwarded live-editing joins with, shared by every
+# replica. Leave name empty and the chart creates <release>-cluster with a
+# random key, kept across upgrades. To manage it yourself:
+# kubectl create secret generic vellum-cluster --from-literal=key="$(openssl
+# rand -base64 48)"
+cluster:
   secret:
     name: ""
     key: key
@@ -102,15 +120,18 @@ kroki:
   image:
     repository: yuzutech/kroki
     tag: 0.28.0
-    digest: sha256:710a5e8d57344769846695431ceefc02aaf908e9958c9d459171d2255ee2f7f5
+    digest: >-
+      sha256:710a5e8d57344769846695431ceefc02aaf908e9958c9d459171d2255ee2f7f5
   excalidraw:
     repository: yuzutech/kroki-excalidraw
     tag: 0.28.0
-    digest: sha256:fddd0bac124f259b5cbcae664b32fed9da1a8b2fda8d4cd8edf04e8349ee6ef8
+    digest: >-
+      sha256:fddd0bac124f259b5cbcae664b32fed9da1a8b2fda8d4cd8edf04e8349ee6ef8
   diagramsnet:
     repository: yuzutech/kroki-diagramsnet
     tag: 0.28.0
-    digest: sha256:6139cb660c4a2526c2e2e0f7fff64b9b92ac4d8398f85fde53cf25bb6521383b
+    digest: >-
+      sha256:6139cb660c4a2526c2e2e0f7fff64b9b92ac4d8398f85fde53cf25bb6521383b
   resources:
     requests: { cpu: 100m, memory: 512Mi, ephemeral-storage: 128Mi }
     limits: { cpu: "1", memory: 1Gi, ephemeral-storage: 512Mi }
@@ -130,7 +151,8 @@ clamav:
   image:
     repository: clamav/clamav
     tag: 1.5.4
-    digest: sha256:bda39705e291105049c3936e2803ac90b955172af8030f94f05dce1252df6c6d
+    digest: >-
+      sha256:bda39705e291105049c3936e2803ac90b955172af8030f94f05dce1252df6c6d
   resources:
     requests: { cpu: 200m, memory: 1536Mi, ephemeral-storage: 512Mi }
     limits: { cpu: "2", memory: 3Gi, ephemeral-storage: 2Gi }

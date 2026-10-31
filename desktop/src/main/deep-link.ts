@@ -7,7 +7,9 @@ export const DEEP_LINK_SCHEME = "vellum";
 
 const safePath = /^\/[\w\-./~%]*$/;
 
-/** The in-app path a `vellum://` link points at, or undefined if it is not one. */
+/**
+ * The in-app path a `vellum://` link points at, or undefined if it is not one.
+ */
 export function deepLinkPath(url: string): string | undefined {
   let parsed: URL;
   try {
@@ -17,12 +19,18 @@ export function deepLinkPath(url: string): string | undefined {
   }
   if (parsed.protocol !== `${DEEP_LINK_SCHEME}:`) return undefined;
   const path =
-    `/${parsed.host}${parsed.pathname === "/" ? "" : parsed.pathname}`.replace(/\/$/, "") || "/";
+    `/${parsed.host}${parsed.pathname === "/" ? "" : parsed.pathname}`.replace(
+      /\/$/,
+      "",
+    ) || "/";
   if (!safePath.test(path) || path.split("/").includes("..")) return undefined;
   return `${path}${parsed.search}`;
 }
 
-/** Finds the first `vellum://` link in a command line (Windows and Linux pass it there). */
+/**
+ * Finds the first `vellum://` link in a command line (Windows and Linux pass it
+ * there).
+ */
 export function findDeepLink(argv: readonly string[]): string | undefined {
   for (const argument of argv) {
     const path = deepLinkPath(argument);

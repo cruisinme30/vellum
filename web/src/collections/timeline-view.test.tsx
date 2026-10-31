@@ -28,11 +28,19 @@ describe("TimelineView", () => {
   it("lists rows without dates after the chart, and opens rows", async () => {
     const { user } = renderApp(`/data/${COLLECTION.issues}?view=Timeline`);
     const undated = await screen.findByRole("region", { name: "No dates" });
-    await user.click(within(undated).getByRole("button", { name: "Flaky TLS handshake test" }));
-    expect(await screen.findByRole("dialog", { name: "Flaky TLS handshake test" })).toBeDefined();
+    await user.click(
+      within(undated).getByRole("button", { name: "Flaky TLS handshake test" }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Flaky TLS handshake test" }),
+    ).toBeDefined();
     await user.keyboard("{Escape}");
-    await user.click(screen.getByRole("button", { name: /^Per-route timeouts/ }));
-    expect(await screen.findByRole("dialog", { name: "Per-route timeouts" })).toBeDefined();
+    await user.click(
+      screen.getByRole("button", { name: /^Per-route timeouts/ }),
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Per-route timeouts" }),
+    ).toBeDefined();
   });
 
   it("draws an empty scale around today when no row has dates", async () => {
@@ -41,9 +49,19 @@ describe("TimelineView", () => {
     vi.spyOn(collections, "query").mockImplementation((input) =>
       query({ ...input, filter: ["start is empty"] }),
     );
-    renderApp(`/data/${COLLECTION.issues}?view=Timeline`, undefined, collections);
-    expect(await screen.findByRole("region", { name: "No dates" })).toBeDefined();
-    expect(document.querySelector(".vl-timeline-scale")?.children).toHaveLength(5);
-    expect(document.querySelector('.vl-timeline-scale [data-today="true"]')).not.toBeNull();
+    renderApp(
+      `/data/${COLLECTION.issues}?view=Timeline`,
+      undefined,
+      collections,
+    );
+    expect(
+      await screen.findByRole("region", { name: "No dates" }),
+    ).toBeDefined();
+    expect(document.querySelector(".vl-timeline-scale")?.children).toHaveLength(
+      5,
+    );
+    expect(
+      document.querySelector('.vl-timeline-scale [data-today="true"]'),
+    ).not.toBeNull();
   });
 });

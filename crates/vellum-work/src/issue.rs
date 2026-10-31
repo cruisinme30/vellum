@@ -85,7 +85,18 @@ impl<'de> Deserialize<'de> for IssueKey {
 }
 
 /// The kinds of relation between two issues.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum RelationKind {
     /// This issue blocks the other.
@@ -154,17 +165,26 @@ impl<'de> Deserialize<'de> for Relation {
         impl<'de> Visitor<'de> for V {
             type Value = Relation;
             fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.write_str("a map with one key: blocks, blocked_by, related or duplicate_of")
+                f.write_str(
+                    "a map with one key: blocks, blocked_by, related \
+                    or duplicate_of",
+                )
             }
-            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Relation, A::Error> {
+            fn visit_map<A: MapAccess<'de>>(
+                self,
+                mut map: A,
+            ) -> Result<Relation, A::Error> {
                 let (name, issue): (String, IssueId) = map
                     .next_entry()?
                     .ok_or_else(|| de::Error::custom("empty relation"))?;
                 if map.next_key::<de::IgnoredAny>()?.is_some() {
-                    return Err(de::Error::custom("a relation has exactly one key"));
+                    return Err(de::Error::custom(
+                        "a relation has exactly one key",
+                    ));
                 }
-                let kind = RelationKind::from_name(&name)
-                    .ok_or_else(|| de::Error::custom(format!("unknown relation {name}")))?;
+                let kind = RelationKind::from_name(&name).ok_or_else(|| {
+                    de::Error::custom(format!("unknown relation {name}"))
+                })?;
                 Ok(Relation { kind, issue })
             }
         }
@@ -287,6 +307,10 @@ pub struct Issue {
         skip_serializing_if = "Option::is_none"
     )]
     pub snoozed_until: Option<OffsetDateTime>,
+    /// How often the issue repeats, such as `2w`; the next one is filed
+    /// once the due date passes (D224).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repeat: Option<crate::recur::Repeat>,
     /// The dialect version, always 1.
     #[serde(default = "one")]
     pub vellum: u8,
@@ -340,6 +364,7 @@ impl Issue {
             canceled_at: None,
             triaged_at: None,
             snoozed_until: None,
+            repeat: None,
             vellum: 1,
             extra: BTreeMap::new(),
             body: String::new(),
@@ -399,12 +424,12 @@ impl Issue {
         workflow: &Workflow,
         now: OffsetDateTime,
     ) -> Result<(Option<Category>, Category), WorkError> {
-        let to = workflow
-            .category_of(&state)
-            .ok_or_else(|| WorkError::UnknownStatus {
+        let to = workflow.category_of(&state).ok_or_else(|| {
+            WorkError::UnknownStatus {
                 team: self.team.clone(),
                 status: state.to_string(),
-            })?;
+            }
+        })?;
         let from = workflow.category_of(&self.state);
         if from == Some(Category::Triage) && to != Category::Triage {
             self.triaged_at = Some(now);
@@ -446,8 +471,10 @@ impl Issue {
             path: path.to_owned(),
             reason,
         };
-        let (front, body) = split_front_matter(text).map_err(|r| file_err(r.to_owned()))?;
-        let mut issue: Self = serde_saphyr::from_str(front).map_err(|e| file_err(e.to_string()))?;
+        let (front, body) =
+            split_front_matter(text).map_err(|r| file_err(r.to_owned()))?;
+        let mut issue: Self = serde_saphyr::from_str(front)
+            .map_err(|e| file_err(e.to_string()))?;
         if issue.number == 0 {
             return Err(file_err("number must be 1 or more".to_owned()));
         }
@@ -468,10 +495,11 @@ impl Issue {
     ///
     /// Returns [`WorkError::File`] if the front matter cannot be serialised.
     pub fn to_markdown(&self) -> Result<String, WorkError> {
-        let front = serde_saphyr::to_string(self).map_err(|e| WorkError::File {
-            path: self.path(),
-            reason: e.to_string(),
-        })?;
+        let front =
+            serde_saphyr::to_string(self).map_err(|e| WorkError::File {
+                path: self.path(),
+                reason: e.to_string(),
+            })?;
         Ok(join_front_matter(&front, &self.body))
     }
 }
@@ -579,16 +607,17 @@ mod tests {
 
     #[test]
     fn the_brief_example_parses() {
-        let text = "---\n\
-id: 01JBZ3M8K2Q4R5S6T7V8W9X0A1\nteam: ENG\nnumber: 142\n\
-title: Replay 7 days of traffic in under 10 minutes\nstate: in-review\n\
-priority: 1\nestimate: 5\nassignee: dev\nlabels: [gateway]\n\
+        let text = "---\nid: 01JBZ3M8K2Q4R5S6T7V8W9X0A1\nteam: ENG\n\
+number: 142\ntitle: Replay 7 days of traffic in under 10 minutes\n\
+state: in-review\npriority: 1\nestimate: 5\nassignee: dev\nlabels: [gateway]\n\
 project: 01JBZ3M8K2Q4R5S6T7V8W9X0P1\ncycle: 2027-C04\nparent: ~\n\
 relations: [{blocked_by: 01JBZ3M8K2Q4R5S6T7V8W9X0A2}]\ndue: 2027-01-10\n\
-sla: {type: urgent-24h, started_at: 2026-11-01T10:00Z, breaches_at: 2026-11-02T10:00Z}\n\
-created_at: 2026-11-01T10:00:00Z\nupdated_at: 2026-11-01T10:00:00Z\n\
-custom: kept\n---\n\nBody in Vellum Markdown.\n";
-        let i = Issue::from_markdown("teams/ENG/issues/ENG-142.md", text).unwrap();
+sla: {type: urgent-24h, started_at: 2026-11-01T10:00Z, breaches_at: \
+2026-11-02T10:00Z}\ncreated_at: 2026-11-01T10:00:00Z\n\
+updated_at: 2026-11-01T10:00:00Z\ncustom: kept\n---\n\n\
+Body in Vellum Markdown.\n";
+        let i =
+            Issue::from_markdown("teams/ENG/issues/ENG-142.md", text).unwrap();
         assert_eq!(i.priority, Priority::Urgent);
         assert_eq!(i.estimate, Some(Estimate::Points(5)));
         assert_eq!(i.due, Some(date!(2027 - 01 - 10)));
@@ -596,7 +625,8 @@ custom: kept\n---\n\nBody in Vellum Markdown.\n";
         assert_eq!(i.cycle.as_ref().unwrap().as_str(), "2027-C04");
         assert_eq!(i.body, "Body in Vellum Markdown.\n");
         assert_eq!(i.extra.len(), 1);
-        let again = Issue::from_markdown(&i.path(), &i.to_markdown().unwrap()).unwrap();
+        let again =
+            Issue::from_markdown(&i.path(), &i.to_markdown().unwrap()).unwrap();
         assert_eq!(again, i);
         assert!(i.to_markdown().unwrap().contains("custom: kept"));
     }
@@ -608,8 +638,11 @@ custom: kept\n---\n\nBody in Vellum Markdown.\n";
         assert!(Issue::from_markdown(p, "---\ntitle: x\n").is_err());
         let i = issue();
         let text = i.to_markdown().unwrap();
-        assert!(Issue::from_markdown("teams/ENG/issues/ENG-9.md", &text).is_err());
-        let bad_rel = text.replace("vellum: 1", "vellum: 1\nrelations: [{blocks: x}]");
+        assert!(
+            Issue::from_markdown("teams/ENG/issues/ENG-9.md", &text).is_err()
+        );
+        let bad_rel =
+            text.replace("vellum: 1", "vellum: 1\nrelations: [{blocks: x}]");
         assert!(Issue::from_markdown(p, &bad_rel).is_err());
     }
 

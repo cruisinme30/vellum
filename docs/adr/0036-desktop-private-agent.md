@@ -96,5 +96,4 @@ an AI client. A new edge crate, `vellum-private`, does that, and the
 - Headless Linux without a Secret Service cannot hold a device key; the
   command says so and exits.
 - Server-side enrolment and endpoints that serve ciphertext to devices
-  are follow-up work; until then the folder reaches the device through
-  sync or a shared drive.
+  followed in ADR 0043 (#475).

@@ -10,7 +10,9 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use serde_json::{Value, json};
-use tokio::io::{AsyncBufReadExt as _, AsyncWriteExt as _, BufReader, DuplexStream};
+use tokio::io::{
+    AsyncBufReadExt as _, AsyncWriteExt as _, BufReader, DuplexStream,
+};
 use vellum_crypto::recipients::{RecipientSecret, seal_for};
 use vellum_mcp::auth::{Principal, ScopeSet};
 use vellum_mcp::http::request_body;
@@ -23,7 +25,10 @@ use vellum_store::{BlobPath, BlobStore, LocalStore, Precondition};
 use crate::private::{PrivateWorkspace, parse_space};
 
 const PLAN_ID: &str = "01JDB0ARDP1AN0000000000000";
-const PLAN: &str = "---\nid: 01JDB0ARDP1AN0000000000000\ntitle: Q4 plan\nvellum: 1\n---\n\n# Q4 ^blk-q4000001\n\nRaise the seed round in December.\n\n## Risks ^blk-r1sks001\n\nRunway is nine months at the current burn.\n\n## Hiring ^blk-h1re0001\n\nTwo engineers in January.\n";
+const PLAN: &str = "---\nid: 01JDB0ARDP1AN0000000000000\ntitle: Q4 plan\n\
+    vellum: 1\n---\n\n# Q4 ^blk-q4000001\n\nRaise the seed round in December.\n\
+    \n## Risks ^blk-r1sks001\n\nRunway is nine months at the current burn.\n\n\
+    ## Hiring ^blk-h1re0001\n\nTwo engineers in January.\n";
 
 async fn put(store: &LocalStore, path: &str, bytes: Vec<u8>) {
     let _ = store
@@ -125,10 +130,9 @@ async fn reads_come_from_the_opened_pages() {
     assert_eq!(titles, vec!["Q4", "Risks", "Hiring"]);
 
     let tree = ws.space_tree(&actor, "board").await.unwrap();
-    assert!(
-        tree.markdown
-            .contains("[Q4 plan](vellum://doc/01JDB0ARDP1AN0000000000000) `plan.md`")
-    );
+    assert!(tree.markdown.contains(
+        "[Q4 plan](vellum://doc/01JDB0ARDP1AN0000000000000) `plan.md`"
+    ));
     assert_eq!(
         ws.list_readable(&actor, None, 10)
             .await
@@ -186,11 +190,14 @@ impl Client {
             .write_all(format!("{msg}\n").as_bytes())
             .await
             .unwrap();
-        let line = tokio::time::timeout(Duration::from_secs(5), self.output.next_line())
-            .await
-            .unwrap()
-            .unwrap()
-            .unwrap();
+        let line = tokio::time::timeout(
+            Duration::from_secs(5),
+            self.output.next_line(),
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
         serde_json::from_str(&line).unwrap()
     }
 }
@@ -239,7 +246,11 @@ async fn an_ai_client_searches_and_cites_but_cannot_write() {
         .call(
             2,
             "create_page",
-            json!({ "parent": "space:board", "title": "Leak", "markdown": "x" }),
+            json!({
+                "parent": "space:board",
+                "title": "Leak",
+                "markdown": "x"
+            }),
         )
         .await;
     let text = refused.to_string();

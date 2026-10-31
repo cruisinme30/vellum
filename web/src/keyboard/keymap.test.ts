@@ -10,7 +10,10 @@ function command(id: string, keys: string[], scope: Scope = "global"): Command {
   return { id, title: id, keys, scope, run: vi.fn() };
 }
 
-function press(key: string, extra: Partial<KeyLike> & { target?: unknown } = {}) {
+function press(
+  key: string,
+  extra: Partial<KeyLike> & { target?: unknown } = {},
+) {
   const code = /^[a-z]$/.test(key) ? `Key${key.toUpperCase()}` : undefined;
   return {
     key,
@@ -31,10 +34,16 @@ describe("Keymap", () => {
     const create = command("create", ["c"]);
     const inbox = command("inbox", ["g i"]);
     const keymap = new Keymap([create, inbox], { platform: "mac" });
-    expect(keymap.dispatch(press("c"), GLOBAL)).toEqual({ kind: "run", command: create });
+    expect(keymap.dispatch(press("c"), GLOBAL)).toEqual({
+      kind: "run",
+      command: create,
+    });
     expect(keymap.dispatch(press("g"), GLOBAL)).toEqual({ kind: "pending" });
     expect(keymap.pending).toBe(true);
-    expect(keymap.dispatch(press("i"), GLOBAL)).toEqual({ kind: "run", command: inbox });
+    expect(keymap.dispatch(press("i"), GLOBAL)).toEqual({
+      kind: "run",
+      command: inbox,
+    });
     expect(keymap.pending).toBe(false);
     expect(keymap.dispatch(press("z"), GLOBAL)).toEqual({ kind: "none" });
   });
@@ -55,7 +64,10 @@ describe("Keymap", () => {
     keymap.dispatch(press("g"), GLOBAL);
     // A wrong second key ends the chord without running the single-key command.
     expect(keymap.dispatch(press("c"), GLOBAL)).toEqual({ kind: "none" });
-    expect(keymap.dispatch(press("c"), GLOBAL)).toEqual({ kind: "run", command: create });
+    expect(keymap.dispatch(press("c"), GLOBAL)).toEqual({
+      kind: "run",
+      command: create,
+    });
   });
 
   it("prefers the more specific scope and ignores inactive ones", () => {
@@ -63,53 +75,85 @@ describe("Keymap", () => {
     const status = command("status", ["s"], "issues");
     const global = command("search", ["s"]);
     const keymap = new Keymap([cycle, status, global], { platform: "other" });
-    expect(keymap.dispatch(press("s"), ISSUES)).toEqual({ kind: "run", command: status });
-    expect(keymap.dispatch(press("s"), GLOBAL)).toEqual({ kind: "run", command: global });
-    expect(keymap.dispatch(press("C", { code: "KeyC", shiftKey: true }), GLOBAL)).toEqual({
+    expect(keymap.dispatch(press("s"), ISSUES)).toEqual({
+      kind: "run",
+      command: status,
+    });
+    expect(keymap.dispatch(press("s"), GLOBAL)).toEqual({
+      kind: "run",
+      command: global,
+    });
+    expect(
+      keymap.dispatch(press("C", { code: "KeyC", shiftKey: true }), GLOBAL),
+    ).toEqual({
       kind: "none",
     });
-    expect(keymap.dispatch(press("C", { code: "KeyC", shiftKey: true }), ISSUES)).toEqual({
+    expect(
+      keymap.dispatch(press("C", { code: "KeyC", shiftKey: true }), ISSUES),
+    ).toEqual({
       kind: "run",
       command: cycle,
     });
     expect(keymap.bindingsOf(cycle)).toHaveLength(1);
   });
 
-  it("lets typing through but still honours mod shortcuts in text fields", () => {
-    const create = command("create", ["c"]);
-    const menu = command("menu", ["mod+k"]);
-    const keymap = new Keymap([create, menu], { platform: "mac" });
-    const input = document.createElement("input");
-    expect(keymap.dispatch(press("c", { target: input }), GLOBAL)).toEqual({ kind: "none" });
-    expect(keymap.dispatch(press("k", { metaKey: true, target: input }), GLOBAL)).toEqual({
-      kind: "run",
-      command: menu,
-    });
-  });
+  it(
+    "lets typing through but still honours mod shortcuts in text " + "fields",
+    () => {
+      const create = command("create", ["c"]);
+      const menu = command("menu", ["mod+k"]);
+      const keymap = new Keymap([create, menu], { platform: "mac" });
+      const input = document.createElement("input");
+      expect(keymap.dispatch(press("c", { target: input }), GLOBAL)).toEqual({
+        kind: "none",
+      });
+      expect(
+        keymap.dispatch(press("k", { metaKey: true, target: input }), GLOBAL),
+      ).toEqual({
+        kind: "run",
+        command: menu,
+      });
+    },
+  );
 
   it("ignores events it cannot read", () => {
-    const keymap = new Keymap([command("menu", ["mod+k"])], { platform: "mac" });
-    expect(keymap.dispatch(press("Meta", { metaKey: true }), GLOBAL)).toEqual({ kind: "none" });
+    const keymap = new Keymap([command("menu", ["mod+k"])], {
+      platform: "mac",
+    });
+    expect(keymap.dispatch(press("Meta", { metaKey: true }), GLOBAL)).toEqual({
+      kind: "none",
+    });
   });
 
   it("refuses clashing bindings", () => {
     expect(
-      () => new Keymap([command("a", ["c"]), command("b", ["c"])], { platform: "mac" }),
+      () =>
+        new Keymap([command("a", ["c"]), command("b", ["c"])], {
+          platform: "mac",
+        }),
     ).toThrow(/share/);
     expect(
       () =>
-        new Keymap([command("go", ["g i"]), command("g", ["g"], "issues")], { platform: "mac" }),
+        new Keymap([command("go", ["g i"]), command("g", ["g"], "issues")], {
+          platform: "mac",
+        }),
     ).toThrow(/first key/);
     // The same key in different scopes is fine; the specific scope wins.
     expect(
-      () => new Keymap([command("a", ["c"]), command("b", ["c"], "issues")], { platform: "mac" }),
+      () =>
+        new Keymap([command("a", ["c"]), command("b", ["c"], "issues")], {
+          platform: "mac",
+        }),
     ).not.toThrow();
     // A chord and a single key in two specific scopes never meet.
     expect(
       () =>
-        new Keymap([command("a", ["g i"], "editor"), command("b", ["g"], "issues")], {
-          platform: "mac",
-        }),
+        new Keymap(
+          [command("a", ["g i"], "editor"), command("b", ["g"], "issues")],
+          {
+            platform: "mac",
+          },
+        ),
     ).not.toThrow();
   });
 

@@ -94,7 +94,10 @@ impl ImportError {
         }
     }
 
-    pub(crate) fn format(format: &'static str, message: impl Into<String>) -> Self {
+    pub(crate) fn format(
+        format: &'static str,
+        message: impl Into<String>,
+    ) -> Self {
         Self::Format {
             format,
             message: message.into(),
@@ -120,7 +123,10 @@ pub struct ExportWarning {
 
 impl ExportWarning {
     /// A warning at `location`.
-    pub fn new(location: impl Into<String>, message: impl Into<String>) -> Self {
+    pub fn new(
+        location: impl Into<String>,
+        message: impl Into<String>,
+    ) -> Self {
         Self {
             location: location.into(),
             message: message.into(),

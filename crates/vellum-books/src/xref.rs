@@ -35,9 +35,15 @@ impl Book {
     /// section keeps its `§` text, so its title never shows. Labels keep
     /// the book's own numbering, so every reader quotes the same numbers.
     #[must_use]
-    pub fn render_cross_refs_for(&self, text: &str, visible: impl Fn(&NodeId) -> bool) -> String {
+    pub fn render_cross_refs_for(
+        &self,
+        text: &str,
+        visible: impl Fn(&NodeId) -> bool,
+    ) -> String {
         markdown::map_links(text, |link, current| {
-            if link.kind != LinkKind::Inline || !current.is_some_and(is_cross_ref_text) {
+            if link.kind != LinkKind::Inline
+                || !current.is_some_and(is_cross_ref_text)
+            {
                 return None;
             }
             let (id, _) = NodeId::from_uri(&link.dest)?;
@@ -58,7 +64,10 @@ impl Book {
     ///
     /// Returns [`crate::BookError::UnknownNode`] when the book has no such
     /// section.
-    pub fn references_from(&self, id: &NodeId) -> crate::Result<BTreeSet<NodeId>> {
+    pub fn references_from(
+        &self,
+        id: &NodeId,
+    ) -> crate::Result<BTreeSet<NodeId>> {
         let text = self.text(id)?;
         Ok(markdown::links(text)
             .into_iter()
@@ -94,7 +103,9 @@ mod tests {
         let week = book.text(&id(3)).unwrap().to_owned();
         let rendered = book.render_cross_refs(&week);
         assert!(
-            rendered.contains("[§2.1 Services](vellum://doc/01JBK0000000000000000000A5)"),
+            rendered.contains(
+                "[§2.1 Services](vellum://doc/01JBK0000000000000000000A5)"
+            ),
             "{rendered}"
         );
         book.move_section(&id(4).into(), &Place::Before(id(2).into()))
@@ -114,7 +125,8 @@ mod tests {
     fn hidden_targets_keep_their_marker() {
         let book = handbook();
         let week = book.text(&id(3)).unwrap();
-        let rendered = book.render_cross_refs_for(week, |target| target != &id(5));
+        let rendered =
+            book.render_cross_refs_for(week, |target| target != &id(5));
         assert!(
             rendered.contains("[§](vellum://doc/01JBK0000000000000000000A5)"),
             "{rendered}"

@@ -23,7 +23,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use vellum_authz::{Change, Id, Object, Relation, SpaceGraph, Subject, Tuple, TupleRelation};
+use vellum_authz::{
+    Change, Id, Object, Relation, SpaceGraph, Subject, Tuple, TupleRelation,
+};
 use vellum_books::manifest::Principal;
 use vellum_books::{Book, BookError, NodeId};
 use vellum_kernel::ObjectId;
@@ -53,7 +55,8 @@ impl Restrictions {
     ///
     /// Only for an inconsistent book.
     pub fn of(book: &Book) -> Result<Self, BookError> {
-        let sections = book.manifest().nodes.keys().filter_map(node_id).collect();
+        let sections =
+            book.manifest().nodes.keys().filter_map(node_id).collect();
         let restricted = book
             .restrictions()?
             .iter()
@@ -153,7 +156,11 @@ mod tests {
         SpaceGraph {
             space: Id(1),
             epoch: 0,
-            parents: BTreeMap::from([(BOOK, None), (OPEN, Some(BOOK)), (SECRET, Some(BOOK))]),
+            parents: BTreeMap::from([
+                (BOOK, None),
+                (OPEN, Some(BOOK)),
+                (SECRET, Some(BOOK)),
+            ]),
             tuples,
         }
     }
@@ -171,7 +178,8 @@ mod tests {
     #[test]
     fn restricts_grants_and_skips_unindexed_sections() {
         let sre = Subject::Group(Id(50));
-        let (changes, skipped) = plan(&graph(vec![]), &wanted(&[(SECRET, &[sre])]));
+        let (changes, skipped) =
+            plan(&graph(vec![]), &wanted(&[(SECRET, &[sre])]));
         assert_eq!(skipped, 1);
         assert_eq!(
             changes,
@@ -210,7 +218,8 @@ mod tests {
     #[test]
     fn principals_map_to_subjects() {
         let user = Principal::parse("user:01JBK0000000000000000000A1").unwrap();
-        let group = Principal::parse("group:01JBK0000000000000000000A2").unwrap();
+        let group =
+            Principal::parse("group:01JBK0000000000000000000A2").unwrap();
         assert!(matches!(subject_of(&user), Some(Subject::User(_))));
         assert!(matches!(subject_of(&group), Some(Subject::Group(_))));
         assert_eq!(subject_of(&Principal::parse("group:sre").unwrap()), None);

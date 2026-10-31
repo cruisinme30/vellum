@@ -14,6 +14,16 @@ use vellum_kernel::BookId;
 #[derive(Debug, Clone, Default, Deserialize, JsonSchema)]
 pub struct ListBooks {}
 
+/// `books.create`: a new, empty book (D322).
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct CreateBook {
+    /// The drive folder to make it in: a space's root folder, such as
+    /// `drives/users/priya`, or a folder of one.
+    pub folder: String,
+    /// Its title, which also names its `.book` folder.
+    pub title: String,
+}
+
 /// A book in a list.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct BookSummary {
@@ -374,4 +384,178 @@ pub struct DiffOutput {
     pub settings: Vec<String>,
     /// A unified diff of `SUMMARY.md`.
     pub summary_patch: String,
+}
+
+/// `books.history`: the book's outline changes, newest first.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct HistoryInput {
+    /// The book.
+    pub book_id: BookId,
+    /// The most entries to return, 1 to 200; 50 when absent.
+    pub limit: Option<u16>,
+}
+
+/// One section in a recorded outline, in reading order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct OutlineLine {
+    /// The section.
+    pub id: String,
+    /// Its title then.
+    pub title: String,
+    /// Its cross-reference label then, such as `§2.3 Services`.
+    pub label: String,
+    /// Nesting depth, 1 at the top.
+    pub depth: usize,
+    /// The section it sat under, if any.
+    pub parent: Option<String>,
+    /// `prefix`, `numbered` or `suffix`.
+    pub region: String,
+}
+
+/// A change to the book's manifest or summary: a reorder, a nest, an
+/// added, renamed or removed section, or new section access.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct HistoryEntry {
+    /// The entry, for `books.restore_outline`.
+    pub id: String,
+    /// When (RFC 3339).
+    pub at: String,
+    /// Who (`user:<id>`), empty for the system.
+    pub by: String,
+    /// The operation, such as `move_section`.
+    pub op: String,
+    /// The outline after the change, without hidden sections.
+    pub outline: Vec<OutlineLine>,
+}
+
+/// The book's outline history.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct HistoryList {
+    /// Entries, newest first.
+    pub entries: Vec<HistoryEntry>,
+}
+
+/// `books.restore_outline`: puts every section that still exists back
+/// where an earlier outline had it.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct RestoreOutline {
+    /// The book.
+    pub book_id: BookId,
+    /// The history entry to restore.
+    pub entry: String,
+}
+
+/// `books.transfer_section`: moves or copies a section and everything
+/// under it into another book.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct TransferSection {
+    /// The source book.
+    pub book_id: BookId,
+    /// The section.
+    pub section_id: String,
+    /// The target book.
+    pub to_book: BookId,
+    /// Where it goes in the target book.
+    pub place: PlaceInput,
+    /// Copy with fresh IDs instead of moving.
+    #[serde(default)]
+    pub copy: bool,
+}
+
+/// `books.copy_section`: copies a section and everything under it within
+/// its book, with fresh IDs.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct CopySection {
+    /// The book.
+    pub book_id: BookId,
+    /// The section.
+    pub section_id: String,
+    /// Where the copy goes.
+    pub place: PlaceInput,
+}
+
+/// `books.split_section`: turns a section's headings into child sections.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct SplitSection {
+    /// The book.
+    pub book_id: BookId,
+    /// The section.
+    pub section_id: String,
+    /// The heading level to split at, 1 to 6; the shallowest present when
+    /// absent.
+    pub level: Option<u8>,
+}
+
+/// Sections a split, copy or transfer created.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct Created {
+    /// The book they are in.
+    pub book_id: BookId,
+    /// The section that now holds the named content (the copy's root for
+    /// a copy, the section itself for a move or split).
+    pub section_id: String,
+    /// New section IDs, in reading order.
+    pub created: Vec<String>,
+}
+
+/// `books.merge_section`: folds a section's children back into it as
+/// headings.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct MergeSection {
+    /// The book.
+    pub book_id: BookId,
+    /// The section whose children are folded in.
+    pub section_id: String,
+}
+
+/// What a publication is.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum PublishFormat {
+    /// A static HTML site with no scripts.
+    Site,
+    /// An mdBook source tree for `mdbook build` or the public docs site.
+    Mdbook,
+}
+
+/// `books.publish`.
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
+pub struct Publish {
+    /// The book.
+    pub book_id: BookId,
+    /// What to build.
+    pub format: PublishFormat,
+    /// Who it is for (`user:<id>`, `group:<id>`): restricted sections are
+    /// kept only for these. Empty publishes for everyone, and only a
+    /// public site is served at `/published/books/<book id>/`.
+    #[serde(default)]
+    pub audience: Vec<String>,
+}
+
+/// A publication of the book.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Publication {
+    /// What was built.
+    pub format: PublishFormat,
+    /// Whether it is for everyone.
+    pub public: bool,
+    /// When (RFC 3339).
+    pub at: String,
+    /// Who (`user:<id>`).
+    pub by: String,
+    /// Where the files are in the store.
+    pub folder: String,
+    /// How many files it holds.
+    pub files: usize,
+    /// Where a public site is served, relative to the app origin.
+    pub url: Option<String>,
+}
+
+/// The book's current publications.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct PublicationList {
+    /// One per format, if published.
+    pub publications: Vec<Publication>,
 }

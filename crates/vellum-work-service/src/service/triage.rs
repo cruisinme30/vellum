@@ -67,7 +67,9 @@ impl FormOut {
                     let (kind, options) = match &f.kind {
                         FieldKind::Text => ("text", Vec::new()),
                         FieldKind::LongText => ("long_text", Vec::new()),
-                        FieldKind::Select { options } => ("select", options.clone()),
+                        FieldKind::Select { options } => {
+                            ("select", options.clone())
+                        }
                         FieldKind::Email => ("email", Vec::new()),
                     };
                     FieldOut {
@@ -241,7 +243,11 @@ pub struct SuggestTriage {
 }
 
 impl WorkService {
-    fn form(graph: &WorkGraph, team: &TeamKey, slug: &str) -> Result<IntakeForm, Error> {
+    fn form(
+        graph: &WorkGraph,
+        team: &TeamKey,
+        slug: &str,
+    ) -> Result<IntakeForm, Error> {
         graph
             .team(team)
             .and_then(|t| t.forms.iter().find(|f| f.slug == slug))
@@ -282,9 +288,14 @@ impl WorkService {
         let _ = Self::form(&st.graph, &team, &i.slug)?;
         let id = IssueId::generate();
         let backup = st.clone();
-        let changes =
-            st.graph
-                .submit_form(&team, &i.slug, id, &i.answers, submitter.as_deref(), &ctx)?;
+        let changes = st.graph.submit_form(
+            &team,
+            &i.slug,
+            id,
+            &i.answers,
+            submitter.as_deref(),
+            &ctx,
+        )?;
         self.commit(
             &mut st,
             backup,

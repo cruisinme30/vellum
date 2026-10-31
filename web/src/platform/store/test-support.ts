@@ -27,7 +27,8 @@ export const issueMutators: Mutators = {
   },
   setState(tx, input) {
     const { key, state } = input as { key: string; state: string };
-    const issue = tx.get("issues", key) as Record<string, JsonValue> | undefined;
+    const issue = tx.get("issues", key) as
+      Record<string, JsonValue> | undefined;
     if (issue === undefined) throw new Error(`no issue ${key}`);
     tx.put("issues", key, { ...issue, state });
   },
@@ -57,13 +58,20 @@ export class FakeServer implements SyncTransport {
       const last = this.applied.get(request.clientId) ?? 0;
       if (mutation.id <= last) continue;
       if (this.forbidden.has(mutation.name)) {
-        rejected.push({ id: mutation.id, code: "forbidden", message: "not allowed" });
+        rejected.push({
+          id: mutation.id,
+          code: "forbidden",
+          message: "not allowed",
+        });
       } else {
         this.serverApply(mutation);
       }
       this.applied.set(request.clientId, mutation.id);
     }
-    return Promise.resolve({ lastMutationId: this.applied.get(request.clientId) ?? 0, rejected });
+    return Promise.resolve({
+      lastMutationId: this.applied.get(request.clientId) ?? 0,
+      rejected,
+    });
   }
 
   pull(clientId: string, cursor: string): Promise<PullResponse> {
@@ -86,10 +94,12 @@ export class FakeServer implements SyncTransport {
     this.view.apply(mutation);
     const after = new Map(this.view.scan("issues"));
     for (const [key, value] of after) {
-      if (before.get(key) !== value) this.log.push({ op: "put", collection: "issues", key, value });
+      if (before.get(key) !== value)
+        this.log.push({ op: "put", collection: "issues", key, value });
     }
     for (const key of before.keys()) {
-      if (!after.has(key)) this.log.push({ op: "del", collection: "issues", key });
+      if (!after.has(key))
+        this.log.push({ op: "del", collection: "issues", key });
     }
   }
 

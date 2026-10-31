@@ -98,8 +98,8 @@ pub enum Precondition {
 /// The storage port every backend implements (local folder, S3, Google
 /// Drive, Dropbox, `OneDrive`, Git) and every decorator wraps (encryption).
 ///
-/// All adapters must pass `conformance` (feature `conformance`). Writes are atomic: a
-/// reader sees the old content or the new content, never a mix.
+/// All adapters must pass `conformance` (feature `conformance`). Writes are
+/// atomic: a reader sees the old content or the new content, never a mix.
 #[async_trait]
 pub trait BlobStore: Send + Sync + fmt::Debug {
     /// Short backend name for spans and metrics, such as `"local"`.
@@ -122,12 +122,23 @@ pub trait BlobStore: Send + Sync + fmt::Debug {
 
     /// Removes a blob if `condition` holds. With `IfAbsent` the delete
     /// fails either way: `AlreadyExists` or `NotFound`.
-    async fn delete(&self, path: &BlobPath, condition: Precondition) -> StoreResult<()>;
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        condition: Precondition,
+    ) -> StoreResult<()>;
 
     /// Moves a blob, failing with `AlreadyExists` if `to` is taken.
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta>;
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta>;
 
     /// Streams every blob at or beneath `dir` (the whole store for `None`),
     /// recursively and in no particular order.
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>>;
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>>;
 }

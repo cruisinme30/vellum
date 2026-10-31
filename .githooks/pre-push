@@ -2,11 +2,56 @@
 # SPDX-FileCopyrightText: 2026 The Vellum contributors
 # SPDX-License-Identifier: AGPL-3.0-only
 #
-# Runs the Fast suite locally before every push, so CI failures are caught
-# before they cost a CI cycle. Install with: cargo xtask install-hooks
+# Before a push (ADR 0073, D318):
+#   - to develop, main or chore/release-*: refuses unless scripts/dev/gate.sh
+#     passed on the pushed commit's tree (main and release branches need a
+#     --release run), so CI never finds what a local run would have;
+# - to any other branch: runs the Fast suite, as before (ADR 0048). Install
+# with: cargo xtask install-hooks (or git config core.hooksPath .githooks)
 set -euo pipefail
 
 root="$(git rev-parse --show-toplevel)"
 cd "${root}"
-git fetch --quiet origin develop 2>/dev/null || true
-exec cargo xtask fast
+stamps="$(git rev-parse --git-common-dir)/vellum-gate"
+zero="0000000000000000000000000000000000000000"
+
+feature_push=0
+refused=0
+# git passes one line per ref: <local ref> <local sha> <remote ref> <remote sha>
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+  [[ "${local_sha}" == "${zero}" ]] && continue # deleting a branch
+  case "${remote_ref}" in
+    refs/heads/develop) need=standard ;;
+    refs/heads/main | refs/heads/chore/release-*) need=release ;;
+    refs/heads/*)
+      feature_push=1
+      continue
+      ;;
+    *) continue ;; # tags
+  esac
+  tree="$(git rev-parse "${local_sha}^{tree}")"
+  stamp="${stamps}/${tree}"
+  if [[ ! -f "${stamp}" ]] || { [[ "${need}" == release ]] \
+    && ! grep -qx 'mode=release' "${stamp}"; }; then
+    command="scripts/dev/gate.sh"
+    [[ "${need}" == release ]] && command+=" --release"
+    echo "pre-push: ${remote_ref#refs/heads/} takes only commits the local" \
+        "gate passed," >&2
+    echo "and tree ${tree:0:12} (commit ${local_sha:0:12}) has no ${need}" \
+        "gate stamp. Check out that commit and run:" >&2
+    echo >&2
+    echo "    ${command}" >&2
+    echo >&2
+    refused=1
+  fi
+done
+((refused)) && exit 1
+
+if ((feature_push)); then
+  git fetch --quiet origin develop 2>/dev/null || true
+  if command -v cargo >/dev/null; then
+    exec cargo xtask fast
+  fi
+  # No Rust toolchain here (a Mac): the same suite in the gate's container.
+  exec scripts/dev/gate.sh --only fast --focused
+fi

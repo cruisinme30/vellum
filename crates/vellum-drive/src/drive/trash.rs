@@ -26,8 +26,17 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`.
-    #[tracing::instrument(name = "drive.trash", skip_all, fields(node = %id), err)]
-    pub async fn trash(&self, actor: &Actor, id: ObjectId) -> DriveResult<Node> {
+    #[tracing::instrument(
+        name = "drive.trash",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
+    pub async fn trash(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+    ) -> DriveResult<Node> {
         self.observe("trash", async {
             let node = self.live_node(id).await?;
             let members = self
@@ -56,14 +65,22 @@ impl Drive {
             // an entry the scan can reconcile, never a lost file.
             let manifest_path = entry.join(layout::TRASH_MANIFEST)?;
             let _ = self.put_file(&manifest_path, to_yaml(&manifest)?).await?;
-            if let Err(err) = self.move_blobs(node.kind, &node.path, &item).await {
-                let _ = self.store.delete(&manifest_path, Precondition::None).await;
+            if let Err(err) =
+                self.move_blobs(node.kind, &node.path, &item).await
+            {
+                let _ =
+                    self.store.delete(&manifest_path, Precondition::None).await;
                 return Err(err);
             }
             let mut trashed = node.clone();
             for member in members {
                 let mut after = member.clone();
-                after.path = layout::rebase_member(node.kind, &member.path, &node.path, &item)?;
+                after.path = layout::rebase_member(
+                    node.kind,
+                    &member.path,
+                    &node.path,
+                    &item,
+                )?;
                 after.trash = Some(TrashState {
                     trashed_at: now,
                     trashed_by: *actor,
@@ -92,8 +109,17 @@ impl Drive {
     /// `NotFound`, `PermissionDenied`, `Invalid` for a node that went with
     /// a folder (restore the folder instead), `QuotaExceeded` never (trash
     /// already counts against the quota).
-    #[tracing::instrument(name = "drive.restore", skip_all, fields(node = %id), err)]
-    pub async fn restore(&self, actor: &Actor, id: ObjectId) -> DriveResult<Node> {
+    #[tracing::instrument(
+        name = "drive.restore",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
+    pub async fn restore(
+        &self,
+        actor: &Actor,
+        id: ObjectId,
+    ) -> DriveResult<Node> {
         self.observe("restore", async {
             let node = self.any_node(id).await?;
             let state = self.entry_state(&node)?;
@@ -102,18 +128,28 @@ impl Drive {
             let space = self.space(node.space).await?;
             let parent = match state.original_parent {
                 Some(parent) => match self.index.node(parent).await? {
-                    Some(folder) if folder.is_live() && folder.space == space.id => Some(parent),
+                    Some(folder)
+                        if folder.is_live() && folder.space == space.id =>
+                    {
+                        Some(parent)
+                    }
                     _ => None,
                 },
                 None => None,
             };
             let dir = self.dir_of(&space, parent).await?;
-            let path = self.free_path(&dir, node.kind, &node.title, None).await?;
+            let path =
+                self.free_path(&dir, node.kind, &node.title, None).await?;
             self.move_blobs(node.kind, &node.path, &path).await?;
             let mut restored = node.clone();
             for member in self.entry_members(&node).await? {
                 let mut after = member.clone();
-                after.path = layout::rebase_member(node.kind, &member.path, &node.path, &path)?;
+                after.path = layout::rebase_member(
+                    node.kind,
+                    &member.path,
+                    &node.path,
+                    &path,
+                )?;
                 after.trash = None;
                 if member.id == node.id {
                     after.parent = parent;
@@ -141,14 +177,24 @@ impl Drive {
     /// # Errors
     /// `NotFound`, `PermissionDenied`, `Invalid` for a live node or one
     /// that went with a folder.
-    #[tracing::instrument(name = "drive.purge", skip_all, fields(node = %id), err)]
+    #[tracing::instrument(
+        name = "drive.purge",
+        skip_all,
+        fields(node = %id),
+        err
+    )]
     pub async fn purge(&self, actor: &Actor, id: ObjectId) -> DriveResult<()> {
         self.observe("purge", async {
             let node = self.any_node(id).await?;
             let _ = self.entry_state(&node)?;
             let space = self.space(node.space).await?;
-            self.authorize(actor, space.id, space.node_id(), Permission::Manage)
-                .await?;
+            self.authorize(
+                actor,
+                space.id,
+                space.node_id(),
+                Permission::Manage,
+            )
+            .await?;
             self.purge_entry(actor, &node).await
         })
         .await
@@ -159,12 +205,26 @@ impl Drive {
     ///
     /// # Errors
     /// `SpaceNotFound`, `PermissionDenied`.
-    #[tracing::instrument(name = "drive.empty_trash", skip_all, fields(space = %space), err)]
-    pub async fn empty_trash(&self, actor: &Actor, space: SpaceId) -> DriveResult<usize> {
+    #[tracing::instrument(
+        name = "drive.empty_trash",
+        skip_all,
+        fields(space = %space),
+        err
+    )]
+    pub async fn empty_trash(
+        &self,
+        actor: &Actor,
+        space: SpaceId,
+    ) -> DriveResult<usize> {
         self.observe("empty_trash", async {
             let space = self.space(space).await?;
-            self.authorize(actor, space.id, space.node_id(), Permission::Manage)
-                .await?;
+            self.authorize(
+                actor,
+                space.id,
+                space.node_id(),
+                Permission::Manage,
+            )
+            .await?;
             let entries = self.entries(space.id).await?;
             for entry in &entries {
                 self.purge_entry(actor, entry).await?;
@@ -185,12 +245,12 @@ impl Drive {
             let now = self.clock.now().unix_ms();
             let mut purged = 0;
             for space in self.index.spaces().await? {
-                let keep_ms = i64::from(space.settings.trash_days).saturating_mul(DAY_MS);
+                let keep_ms =
+                    i64::from(space.settings.trash_days).saturating_mul(DAY_MS);
                 for entry in self.entries(space.id).await? {
-                    let expired = entry
-                        .trash
-                        .as_ref()
-                        .is_some_and(|t| now.saturating_sub(t.trashed_at.unix_ms()) >= keep_ms);
+                    let expired = entry.trash.as_ref().is_some_and(|t| {
+                        now.saturating_sub(t.trashed_at.unix_ms()) >= keep_ms
+                    });
                     if expired {
                         self.purge_entry(&Actor::System, &entry).await?;
                         purged += 1;
@@ -207,8 +267,17 @@ impl Drive {
     ///
     /// # Errors
     /// `SpaceNotFound`, `PermissionDenied` without view rights on the space.
-    #[tracing::instrument(name = "drive.trash_list", skip_all, fields(space = %space), err)]
-    pub async fn trash_list(&self, actor: &Actor, space: SpaceId) -> DriveResult<Vec<Node>> {
+    #[tracing::instrument(
+        name = "drive.trash_list",
+        skip_all,
+        fields(space = %space),
+        err
+    )]
+    pub async fn trash_list(
+        &self,
+        actor: &Actor,
+        space: SpaceId,
+    ) -> DriveResult<Vec<Node>> {
         self.observe("trash_list", async {
             let space = self.space(space).await?;
             self.authorize(actor, space.id, space.node_id(), Permission::View)
@@ -256,10 +325,13 @@ impl Drive {
         match &node.trash {
             Some(state) if state.explicitly_trashed => Ok(state.clone()),
             Some(state) => Err(DriveError::Invalid(format!(
-                "this item went to the trash with {}; restore or purge that instead",
+                "this item went to the trash with {}; restore or purge that \
+                    instead",
                 state.entry
             ))),
-            None => Err(DriveError::Invalid("this item is not in the trash".into())),
+            None => {
+                Err(DriveError::Invalid("this item is not in the trash".into()))
+            }
         }
     }
 

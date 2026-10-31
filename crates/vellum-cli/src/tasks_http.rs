@@ -35,7 +35,10 @@ struct Routes {
 }
 
 /// The routers to mount cross-site, by prefix.
-pub fn routers(tasks: &Arc<TasksService>, identity: &Arc<Identity>) -> Vec<(&'static str, Router)> {
+pub fn routers(
+    tasks: &Arc<TasksService>,
+    identity: &Arc<Identity>,
+) -> Vec<(&'static str, Router)> {
     let state = Routes {
         tasks: Arc::clone(tasks),
         identity: Arc::clone(identity),
@@ -110,8 +113,10 @@ async fn handle(
                 .map(|v| (name.as_str().to_owned(), v.to_owned()))
         })
         .collect();
-    let Ok(body) = axum::body::to_bytes(request.into_body(), MAX_BODY).await else {
-        return (StatusCode::PAYLOAD_TOO_LARGE, "request too large").into_response();
+    let Ok(body) = axum::body::to_bytes(request.into_body(), MAX_BODY).await
+    else {
+        return (StatusCode::PAYLOAD_TOO_LARGE, "request too large")
+            .into_response();
     };
     let raw = RawRequest {
         method,
@@ -123,8 +128,8 @@ async fn handle(
     };
     let out = routes.tasks.handle_raw(raw).await;
     let mut response = Response::new(Body::from(out.body));
-    *response.status_mut() =
-        StatusCode::from_u16(out.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+    *response.status_mut() = StatusCode::from_u16(out.status)
+        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
     for (name, value) in out.headers {
         if let (Ok(name), Ok(value)) = (
             HeaderName::try_from(name.as_str()),

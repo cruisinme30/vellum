@@ -146,9 +146,15 @@ fn week(end: Timestamp, tz: &TimeZone) -> String {
 
 /// Computes a report.
 #[must_use]
-pub fn report(issues: &[Lifecycle], metric: Metric, group_by: &GroupBy) -> Report {
+pub fn report(
+    issues: &[Lifecycle],
+    metric: Metric,
+    group_by: &GroupBy,
+) -> Report {
     let tz = match group_by {
-        GroupBy::Week { time_zone } => TimeZone::get(time_zone).unwrap_or(TimeZone::UTC),
+        GroupBy::Week { time_zone } => {
+            TimeZone::get(time_zone).unwrap_or(TimeZone::UTC)
+        }
         _ => TimeZone::UTC,
     };
     let mut groups: BTreeMap<String, Vec<f64>> = BTreeMap::new();
@@ -167,7 +173,9 @@ pub fn report(issues: &[Lifecycle], metric: Metric, group_by: &GroupBy) -> Repor
                     .clone()
                     .unwrap_or_else(|| "unassigned".to_owned()),
             ],
-            GroupBy::Label if issue.labels.is_empty() => vec!["no label".to_owned()],
+            GroupBy::Label if issue.labels.is_empty() => {
+                vec!["no label".to_owned()]
+            }
             GroupBy::Label => issue.labels.clone(),
             GroupBy::Project => vec![
                 issue
@@ -214,7 +222,11 @@ pub fn report(issues: &[Lifecycle], metric: Metric, group_by: &GroupBy) -> Repor
 /// The issues completed in the `weeks` full weeks before `now`, for the
 /// default "last 12 weeks" window.
 #[must_use]
-pub fn window(issues: &[Lifecycle], now: Timestamp, weeks: i64) -> Vec<Lifecycle> {
+pub fn window(
+    issues: &[Lifecycle],
+    now: Timestamp,
+    weeks: i64,
+) -> Vec<Lifecycle> {
     let since = now
         .checked_sub((weeks * 7 * 24).hours())
         .unwrap_or(Timestamp::MIN);
@@ -233,7 +245,12 @@ mod tests {
         Timestamp::from_second(1_793_260_800 + h * 3600).ok()
     }
 
-    fn issue(key: &str, created: i64, started: Option<i64>, completed: Option<i64>) -> Lifecycle {
+    fn issue(
+        key: &str,
+        created: i64,
+        started: Option<i64>,
+        completed: Option<i64>,
+    ) -> Lifecycle {
         Lifecycle {
             key: key.to_owned(),
             team: "ENG".to_owned(),
@@ -292,7 +309,8 @@ mod tests {
                 time_zone: "Europe/London".to_owned(),
             },
         );
-        let names: Vec<&str> = by_week.groups.iter().map(|g| g.group.as_str()).collect();
+        let names: Vec<&str> =
+            by_week.groups.iter().map(|g| g.group.as_str()).collect();
         assert_eq!(names, ["2026-W41", "2026-W44"]);
         let now = hours(24).unwrap_or(Timestamp::UNIX_EPOCH);
         assert_eq!(window(&issues, now, 1).len(), 1);

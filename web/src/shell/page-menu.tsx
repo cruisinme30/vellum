@@ -91,7 +91,10 @@ export function PageMenu({
 
   const onKeyDown = (event: KeyboardEvent) => {
     event.stopPropagation();
-    const entries = [...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])];
+    const entries = [
+      ...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ??
+        []),
+    ];
     const at = entries.indexOf(document.activeElement as HTMLElement);
     const targets: Record<string, number> = {
       ArrowDown: at + 1,
@@ -118,7 +121,9 @@ export function PageMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        aria-label={t("menu-label", { title: page.title === "" ? t("page-untitled") : page.title })}
+        aria-label={t("menu-label", {
+          title: page.title === "" ? t("page-untitled") : page.title,
+        })}
         onClick={(event) => {
           event.stopPropagation();
           onOpenChange(!open);
@@ -127,7 +132,14 @@ export function PageMenu({
         <Icon name="more_horiz" size={20} />
       </button>
       {open && (
-        <div className="vl-menu" role="menu" tabIndex={-1} id={id} ref={menu} onKeyDown={onKeyDown}>
+        <div
+          className="vl-menu"
+          role="menu"
+          tabIndex={-1}
+          id={id}
+          ref={menu}
+          onKeyDown={onKeyDown}
+        >
           {items.map(([key, icon, run]) => (
             <div
               key={key}

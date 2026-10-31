@@ -11,7 +11,12 @@
 
 /** A JSON value as stored in a record. Records are treated as immutable. */
 export type JsonValue =
-  string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue };
+  | string
+  | number
+  | boolean
+  | null
+  | readonly JsonValue[]
+  | { readonly [key: string]: JsonValue };
 
 /** One mutation waiting to be confirmed by the server. */
 export interface PendingMutation {

@@ -30,6 +30,13 @@ vellum reindex --drive product
 The index is derived from the files, so rebuilding it is always safe.
 Per-person state such as stars and recent pages is kept.
 
+When the files are in a bucket, run it with the server's settings
+(`VELLUM_BLOB_URL` and the S3 sign-in, see
+[Signing in to S3](../configure/storage.md#s3-credentials)). It lists the
+bucket, fetches the pages and manifests sixteen at a time, and builds the
+same index a folder would give. Attachments are listed but not
+downloaded.
+
 ## Getting help {#help}
 
 Include the request ID from the error dialog and the output of

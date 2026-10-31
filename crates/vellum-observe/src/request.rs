@@ -18,7 +18,9 @@
 
 use std::time::{Duration, Instant};
 
-use opentelemetry::trace::{SpanContext, TraceContextExt as _, TraceFlags, TraceState};
+use opentelemetry::trace::{
+    SpanContext, TraceContextExt as _, TraceFlags, TraceState,
+};
 use tracing::Span;
 use tracing_opentelemetry::OpenTelemetrySpanExt as _;
 
@@ -114,7 +116,8 @@ impl RequestObservation {
                 ..p
             })
         };
-        let _ = span.record("trace_id", tracing::field::display(trace.trace_id));
+        let _ =
+            span.record("trace_id", tracing::field::display(trace.trace_id));
         Self {
             in_flight: metrics.start(method, route),
             span,
@@ -216,23 +219,22 @@ mod tests {
     async fn joins_incoming_trace_and_records_everything() {
         let _lock = crate::TRACING_TEST_LOCK.lock().await;
         let store = Arc::new(TraceStore::default());
-        let subscriber = tracing_subscriber::registry().with(RequestRecorder::new(
-            Arc::clone(&store),
-            RecorderConfig::default(),
-        ));
+        let subscriber = tracing_subscriber::registry().with(
+            RequestRecorder::new(Arc::clone(&store), RecorderConfig::default()),
+        );
         let _default = tracing::subscriber::set_default(subscriber);
         let metrics = RouteMetrics::new();
-        let incoming = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+        let incoming =
+            "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
         let done = handle(&metrics, Some(incoming), 503).await;
         assert_eq!(
             done.trace_id.to_string(),
             "4bf92f3577b34da6a3ce929d0e0e4736"
         );
         assert!(done.server_timing.starts_with("db;dur=2.0, total;dur="));
-        assert!(
-            done.server_timing
-                .contains("traceparent;desc=\"00-4bf92f3577b34da6a3ce929d0e0e4736-")
-        );
+        assert!(done.server_timing.contains(
+            "traceparent;desc=\"00-4bf92f3577b34da6a3ce929d0e0e4736-"
+        ));
         let rows = store.query(&TraceQuery::default());
         let row = rows.first().unwrap();
         assert_eq!(row.trace_id, done.trace_id);

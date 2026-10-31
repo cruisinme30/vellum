@@ -23,7 +23,18 @@ use crate::path::ChapterPath;
 pub const FILE_NAME: &str = "SUMMARY.md";
 
 /// The three top-level regions of a summary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Section {
     /// Unnumbered chapters before the numbered ones (an introduction).
@@ -107,7 +118,9 @@ pub struct Summary {
 
 /// The address of a chapter: its region, its index among the region's
 /// items, then its index among each level of children.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub struct Slot {
     /// The region.
     pub section: Section,
@@ -208,7 +221,8 @@ impl Summary {
     #[must_use]
     pub fn chapter(&self, slot: &Slot) -> Option<&Chapter> {
         let (first, rest) = slot.path.split_first()?;
-        let Some(Item::Chapter(chapter)) = self.items(slot.section).get(*first) else {
+        let Some(Item::Chapter(chapter)) = self.items(slot.section).get(*first)
+        else {
             return None;
         };
         let mut chapter = chapter;
@@ -221,7 +235,9 @@ impl Summary {
     /// The chapter at `slot`, mutably.
     pub fn chapter_mut(&mut self, slot: &Slot) -> Option<&mut Chapter> {
         let (first, rest) = slot.path.split_first()?;
-        let Some(Item::Chapter(chapter)) = self.items_mut(slot.section).get_mut(*first) else {
+        let Some(Item::Chapter(chapter)) =
+            self.items_mut(slot.section).get_mut(*first)
+        else {
             return None;
         };
         let mut chapter = chapter;
@@ -310,7 +326,11 @@ impl Summary {
     /// Every chapter with its slot, in reading order.
     #[must_use]
     pub fn chapters(&self) -> Vec<(Slot, &Chapter)> {
-        fn visit<'a>(slot: &Slot, chapter: &'a Chapter, out: &mut Vec<(Slot, &'a Chapter)>) {
+        fn visit<'a>(
+            slot: &Slot,
+            chapter: &'a Chapter,
+            out: &mut Vec<(Slot, &'a Chapter)>,
+        ) {
             for (index, child) in chapter.children.iter().enumerate() {
                 let child_slot = slot.child(index);
                 out.push((child_slot.clone(), child));
@@ -333,9 +353,9 @@ impl Summary {
     /// The slot of the chapter stored at `path`.
     #[must_use]
     pub fn find(&self, path: &ChapterPath) -> Option<Slot> {
-        self.chapters()
-            .into_iter()
-            .find_map(|(slot, chapter)| (chapter.location.as_ref() == Some(path)).then_some(slot))
+        self.chapters().into_iter().find_map(|(slot, chapter)| {
+            (chapter.location.as_ref() == Some(path)).then_some(slot)
+        })
     }
 
     /// Parses `SUMMARY.md`.
@@ -358,14 +378,18 @@ impl Summary {
         if let Some(title) = &self.title {
             blocks.push(format!("# {}", escape(title)));
         }
-        let push_region = |items: &[Item], numbered: bool, blocks: &mut Vec<String>| {
+        let push_region = |items: &[Item],
+                           numbered: bool,
+                           blocks: &mut Vec<String>| {
             let mut list = String::new();
             for item in items {
                 match item {
                     Item::Chapter(chapter) if !numbered => {
                         blocks.push(link(chapter));
                     }
-                    Item::Chapter(chapter) => write_list_item(&mut list, chapter, 0),
+                    Item::Chapter(chapter) => {
+                        write_list_item(&mut list, chapter, 0);
+                    }
                     Item::Separator | Item::Part(_) => {
                         if !list.is_empty() {
                             blocks.push(std::mem::take(&mut list));
@@ -425,7 +449,19 @@ fn escape(text: &str) -> String {
     {
         if matches!(
             c,
-            '\\' | '[' | ']' | '*' | '_' | '`' | '<' | '>' | '&' | '!' | '~' | '|' | '#' | '$'
+            '\\' | '['
+                | ']'
+                | '*'
+                | '_'
+                | '`'
+                | '<'
+                | '>'
+                | '&'
+                | '!'
+                | '~'
+                | '|'
+                | '#'
+                | '$'
         ) {
             out.push('\\');
         }
@@ -491,15 +527,23 @@ impl<'a> SummaryParser<'a> {
             match event {
                 Event::Start(Tag::Heading { level, .. }) => {
                     if level != HeadingLevel::H1 {
-                        return Err(self.error("only `#` headings (title and parts) are allowed"));
+                        return Err(self.error(
+                            "only `#` headings (title and parts) are allowed",
+                        ));
                     }
                     self.pos += 1;
                     let name = self.text_until(TagEnd::Heading(level))?;
-                    let empty = summary.prefix.is_empty() && summary.numbered.is_empty();
-                    if summary.title.is_none() && empty && phase == Phase::Prefix {
+                    let empty = summary.prefix.is_empty()
+                        && summary.numbered.is_empty();
+                    if summary.title.is_none()
+                        && empty
+                        && phase == Phase::Prefix
+                    {
                         summary.title = Some(name);
                     } else if phase == Phase::Suffix {
-                        return Err(self.error("a part title cannot follow suffix chapters"));
+                        return Err(self.error(
+                            "a part title cannot follow suffix chapters",
+                        ));
                     } else {
                         phase = Phase::Numbered;
                         summary.numbered.push(Item::Part(name));
@@ -522,13 +566,17 @@ impl<'a> SummaryParser<'a> {
                     self.pos += 1;
                     match phase {
                         Phase::Prefix => summary.prefix.push(Item::Separator),
-                        Phase::Numbered => summary.numbered.push(Item::Separator),
+                        Phase::Numbered => {
+                            summary.numbered.push(Item::Separator);
+                        }
                         Phase::Suffix => summary.suffix.push(Item::Separator),
                     }
                 }
                 Event::Start(Tag::List(_)) => {
                     if phase == Phase::Suffix {
-                        return Err(self.error("numbered chapters cannot follow suffix chapters"));
+                        return Err(self.error(
+                            "numbered chapters cannot follow suffix chapters",
+                        ));
                     }
                     phase = Phase::Numbered;
                     self.pos += 1;
@@ -539,7 +587,8 @@ impl<'a> SummaryParser<'a> {
                 }
                 _ => {
                     return Err(self.error(
-                        "expected a link, a list of links, a `#` heading or a `---` separator",
+                        "expected a link, a list of links, a `#` heading or a \
+                            `---` separator",
                     ));
                 }
             }
@@ -591,7 +640,9 @@ impl<'a> SummaryParser<'a> {
                 Some(Event::Text(t)) if t.trim().is_empty() => {}
                 _ => {
                     self.pos = self.pos.saturating_sub(1);
-                    return Err(self.error("prefix and suffix chapters must be plain links"));
+                    return Err(self.error(
+                        "prefix and suffix chapters must be plain links",
+                    ));
                 }
             }
         }
@@ -619,26 +670,35 @@ impl<'a> SummaryParser<'a> {
             match self.next() {
                 Some(Event::End(TagEnd::Item)) => break,
                 Some(
-                    Event::Start(Tag::Paragraph) | Event::End(TagEnd::Paragraph) | Event::SoftBreak,
+                    Event::Start(Tag::Paragraph)
+                    | Event::End(TagEnd::Paragraph)
+                    | Event::SoftBreak,
                 ) => {}
                 Some(Event::Text(t)) if t.trim().is_empty() => {}
-                Some(Event::Start(Tag::Link { dest_url, .. })) if chapter.is_none() => {
+                Some(Event::Start(Tag::Link { dest_url, .. }))
+                    if chapter.is_none() =>
+                {
                     chapter = Some(self.link(&dest_url)?);
                 }
                 Some(Event::Start(Tag::List(_))) => {
                     let Some(parent) = chapter.as_mut() else {
-                        return Err(self.error("a nested list needs a parent link"));
+                        return Err(
+                            self.error("a nested list needs a parent link")
+                        );
                     };
                     let children = self.list()?;
                     parent.children.extend(children);
                 }
                 _ => {
                     self.pos = self.pos.saturating_sub(1);
-                    return Err(self.error("each list item must be a single link"));
+                    return Err(
+                        self.error("each list item must be a single link")
+                    );
                 }
             }
         }
-        chapter.ok_or_else(|| self.error("each list item must be a single link"))
+        chapter
+            .ok_or_else(|| self.error("each list item must be a single link"))
     }
 }
 
@@ -665,8 +725,12 @@ mod tests {
         assert_eq!(summary.title.as_deref(), Some("Summary"));
         assert_eq!(summary.prefix.len(), 1);
         assert_eq!(summary.suffix.len(), 1);
-        assert!(matches!(summary.numbered.first(), Some(Item::Part(p)) if p == "Part I · Joining"));
-        // The separator before the suffix belongs to the numbered region, as in mdBook.
+        assert!(matches!(
+            summary.numbered.first(),
+            Some(Item::Part(p)) if p == "Part I · Joining"
+        ));
+        // The separator before the suffix belongs to the numbered region, as in
+        // mdBook.
         assert!(matches!(summary.numbered.last(), Some(Item::Separator)));
         let onboarding = summary
             .chapter(&Slot::top(Section::Numbered, 1))
@@ -690,7 +754,9 @@ mod tests {
 
     #[test]
     fn reports_line_numbers() {
-        let err = Summary::parse("# Summary\n\n- [A](a.md)\n\n[B](b.md)\n\n- [C](c.md)\n");
+        let err = Summary::parse(
+            "# Summary\n\n- [A](a.md)\n\n[B](b.md)\n\n- [C](c.md)\n",
+        );
         assert!(
             matches!(err, Err(BookError::Summary { line: 7, .. })),
             "{err:?}"

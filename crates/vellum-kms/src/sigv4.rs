@@ -34,11 +34,16 @@ pub struct Scope<'a> {
 }
 
 /// The `Authorization` header value for `request`.
-pub fn authorization(request: &Request<'_>, scope: &Scope<'_>) -> Result<String, CryptoError> {
+pub fn authorization(
+    request: &Request<'_>,
+    scope: &Scope<'_>,
+) -> Result<String, CryptoError> {
     let mut headers: Vec<(String, String)> = request
         .headers
         .iter()
-        .map(|(name, value)| (name.to_ascii_lowercase(), collapse_spaces(value)))
+        .map(|(name, value)| {
+            (name.to_ascii_lowercase(), collapse_spaces(value))
+        })
         .collect();
     headers.sort();
     let signed_headers = headers
@@ -46,7 +51,8 @@ pub fn authorization(request: &Request<'_>, scope: &Scope<'_>) -> Result<String,
         .map(|(name, _)| name.as_str())
         .collect::<Vec<_>>()
         .join(";");
-    let mut canonical = format!("{}\n{}\n{}\n", request.method, request.path, request.query);
+    let mut canonical =
+        format!("{}\n{}\n{}\n", request.method, request.path, request.query);
     for (name, value) in &headers {
         let _ = writeln!(canonical, "{name}:{value}");
     }
@@ -60,14 +66,16 @@ pub fn authorization(request: &Request<'_>, scope: &Scope<'_>) -> Result<String,
         .amz_date
         .get(..8)
         .ok_or(CryptoError::Malformed("x-amz-date"))?;
-    let credential_scope = format!("{date}/{}/{}/aws4_request", scope.region, scope.service);
+    let credential_scope =
+        format!("{date}/{}/{}/aws4_request", scope.region, scope.service);
     let string_to_sign = format!(
         "{ALGORITHM}\n{}\n{credential_scope}\n{}",
         scope.amz_date,
         hex(&Sha256::digest(canonical.as_bytes()))
     );
 
-    let secret = zeroize::Zeroizing::new(format!("AWS4{}", scope.secret_access_key));
+    let secret =
+        zeroize::Zeroizing::new(format!("AWS4{}", scope.secret_access_key));
     let k_date = hmac(secret.as_bytes(), date.as_bytes())?;
     let k_region = hmac(&k_date, scope.region.as_bytes())?;
     let k_service = hmac(&k_region, scope.service.as_bytes())?;
@@ -75,7 +83,8 @@ pub fn authorization(request: &Request<'_>, scope: &Scope<'_>) -> Result<String,
     let signature = hex(&hmac(&k_signing, string_to_sign.as_bytes())?);
 
     Ok(format!(
-        "{ALGORITHM} Credential={}/{credential_scope}, SignedHeaders={signed_headers}, Signature={signature}",
+        "{ALGORITHM} Credential={}/{credential_scope}, \
+            SignedHeaders={signed_headers}, Signature={signature}",
         scope.access_key_id
     ))
 }
@@ -117,8 +126,10 @@ const fn civil_from_days(days: u64) -> (u64, u64, u64) {
 }
 
 fn hmac(key: &[u8], data: &[u8]) -> Result<Vec<u8>, CryptoError> {
-    let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(key)
-        .map_err(|_| CryptoError::Provider("aws-kms: cannot key HMAC".into()))?;
+    let mut mac =
+        <Hmac<Sha256> as KeyInit>::new_from_slice(key).map_err(|_| {
+            CryptoError::Provider("aws-kms: cannot key HMAC".into())
+        })?;
     mac.update(data);
     Ok(mac.finalize().into_bytes().to_vec())
 }
@@ -165,9 +176,11 @@ mod tests {
         };
         assert_eq!(
             authorization(&request, &scope)?,
-            "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20150830/us-east-1/iam/aws4_request, \
+            "AWS4-HMAC-SHA256 \
+             Credential=AKIDEXAMPLE/20150830/us-east-1/iam/aws4_request, \
              SignedHeaders=content-type;host;x-amz-date, \
-             Signature=5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924a6f2b5d7"
+             Signature=5d672d79c15b13162d9279b0855cfba6789a8edb4c82c400e06b5924\
+             a6f2b5d7"
         );
         Ok(())
     }

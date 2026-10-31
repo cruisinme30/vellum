@@ -6,8 +6,11 @@
 //! lines and sends the web pushes.
 //!
 //! Pushes held by a snooze are not sent later; the inbox line is there
-//! when the person looks. Email needs a mail transport, which the server
-//! does not configure yet, so email deliveries are counted and skipped.
+//! when the person looks. Emails are queued for [`crate::mail::Mailer`],
+//! which sends them when their delay ends, once the server has turned
+//! email on ([`NotifyStore::enable_email`]); until then they are counted
+//! and skipped. So every dispatcher, such as My Work's reminder sender,
+//! emails by each person's preferences without asking for it.
 
 use std::sync::Arc;
 
@@ -31,6 +34,8 @@ pub struct Report {
     pub push_failed: usize,
     /// Pushes held by a snooze.
     pub held: usize,
+    /// Emails queued for the mailer.
+    pub email_queued: usize,
     /// Emails skipped for want of a mail transport.
     pub email_skipped: usize,
 }
@@ -84,12 +89,35 @@ impl<T: HttpTransport> Dispatcher<T> {
                     });
                     match filed {
                         Ok(()) => report.inbox += 1,
-                        Err(error) => tracing::warn!(%error, "inbox line not saved"),
+                        Err(error) => {
+                            tracing::warn!(%error, "inbox line not saved");
+                        }
                     }
                 }
                 Channel::Push if step.not_before > now => report.held += 1,
-                Channel::Push => self.push(user, notification, now, &mut report).await,
-                Channel::Email => report.email_skipped += 1,
+                Channel::Push => {
+                    self.push(user, notification, now, &mut report).await;
+                }
+                Channel::Email if !self.store.email_enabled() => {
+                    report.email_skipped += 1;
+                }
+                Channel::Email => {
+                    let queued = self.store.update(user, |state| {
+                        crate::mail::queue(
+                            &mut state.email_queue,
+                            notification,
+                            step.not_before,
+                            step.skip_if_read,
+                        );
+                        Ok(())
+                    });
+                    match queued {
+                        Ok(()) => report.email_queued += 1,
+                        Err(error) => {
+                            tracing::warn!(%error, "email not queued");
+                        }
+                    }
+                }
             }
         }
         tracing::info!(
@@ -98,6 +126,7 @@ impl<T: HttpTransport> Dispatcher<T> {
             pushed = report.pushed,
             push_failed = report.push_failed,
             held = report.held,
+            email_queued = report.email_queued,
             "notification delivered"
         );
         report
@@ -139,15 +168,22 @@ impl<T: HttpTransport> Dispatcher<T> {
                 report.push_failed += 1;
                 continue;
             };
-            match delivery::attempt(&self.transport, &request, PUSH_CHANNEL, 1).await {
+            match delivery::attempt(&self.transport, &request, PUSH_CHANNEL, 1)
+                .await
+            {
                 Outcome::Delivered => report.pushed += 1,
                 Outcome::Gone => {
                     report.push_failed += 1;
-                    if let Err(error) = self.store.drop_endpoint(&stored.endpoint) {
-                        tracing::warn!(%error, "expired push subscription not removed");
+                    if let Err(error) =
+                        self.store.drop_endpoint(&stored.endpoint)
+                    {
+                        tracing::warn!(%error, "expired push subscription not \
+                            removed");
                     }
                 }
-                Outcome::Retry(_) | Outcome::Rejected => report.push_failed += 1,
+                Outcome::Retry(_) | Outcome::Rejected => {
+                    report.push_failed += 1;
+                }
             }
         }
     }
@@ -187,7 +223,10 @@ mod tests {
     }
 
     impl HttpTransport for Fake {
-        async fn post(&self, request: &OutboundRequest) -> Result<HttpResponse, TransportError> {
+        async fn post(
+            &self,
+            request: &OutboundRequest,
+        ) -> Result<HttpResponse, TransportError> {
             self.sent.lock().unwrap().push(request.url.to_string());
             Ok(HttpResponse {
                 status: self.status,
@@ -293,7 +332,8 @@ mod tests {
         let store = store_with_browser(cy);
         store
             .update(cy, |s| {
-                s.preferences.snoozed_until = Some(Timestamp::from_second(3600).unwrap());
+                s.preferences.snoozed_until =
+                    Some(Timestamp::from_second(3600).unwrap());
                 Ok(())
             })
             .unwrap();

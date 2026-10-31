@@ -19,7 +19,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use vellum_contracts::{
-    CredentialKind, HttpMethod, Operation, Principal, RequestContext, Scope, Service,
+    CredentialKind, HttpMethod, Operation, Principal, RequestContext, Scope,
+    Service,
 };
 use vellum_crypto::KeyProvider;
 use vellum_kernel::{Error, ErrorKind, Result};
@@ -27,8 +28,9 @@ use vellum_observe::{TraceId, TraceParent, TraceQuery};
 
 use crate::audit::{AuditActor, AuditQuery, AuditRecord};
 use crate::backup::BackupFile;
+use crate::counts::{UsageCounts, UsageSampler};
 use crate::service::{AdminService, Caller};
-use crate::settings::AdminSettings;
+use crate::settings::{AdminSettings, AppearanceSettings};
 use crate::usage::UsageFacts;
 
 /// How recent a sign-in admin changes need. It matches the default of
@@ -41,6 +43,11 @@ pub const FRESH_AUTH: Duration = Duration::from_mins(5);
 pub trait UsageFactsSource: Send + Sync {
     /// The counts now.
     async fn facts(&self) -> UsageFacts;
+
+    /// The exact counts behind Admin → Usage, when the server keeps them.
+    fn sampler(&self) -> Option<Arc<UsageSampler>> {
+        None
+    }
 }
 
 /// A source that reports nothing, until the services that own the counts
@@ -70,7 +77,10 @@ impl<K: KeyProvider + 'static> std::fmt::Debug for AdminApi<K> {
 impl<K: KeyProvider + 'static> AdminApi<K> {
     /// Wraps the service.
     #[must_use]
-    pub fn new(service: Arc<AdminService<K>>, facts: Arc<dyn UsageFactsSource>) -> Self {
+    pub fn new(
+        service: Arc<AdminService<K>>,
+        facts: Arc<dyn UsageFactsSource>,
+    ) -> Self {
         Self { service, facts }
     }
 }
@@ -151,6 +161,18 @@ pub struct WindowInput {
     /// Minutes, 1 to 60 (default 15).
     pub minutes: Option<u64>,
 }
+
+/// How fresh the usage counts must be.
+#[derive(Debug, Clone, Copy, Default, Deserialize, JsonSchema)]
+#[serde(default)]
+pub struct UsageInput {
+    /// Count again now instead of answering from the last sample (at most
+    /// five minutes old).
+    pub refresh: bool,
+}
+
+/// How long cached usage counts are served without counting again.
+pub const USAGE_MAX_AGE_MS: i64 = 5 * 60 * 1000;
 
 /// The SLOs.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -322,11 +344,18 @@ impl<K: KeyProvider + 'static> Service for AdminApi<K> {
                 "One request's trace with every span",
                 |s, _ctx, input: TraceInput| async move {
                     let id: TraceId = input.trace_id.parse().map_err(|_| {
-                        Error::new(ErrorKind::InvalidInput, "trace_id must be 32 hex digits")
+                        Error::new(
+                            ErrorKind::InvalidInput,
+                            "trace_id must be 32 hex digits",
+                        )
                     })?;
                     let trace = s.request(id)?;
                     serde_json::to_value(&*trace).map_err(|e| {
-                        Error::new(ErrorKind::Internal, "cannot encode the trace").with_source(e)
+                        Error::new(
+                            ErrorKind::Internal,
+                            "cannot encode the trace",
+                        )
+                        .with_source(e)
                     })
                 },
             ),
@@ -334,15 +363,21 @@ impl<K: KeyProvider + 'static> Service for AdminApi<K> {
                 svc,
                 "admin.routes",
                 "/v1/admin/routes",
-                "Rate, errors, latency and saturation per route, against its budget",
-                |s, _ctx, input: WindowInput| async move { s.routes(input.minutes.unwrap_or(15)).await },
+                "Rate, errors, latency and saturation per route, against its \
+                    budget",
+                |s, _ctx, input: WindowInput| async move {
+                    s.routes(input.minutes.unwrap_or(15)).await
+                },
             ),
             query(
                 svc,
                 "admin.slos",
                 "/v1/admin/slos",
-                "Service level objectives, burn rates and remaining error budget",
-                |s, _ctx, _input: Empty| async move { Ok(SlosOutput { slos: s.slos() }) },
+                "Service level objectives, burn rates and remaining error \
+                    budget",
+                |s, _ctx, _input: Empty| async move {
+                    Ok(SlosOutput { slos: s.slos() })
+                },
             ),
             query(
                 svc,
@@ -350,10 +385,14 @@ impl<K: KeyProvider + 'static> Service for AdminApi<K> {
                 "/v1/admin/profile",
                 "Folded span stacks of recent requests, for vellum profile",
                 |s, _ctx, input: ProfileInput| async move {
-                    Ok(s.profile_report(input.seconds.unwrap_or(60), input.route.as_deref()))
+                    Ok(s.profile_report(
+                        input.seconds.unwrap_or(60),
+                        input.route.as_deref(),
+                    ))
                 },
             ),
             client_report(svc),
+            appearance(svc),
             query(
                 svc,
                 "admin.list_audit",
@@ -383,7 +422,9 @@ impl<K: KeyProvider + 'static> Service for AdminApi<K> {
                 "admin.verify_audit",
                 "/v1/admin/audit/verify",
                 "Checks the audit log's hash chain end to end",
-                |s, ctx, _input: Empty| async move { s.verify_audit(&caller(&ctx)).await },
+                |s, ctx, _input: Empty| async move {
+                    s.verify_audit(&caller(&ctx)).await
+                },
             ),
             query(
                 svc,
@@ -399,11 +440,16 @@ impl<K: KeyProvider + 'static> Service for AdminApi<K> {
                 "/v1/admin/settings",
                 "Replaces the settings if nobody saved since expected_version",
                 |s, ctx, input: SettingsUpdate| async move {
-                    s.update_settings(&caller(&ctx), input.expected_version, input.settings)
-                        .await
+                    s.update_settings(
+                        &caller(&ctx),
+                        input.expected_version,
+                        input.settings,
+                    )
+                    .await
                 },
             ),
             telemetry_preview(svc, &self.facts),
+            usage(svc, &self.facts),
             query(
                 svc,
                 "admin.state",
@@ -428,7 +474,9 @@ impl<K: KeyProvider + 'static> Service for AdminApi<K> {
                 "admin.create_backup",
                 "/v1/admin/backups",
                 "Takes an encrypted backup now",
-                |s, ctx, _input: Empty| async move { s.backup_now(&caller(&ctx)).await },
+                |s, ctx, _input: Empty| async move {
+                    s.backup_now(&caller(&ctx)).await
+                },
             )
             .budget(BACKUP_BUDGET),
             mutation(
@@ -437,7 +485,9 @@ impl<K: KeyProvider + 'static> Service for AdminApi<K> {
                 "admin.run_drill",
                 "/v1/admin/backups/drill",
                 "Restores the newest backup into scratch space and checks it",
-                |s, ctx, _input: Empty| async move { s.drill_now(&caller(&ctx)).await },
+                |s, ctx, _input: Empty| async move {
+                    s.drill_now(&caller(&ctx)).await
+                },
             )
             .budget(BACKUP_BUDGET),
         ]
@@ -456,7 +506,8 @@ fn client_report<K: KeyProvider + 'static>(svc: &Svc<K>) -> Operation {
             let s = Arc::clone(&s);
             async move {
                 let body = serde_json::to_vec(&input).map_err(|e| {
-                    Error::new(ErrorKind::InvalidInput, "invalid report").with_source(e)
+                    Error::new(ErrorKind::InvalidInput, "invalid report")
+                        .with_source(e)
                 })?;
                 let ingested = s.client_report(&body)?;
                 Ok(IngestedOutput {
@@ -466,7 +517,28 @@ fn client_report<K: KeyProvider + 'static>(svc: &Svc<K>) -> Operation {
             }
         },
     )
-    .summary("Browser timings for a page view or slow call, joined to its trace")
+    .summary(
+        "Browser timings for a page view or slow call, joined to its trace",
+    )
+}
+
+/// The organisation's look: any signed-in reader may read it, so the app
+/// can theme itself from the organisation's seed (R-TH-1).
+fn appearance<K: KeyProvider + 'static>(svc: &Svc<K>) -> Operation {
+    let s = Arc::clone(svc);
+    Operation::query(
+        "admin.appearance",
+        "/v1/appearance",
+        Scope::Read,
+        move |_ctx: RequestContext, _input: Empty| {
+            let s = Arc::clone(&s);
+            async move {
+                let current = s.settings().await?;
+                Ok::<AppearanceSettings, Error>(current.settings.appearance)
+            }
+        },
+    )
+    .summary("The organisation's seed colour and export and site themes")
 }
 
 fn telemetry_preview<K: KeyProvider + 'static>(
@@ -484,6 +556,30 @@ fn telemetry_preview<K: KeyProvider + 'static>(
             async move {
                 let f = facts.facts().await;
                 s.telemetry_preview(&f).await
+            }
+        },
+    )
+}
+
+fn usage<K: KeyProvider + 'static>(
+    svc: &Svc<K>,
+    facts: &Arc<dyn UsageFactsSource>,
+) -> Operation {
+    let sampler = facts.sampler();
+    query(
+        svc,
+        "admin.usage",
+        "/v1/admin/usage",
+        "People, pages, storage and activity on this server, counted at most \
+            five minutes ago",
+        move |_s, _ctx, input: UsageInput| {
+            let sampler = sampler.clone();
+            async move {
+                let Some(sampler) = sampler else {
+                    return Ok(UsageCounts::default());
+                };
+                let max_age = if input.refresh { -1 } else { USAGE_MAX_AGE_MS };
+                sampler.current(max_age).await
             }
         },
     )

@@ -3,12 +3,12 @@
 
 //! The stdio transport behind `vellum mcp`.
 //!
-//! One JSON-RPC message per line in each direction. Requests run
-//! concurrently; `notifications/cancelled` stops one (including a
-//! `subscriptions/listen` stream). When standard input closes, the server
-//! ends open subscriptions, lets requests already received finish (up to
-//! [`SHUTDOWN_GRACE`]), flushes their responses and exits. Credentials come from the environment (an API token), as the
-//! specification asks for stdio, so no `OAuth` flow runs here.
+//! One JSON-RPC message per line in each direction. Requests run concurrently;
+//! `notifications/cancelled` stops one (including a `subscriptions/listen`
+//! stream). When standard input closes, the server ends open subscriptions,
+//! lets requests already received finish (up to [`SHUTDOWN_GRACE`]), flushes
+//! their responses and exits. Credentials come from the environment (an API
+//! token), as the specification asks for stdio, so no `OAuth` flow runs here.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -16,7 +16,8 @@ use std::time::Duration;
 
 use serde_json::Value;
 use tokio::io::{
-    AsyncBufReadExt as _, AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, BufReader,
+    AsyncBufReadExt as _, AsyncRead, AsyncReadExt as _, AsyncWrite,
+    AsyncWriteExt as _, BufReader,
 };
 use tokio::sync::{mpsc, watch};
 use tokio::task::{AbortHandle, JoinSet};
@@ -89,21 +90,20 @@ where
             }
         };
         if msg.id.is_none() && msg.method == "notifications/cancelled" {
-            if let Some(id) = msg
-                .params
-                .get("requestId")
-                .and_then(|v| serde_json::from_value::<RequestId>(v.clone()).ok())
-                && let Some(handle) = in_flight
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner)
-                    .remove(&id)
+            if let Some(id) = msg.params.get("requestId").and_then(|v| {
+                serde_json::from_value::<RequestId>(v.clone()).ok()
+            }) && let Some(handle) = in_flight
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .remove(&id)
             {
                 let reason = msg
                     .params
                     .get("reason")
                     .and_then(Value::as_str)
                     .unwrap_or_default();
-                tracing::info!(request = %id, reason, "request cancelled by the client");
+                tracing::info!(request = %id, reason, "request cancelled by \
+                    the client");
                 handle.abort();
             }
             continue;
@@ -168,7 +168,8 @@ where
             }
         });
         if let Some(id) = id {
-            let mut map = in_flight.lock().unwrap_or_else(PoisonError::into_inner);
+            let mut map =
+                in_flight.lock().unwrap_or_else(PoisonError::into_inner);
             map.retain(|_, h| !h.is_finished());
             if !handle.is_finished() {
                 let _ = map.insert(id, handle);
@@ -186,7 +187,9 @@ where
     })
     .await;
     if drained.is_err() {
-        tracing::warn!("requests still running after standard input closed; stopping them");
+        tracing::warn!(
+            "requests still running after standard input closed; stopping them"
+        );
         tasks.abort_all();
         while tasks.join_next().await.is_some() {}
     }

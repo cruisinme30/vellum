@@ -11,8 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D109, D110, D111
-- Issue: #279 (redesign); the first version predates the issue rule
+- Decisions: D109, D110, D111, D307, D308
+- Issue: #279 (redesign), #549 (type and theme toggle); the first version
+  predates the issue rule
 - Pull requests: #31, #325
 
 :::
@@ -50,7 +51,8 @@ tools, Google's colours, and every guide readable on the site itself.
 - It uses Google's Material 3 colours and the Google Sans Flex and Google
   Sans Code fonts (SIL Open Font License), served from the site itself,
   in light and dark schemes that follow the visitor's system.
-- There is no JavaScript: the product tabs are radio buttons styled with
+- No JavaScript is needed (D308 adds one small script, for the theme
+  toggle): the product tabs are radio buttons styled with
   CSS. The tour video has controls, a text transcript, and does not play
   by itself when the visitor asks for reduced motion.
 - A Content Security Policy allows only the site's own styles, images,
@@ -80,6 +82,44 @@ tools, Google's colours, and every guide readable on the site itself.
   that touches it, and deploys it on every push to `main`, so the site
   matches the last release, not work in progress.
 
+### D307: book type in mdBook's 10-pixel rems, fonts that always arrive
+
+- mdBook sets the root font size to 62.5%, so a rem inside a book is
+  10 pixels, not 16. `site/book.css` sizes everything in those rems:
+  body text 17 pixels (`1.7rem`), the site bar and feedback line 14
+  pixels. The first version used 16-pixel rems and printed body text at
+  10.6 pixels (#549).
+- Fonts use `font-display: swap` and the Google Sans Flex file is
+  preloaded on the docs home and every book page (`site/book-head.hbs`),
+  so readers always get the site font. `optional` kept the fallback for
+  the whole visit whenever the font took over ~100 ms, which over the
+  network was most first visits. The UI suite's layout-shift gate still
+  passes on a slow network. The code font is the exception (ADR 0071,
+  D309): it is preloaded too and uses `optional`, since `swap` moved
+  every line below the first code on the page.
+- The build fills in the font path per book through a placeholder, so the older
+  releases' books at `docs/v/<tag>/` find the fonts too, and it strips
+  mdBook's own font stylesheet from every page, not only the top level.
+- Smaller fixes: chapter numbers no longer run into titles, the book
+  title in the menu bar is weight 500 (not 200), and the site bar sits
+  above mdBook's full-height next-chapter arrow that hid its end.
+
+### D308: one light and dark toggle for the whole site
+
+- Every page (landing page, docs home, every book page) has a toggle at
+  the end of its top bar. Until the reader presses it, the site follows
+  the system setting; the choice is then kept in this browser
+  (`localStorage`, key `vellum-site-theme`) for the whole site. Nothing
+  is sent anywhere.
+- `site/theme.js` is the one script the landing page and docs home run.
+  Their policy allows scripts from the site itself only (`script-src
+  'self'`); inline scripts stay blocked, and `check-site.sh` fails on any
+  script other than `theme.js`. It loads in `<head>`, so the theme is set
+  before first paint, and the toggle is hidden when JavaScript is off.
+- In the books, "light" and "dark" are mdBook's recoloured light and navy
+  themes; mdBook's menu of five themes is hidden, since three were never
+  recoloured.
+
 ## Alternatives
 
 - **A site generator with a theme (Docusaurus, Astro)**: more tooling,
@@ -89,6 +129,10 @@ tools, Google's colours, and every guide readable on the site itself.
 - **An animated product tour in JavaScript**: livelier, but it breaks the
   no-script rule; a short video does the same job.
 - **Deploy from `develop`**: the site would show unreleased work.
+- **A toggle without JavaScript** (a checkbox and `:has()`): it cannot
+  remember the choice from one page to the next.
+- **Resetting mdBook's root size to 100%**: mdBook's own layout is sized
+  in 10-pixel rems and would grow by 60%.
 
 ## Consequences
 

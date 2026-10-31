@@ -36,6 +36,10 @@ theme.panel: user/start/editor.md#themes
 shortcuts.global: user/start/shortcuts.md#global
 shortcuts.editor: user/start/shortcuts.md#editor
 shortcuts.issues: user/start/shortcuts.md#issues
+app.install: user/start/desktop.md#install
+app.offline: user/start/desktop.md#offline
+app.notifications: user/start/desktop.md#notifications
+app.private-spaces: user/start/desktop.md#private-spaces
 
 # Collections
 collection.create: user/data/README.md#create
@@ -77,6 +81,8 @@ work.import: user/work/import.md
 # My Work
 mywork.buckets: user/my-work/README.md#buckets
 mywork.lists: user/my-work/README.md#lists
+mywork.settings: user/my-work/README.md#settings
+mywork.mentions: user/my-work/README.md#mentions
 mywork.quick-add: user/my-work/quick-add.md#quick-add
 mywork.recurrence: user/my-work/quick-add.md#recurrence
 mywork.calendar: user/my-work/calendar.md#ics
@@ -86,6 +92,7 @@ mywork.import: user/my-work/calendar.md#import
 
 # Drive and sharing
 drive.places: user/drive/README.md#places
+drive.nesting: user/drive/README.md#nesting
 drive.move: user/drive/README.md#move
 drive.trash: user/drive/README.md#trash
 drive.search: user/drive/README.md#search
@@ -120,7 +127,9 @@ admin.diagrams: admin/deploy/compose.md#kroki
 admin.keys: admin/security/encryption.md#workspace-key
 admin.uploads: admin/security/README.md#uploads
 admin.audit: admin/security/access.md#audit
+admin.backups: admin/operate/backups.md#take
 admin.access-report: admin/security/access.md#reports
 admin.requests: admin/operate/observability.md#built-in
 admin.telemetry: admin/operate/observability.md#usage
+admin.usage: admin/operate/observability.md#usage-counts
 admin.import: user/work/import.md

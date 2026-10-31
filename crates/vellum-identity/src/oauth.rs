@@ -49,7 +49,10 @@ const MAX_PENDING: usize = 10_000;
 /// the SSRF-guarded HTTP client and a small size limit.
 pub trait ClientMetadataFetcher: Send + Sync + 'static {
     /// Fetches the document at `url`.
-    fn fetch<'a>(&'a self, url: &'a str) -> BoxFuture<'a, Result<Vec<u8>, Error>>;
+    fn fetch<'a>(
+        &'a self,
+        url: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<u8>, Error>>;
 }
 
 /// The fetcher when none is configured: only built-in clients work.
@@ -57,7 +60,10 @@ pub trait ClientMetadataFetcher: Send + Sync + 'static {
 pub struct NoMetadataFetch;
 
 impl ClientMetadataFetcher for NoMetadataFetch {
-    fn fetch<'a>(&'a self, _url: &'a str) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
+    fn fetch<'a>(
+        &'a self,
+        _url: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
         Box::pin(async {
             Err(Error::new(
                 ErrorKind::Unavailable,
@@ -295,14 +301,15 @@ fn scope_string(scopes: &[Scope]) -> String {
 
 fn valid_pkce_value(value: &str) -> bool {
     (43..=128).contains(&value.len())
-        && value
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~'))
+        && value.bytes().all(|b| {
+            b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~')
+        })
 }
 
 fn pkce_matches(verifier: &str, challenge: &str) -> bool {
     let computed = URL_SAFE_NO_PAD.encode(Sha256::digest(verifier.as_bytes()));
-    valid_pkce_value(verifier) && bool::from(computed.as_bytes().ct_eq(challenge.as_bytes()))
+    valid_pkce_value(verifier)
+        && bool::from(computed.as_bytes().ct_eq(challenge.as_bytes()))
 }
 
 fn with_params(base: &str, params: &[(&str, &str)]) -> String {
@@ -339,7 +346,9 @@ impl Identity {
             "token_endpoint_auth_methods_supported": ["none"],
             "revocation_endpoint_auth_methods_supported": ["none"],
             "code_challenge_methods_supported": ["S256"],
-            "scopes_supported": Scope::ALL.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+            "scopes_supported": Scope::ALL.iter().map(
+                |s| s.as_str()
+            ).collect::<Vec<_>>(),
             "authorization_response_iss_parameter_supported": true,
             "client_id_metadata_document_supported": true,
         })
@@ -350,13 +359,25 @@ impl Identity {
     /// # Errors
     ///
     /// [`ErrorKind::InvalidInput`] for an unknown or malformed client.
-    pub async fn resolve_client(&self, client_id: &str) -> Result<Client, Error> {
+    pub async fn resolve_client(
+        &self,
+        client_id: &str,
+    ) -> Result<Client, Error> {
         if client_id == DESKTOP_CLIENT_ID {
             return Ok(Client::desktop());
         }
-        let bad = |why: &str| Error::new(ErrorKind::InvalidInput, format!("unknown client: {why}"));
-        let url = Url::parse(client_id).map_err(|_| bad("the client ID is not a URL"))?;
-        if url.scheme() != "https" || url.fragment().is_some() || url.path() == "/" {
+        let bad = |why: &str| {
+            Error::new(
+                ErrorKind::InvalidInput,
+                format!("unknown client: {why}"),
+            )
+        };
+        let url = Url::parse(client_id)
+            .map_err(|_| bad("the client ID is not a URL"))?;
+        if url.scheme() != "https"
+            || url.fragment().is_some()
+            || url.path() == "/"
+        {
             return Err(bad("the client ID must be an https URL with a path"));
         }
         if let Some((client, at)) = lock(&self.oauth.clients).get(client_id)
@@ -365,32 +386,42 @@ impl Identity {
             return Ok(client.clone());
         }
         let bytes = self.fetcher.fetch(client_id).await?;
-        let doc: ClientDocument = serde_json::from_slice(&bytes)
-            .map_err(|e| bad(&format!("the metadata document is not valid: {e}")))?;
+        let doc: ClientDocument =
+            serde_json::from_slice(&bytes).map_err(|e| {
+                bad(&format!("the metadata document is not valid: {e}"))
+            })?;
         if doc.client_id != client_id {
-            return Err(bad("the metadata document names a different client ID"));
+            return Err(bad(
+                "the metadata document names a different client ID",
+            ));
         }
         if doc
             .token_endpoint_auth_method
             .as_deref()
             .is_some_and(|m| m != "none")
         {
-            return Err(bad("only public clients (no client secret) are supported"));
+            return Err(bad(
+                "only public clients (no client secret) are supported",
+            ));
         }
         if doc.redirect_uris.is_empty() {
             return Err(bad("the metadata document lists no redirect URIs"));
         }
-        if let Some(unsafe_uri) = doc.redirect_uris.iter().find(|u| !safe_redirect(u)) {
+        if let Some(unsafe_uri) =
+            doc.redirect_uris.iter().find(|u| !safe_redirect(u))
+        {
             return Err(bad(&format!(
-                "the redirect URI `{unsafe_uri}` must be https, http on a loopback address, \
-                 or an app scheme such as com.example.app"
+                "the redirect URI `{unsafe_uri}` must be https, http on a \
+                 loopback address, or an app scheme such as com.example.app"
             )));
         }
         let name = doc
             .client_name
             .map(|n| n.chars().take(80).collect::<String>())
             .filter(|n| !n.trim().is_empty())
-            .unwrap_or_else(|| url.host_str().unwrap_or("Unknown client").to_owned());
+            .unwrap_or_else(|| {
+                url.host_str().unwrap_or("Unknown client").to_owned()
+            });
         let client = Client {
             client_id: client_id.to_owned(),
             client_name: name,
@@ -400,7 +431,8 @@ impl Identity {
         if cache.len() >= MAX_PENDING {
             cache.clear();
         }
-        let _ = cache.insert(client_id.to_owned(), (client.clone(), Instant::now()));
+        let _ = cache
+            .insert(client_id.to_owned(), (client.clone(), Instant::now()));
         drop(cache);
         Ok(client)
     }
@@ -423,22 +455,32 @@ impl Identity {
 
     /// Checks an authorization request from a signed-in user and prepares
     /// the consent screen.
-    pub async fn authorize(&self, user: UserId, request: &AuthorizeRequest) -> Authorize {
+    pub async fn authorize(
+        &self,
+        user: UserId,
+        request: &AuthorizeRequest,
+    ) -> Authorize {
         let Some(client_id) = request.client_id.as_deref() else {
             return Authorize::Fail("The request names no client.".to_owned());
         };
         let client = match self.resolve_client(client_id).await {
             Ok(c) => c,
             Err(e) => {
-                return Authorize::Fail(format!("The client cannot be used: {}.", e.message()));
+                return Authorize::Fail(format!(
+                    "The client cannot be used: {}.",
+                    e.message()
+                ));
             }
         };
         let Some(redirect_uri) = request.redirect_uri.clone() else {
-            return Authorize::Fail("The request names no redirect URI.".to_owned());
+            return Authorize::Fail(
+                "The request names no redirect URI.".to_owned(),
+            );
         };
         if !client.allows_redirect(&redirect_uri) {
             return Authorize::Fail(
-                "The redirect URI is not registered for this client.".to_owned(),
+                "The redirect URI is not registered for this client."
+                    .to_owned(),
             );
         }
         let issuer = self.config().base();
@@ -479,7 +521,10 @@ impl Identity {
             .filter(|s| ceiling.allows(*s))
             .collect();
         if scopes.is_empty() {
-            return fail("invalid_scope", "you hold none of the requested scopes");
+            return fail(
+                "invalid_scope",
+                "you hold none of the requested scopes",
+            );
         }
         let consent_id = match secret::generate(Kind::Consent) {
             Ok(id) => id,
@@ -509,9 +554,9 @@ impl Identity {
         };
         match self.hold_consent(&consent_id, pending, now) {
             Ok(true) => Authorize::Consent(view),
-            Ok(false) => {
-                Authorize::Fail("Too many sign-ins are pending; try again soon.".to_owned())
-            }
+            Ok(false) => Authorize::Fail(
+                "Too many sign-ins are pending; try again soon.".to_owned(),
+            ),
             Err(e) => Authorize::Fail(e.message().to_owned()),
         }
     }
@@ -537,19 +582,30 @@ impl Identity {
     }
 
     /// Answers a consent screen. Returns the URL to send the browser to.
+    /// `authenticated_at` is when the answering session last proved the
+    /// user's identity; the grant's tokens carry it (RT-039).
     ///
     /// # Errors
     ///
     /// [`ErrorKind::NotFound`] for an unknown, expired or someone else's
     /// consent.
-    pub fn decide(&self, user: UserId, consent_id: &str, approve: bool) -> Result<String, Error> {
+    pub fn decide(
+        &self,
+        user: UserId,
+        authenticated_at: Option<Timestamp>,
+        consent_id: &str,
+        approve: bool,
+    ) -> Result<String, Error> {
         let key = hash_key(&secret::hash(consent_id));
         let consent = self
             .store()
             .write(|s| s.oauth_consents.remove(&key))?
             .filter(|c| c.user == user && c.expires > Timestamp::now())
             .ok_or_else(|| {
-                Error::new(ErrorKind::NotFound, "this request has expired; start again")
+                Error::new(
+                    ErrorKind::NotFound,
+                    "this request has expired; start again",
+                )
             })?;
         let issuer = self.config().base();
         let mut params: Vec<(&str, &str)> = vec![("iss", issuer.as_str())];
@@ -570,6 +626,7 @@ impl Identity {
             scopes: consent.scopes,
             audience: consent.audience,
             challenge: consent.challenge,
+            auth_time: authenticated_at,
             expires: after(now, self.config().code_lifetime),
         };
         let stored = self.store().write(|s| {
@@ -588,7 +645,11 @@ impl Identity {
                 "too many pending sign-ins",
             ));
         }
-        tracing::info!(event = "identity.oauth_consented", user = %user, "OAuth access approved");
+        tracing::info!(
+            event = "identity.oauth_consented",
+            user = %user,
+            "OAuth access approved"
+        );
         params.push(("code", &code));
         Ok(with_params(&consent.redirect_uri, &params))
     }
@@ -598,7 +659,10 @@ impl Identity {
     /// # Errors
     ///
     /// An [`OAuthError`] to return as a 400 response.
-    pub fn token(&self, request: &TokenRequest) -> Result<TokenResponse, OAuthError> {
+    pub fn token(
+        &self,
+        request: &TokenRequest,
+    ) -> Result<TokenResponse, OAuthError> {
         match request.grant_type.as_deref() {
             Some("authorization_code") => self.exchange_code(request),
             Some("refresh_token") => self.refresh(request),
@@ -609,12 +673,14 @@ impl Identity {
         }
     }
 
-    fn exchange_code(&self, request: &TokenRequest) -> Result<TokenResponse, OAuthError> {
+    fn exchange_code(
+        &self,
+        request: &TokenRequest,
+    ) -> Result<TokenResponse, OAuthError> {
         let invalid = |why: &str| OAuthError::new("invalid_grant", why);
-        let code = request
-            .code
-            .as_deref()
-            .ok_or_else(|| OAuthError::new("invalid_request", "code is required"))?;
+        let code = request.code.as_deref().ok_or_else(|| {
+            OAuthError::new("invalid_request", "code is required")
+        })?;
         let key = hash_key(&secret::hash(code));
         let pending = self
             .store()
@@ -622,10 +688,14 @@ impl Identity {
             .map_err(|e| OAuthError::internal(&e))?
             .filter(|c| c.expires > Timestamp::now())
             .ok_or_else(|| invalid("the code is invalid, used or expired"))?;
-        if request.client_id.as_deref() != Some(pending.client.client_id.as_str()) {
+        if request.client_id.as_deref()
+            != Some(pending.client.client_id.as_str())
+        {
             return Err(invalid("the code was issued to another client"));
         }
-        if request.redirect_uri.as_deref() != Some(pending.redirect_uri.as_str()) {
+        if request.redirect_uri.as_deref()
+            != Some(pending.redirect_uri.as_str())
+        {
             return Err(invalid(
                 "redirect_uri does not match the authorization request",
             ));
@@ -649,7 +719,8 @@ impl Identity {
             _ => pending.audience,
         };
         let now = Timestamp::now();
-        let refresh = secret::generate(Kind::RefreshToken).map_err(|e| OAuthError::internal(&e))?;
+        let refresh = secret::generate(Kind::RefreshToken)
+            .map_err(|e| OAuthError::internal(&e))?;
         let refresh_hash = secret::hash(&refresh);
         let grant = Grant {
             id: secret::label(&refresh_hash),
@@ -659,25 +730,33 @@ impl Identity {
             scopes: pending.scopes,
             audience,
             created_at: now,
+            auth_time: pending.auth_time,
             refresh_hash,
             spent_refresh: Vec::new(),
-            refresh_expires_at: after(now, self.config().refresh_token_lifetime),
+            refresh_expires_at: after(
+                now,
+                self.config().refresh_token_lifetime,
+            ),
         };
         self.issue(grant, refresh, None)
     }
 
-    fn refresh(&self, request: &TokenRequest) -> Result<TokenResponse, OAuthError> {
+    fn refresh(
+        &self,
+        request: &TokenRequest,
+    ) -> Result<TokenResponse, OAuthError> {
         let invalid = |why: &str| OAuthError::new("invalid_grant", why);
-        let presented = request
-            .refresh_token
-            .as_deref()
-            .ok_or_else(|| OAuthError::new("invalid_request", "refresh_token is required"))?;
+        let presented = request.refresh_token.as_deref().ok_or_else(|| {
+            OAuthError::new("invalid_request", "refresh_token is required")
+        })?;
         let hash = secret::hash(presented);
         let now = Timestamp::now();
         let found = self.store().read(|s| {
             s.grants
                 .values()
-                .find(|g| g.refresh_hash == hash || g.spent_refresh.contains(&hash))
+                .find(|g| {
+                    g.refresh_hash == hash || g.spent_refresh.contains(&hash)
+                })
                 .cloned()
         });
         let Some(grant) = found else {
@@ -691,20 +770,26 @@ impl Identity {
                 let grants = &s.grants;
                 s.access_tokens.retain(|_, t| grants.contains_key(&t.grant));
             });
-            tracing::warn!(event = "identity.refresh_reuse", grant = %grant.id, "refresh token reused; grant revoked");
+            tracing::warn!(
+                event = "identity.refresh_reuse",
+                grant = %grant.id,
+                "refresh token reused; grant revoked"
+            );
             return Err(invalid("the refresh token was already used"));
         }
         if grant.refresh_expires_at <= now {
             return Err(invalid("the refresh token has expired"));
         }
         if request.client_id.as_deref() != Some(grant.client_id.as_str()) {
-            return Err(invalid("the refresh token was issued to another client"));
+            return Err(invalid(
+                "the refresh token was issued to another client",
+            ));
         }
         let scopes = match request.scope.as_deref() {
             None => grant.scopes.clone(),
             Some(text) => {
-                let asked =
-                    parse_scopes(Some(text)).map_err(|w| OAuthError::new("invalid_scope", w))?;
+                let asked = parse_scopes(Some(text))
+                    .map_err(|w| OAuthError::new("invalid_scope", w))?;
                 if asked.iter().any(|s| !grant.scopes.contains(s)) {
                     return Err(OAuthError::new(
                         "invalid_scope",
@@ -727,14 +812,16 @@ impl Identity {
             }
             None => grant.audience.clone(),
         };
-        let refresh = secret::generate(Kind::RefreshToken).map_err(|e| OAuthError::internal(&e))?;
+        let refresh = secret::generate(Kind::RefreshToken)
+            .map_err(|e| OAuthError::internal(&e))?;
         let mut next = grant.clone();
         next.spent_refresh.push(grant.refresh_hash);
         if next.spent_refresh.len() > 50 {
             let _ = next.spent_refresh.remove(0);
         }
         next.refresh_hash = secret::hash(&refresh);
-        next.refresh_expires_at = after(now, self.config().refresh_token_lifetime);
+        next.refresh_expires_at =
+            after(now, self.config().refresh_token_lifetime);
         self.issue(next, refresh, Some((scopes, audience)))
     }
 
@@ -747,11 +834,12 @@ impl Identity {
         refresh: String,
         narrowed: Option<(Vec<Scope>, Vec<String>)>,
     ) -> Result<TokenResponse, OAuthError> {
-        let access = secret::generate(Kind::AccessToken).map_err(|e| OAuthError::internal(&e))?;
+        let access = secret::generate(Kind::AccessToken)
+            .map_err(|e| OAuthError::internal(&e))?;
         let now = Timestamp::now();
         let lifetime = self.config().access_token_lifetime;
-        let (scopes, audience) =
-            narrowed.unwrap_or_else(|| (grant.scopes.clone(), grant.audience.clone()));
+        let (scopes, audience) = narrowed
+            .unwrap_or_else(|| (grant.scopes.clone(), grant.audience.clone()));
         let record = AccessToken {
             grant: grant.id.clone(),
             scopes: scopes.clone(),
@@ -768,7 +856,11 @@ impl Identity {
                 let _ = s.grants.insert(grant.id.clone(), grant);
             })
             .map_err(|e| OAuthError::internal(&e))?;
-        tracing::info!(event = "identity.oauth_token_issued", user = %user, "OAuth tokens issued");
+        tracing::info!(
+            event = "identity.oauth_token_issued",
+            user = %user,
+            "OAuth tokens issued"
+        );
         Ok(TokenResponse {
             access_token: access,
             token_type: "Bearer",
@@ -838,7 +930,9 @@ impl Identity {
                 s.access_tokens.retain(|_, t| grants.contains_key(&t.grant));
                 Ok(())
             }
-            _ => Err(Error::new(ErrorKind::NotFound, "connected app not found")),
+            _ => {
+                Err(Error::new(ErrorKind::NotFound, "connected app not found"))
+            }
         })?
     }
 }
@@ -870,7 +964,10 @@ mod tests {
     struct Document(String);
 
     impl ClientMetadataFetcher for Document {
-        fn fetch<'a>(&'a self, _url: &'a str) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
+        fn fetch<'a>(
+            &'a self,
+            _url: &'a str,
+        ) -> BoxFuture<'a, Result<Vec<u8>, Error>> {
             let body = self.0.clone().into_bytes();
             Box::pin(async move { Ok(body) })
         }
@@ -883,15 +980,17 @@ mod tests {
             redirect_uri.len()
         ));
         let store = crate::store::Store::open(&dir).unwrap();
-        let config =
-            crate::identity::IdentityConfig::new(Url::parse("https://vellum.example").unwrap());
+        let config = crate::identity::IdentityConfig::new(
+            Url::parse("https://vellum.example").unwrap(),
+        );
         let doc = json!({
             "client_id": "https://app.example/client.json",
             "client_name": "App",
             "redirect_uris": [redirect_uri],
         });
-        Identity::new(config, store)
-            .with_metadata_fetcher(std::sync::Arc::new(Document(doc.to_string())))
+        Identity::new(config, store).with_metadata_fetcher(std::sync::Arc::new(
+            Document(doc.to_string()),
+        ))
     }
 
     fn request(redirect_uri: &str) -> AuthorizeRequest {
@@ -919,8 +1018,12 @@ mod tests {
             "nodots:/cb",
         ] {
             let identity = identity_serving(bad);
-            let outcome = identity.authorize(UserId::generate(), &request(bad)).await;
-            assert!(matches!(outcome, Authorize::Fail(_)), "{bad} was accepted");
+            let outcome =
+                identity.authorize(UserId::generate(), &request(bad)).await;
+            assert!(
+                matches!(outcome, Authorize::Fail(_)),
+                "{bad} was accepted"
+            );
         }
         for good in [
             "https://app.example/cb",
@@ -928,8 +1031,12 @@ mod tests {
             "com.example.app:/oauth/cb",
         ] {
             let identity = identity_serving(good);
-            let outcome = identity.authorize(UserId::generate(), &request(good)).await;
-            assert!(!matches!(outcome, Authorize::Fail(_)), "{good} was refused");
+            let outcome =
+                identity.authorize(UserId::generate(), &request(good)).await;
+            assert!(
+                !matches!(outcome, Authorize::Fail(_)),
+                "{good} was refused"
+            );
         }
     }
 

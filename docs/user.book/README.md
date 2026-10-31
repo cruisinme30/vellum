@@ -22,7 +22,8 @@ work in Vellum. Two other books cover the rest:
 
 ::: cards
 
-- 🚀 **Start here** Your first page, the slash menu, sharing and export in ten minutes.
+- 🚀 **Start here** Your first page, the slash menu, sharing and export in ten
+  minutes.
 - ✍️ **Writing** Every block with the Markdown that makes it.
 - 📊 **Data** Collections with relations, rollups and formulas.
 - 📘 **Books** Documents made of documents, numbered and exportable.

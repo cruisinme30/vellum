@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-admin"
-description = "The audit/admin service: audit log, admin settings, anonymous telemetry, backups and the admin console API."
+description = """\
+    The audit/admin service: audit log, admin settings, anonymous telemetry, \
+    backups and the admin console API."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -24,8 +26,12 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 getrandom = "0.4.3"
 hex = "0.4.3"
 opentelemetry = "0.33.1"
-reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "blocking", "json"] }
-schemars = { version = "1", default-features = false, features = ["std", "derive"] }
+reqwest.version = "0.13.5"
+reqwest.default-features = false
+reqwest.features = ["rustls", "blocking", "json"]
+schemars.version = "1"
+schemars.default-features = false
+schemars.features = ["std", "derive"]
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 sha2 = "0.11.1"
@@ -38,7 +44,9 @@ vellum-kernel.workspace = true
 vellum-observe = { path = "../vellum-observe" }
 
 [dev-dependencies]
-proptest = ">=1.11.0, <1.12"
+proptest = ">=1.11.0, <1.13"
 tempfile = "3.27.0"
 tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread"] }
-tracing-subscriber = { version = "0.3.23", default-features = false, features = ["registry", "std"] }
+tracing-subscriber.version = "0.3.23"
+tracing-subscriber.default-features = false
+tracing-subscriber.features = ["registry", "std"]

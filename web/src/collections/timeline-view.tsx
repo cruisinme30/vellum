@@ -16,14 +16,17 @@ const MAX_DAYS = 366;
 
 /** The first day and the number of days the scale covers. */
 function scaleOf(spans: readonly DateSpan[]): { first: string; days: number } {
-  const starts = spans.map((s) => s.start).toSorted((a, b) => a.localeCompare(b));
+  const starts = spans
+    .map((s) => s.start)
+    .toSorted((a, b) => a.localeCompare(b));
   const ends = spans.map((s) => s.end).toSorted((a, b) => b.localeCompare(a));
   const first = addDays(starts[0] ?? today(), -MARGIN);
   const last = addDays(ends[0] ?? today(), MARGIN);
   return { first, days: Math.min(daysBetween(first, last) + 1, MAX_DAYS) };
 }
 
-const short = (day: string) => formatDay(day, { month: "short", day: "numeric" });
+const short = (day: string) =>
+  formatDay(day, { month: "short", day: "numeric" });
 
 /**
  * The timeline view: each row is a bar from its date to its end date over
@@ -32,13 +35,18 @@ const short = (day: string) => formatDay(day, { month: "short", day: "numeric" }
 export function TimelineView({ result, onOpen }: ViewProperties) {
   const t = useT();
   const rows = uniqueRows(result);
-  const dated = rows.filter((row): row is RowView & { span: DateSpan } => row.span !== undefined);
+  const dated = rows.filter(
+    (row): row is RowView & { span: DateSpan } => row.span !== undefined,
+  );
   const undated = rows.filter((row) => row.span === undefined);
   const { first, days } = scaleOf(dated.map((row) => row.span));
-  const scale = Array.from({ length: days }, (_, index) => addDays(first, index));
+  const scale = Array.from({ length: days }, (_, index) =>
+    addDays(first, index),
+  );
   const now = today();
   const style = { "--vl-days": String(days) } as CSSProperties;
-  const titleOf = (row: RowView) => (row.title === "" ? t("page-untitled") : row.title);
+  const titleOf = (row: RowView) =>
+    row.title === "" ? t("page-untitled") : row.title;
 
   return (
     <div className="vl-timeline-view">
@@ -56,14 +64,19 @@ export function TimelineView({ result, onOpen }: ViewProperties) {
           </div>
           <ul className="vl-timeline-rows" aria-label={result.view}>
             {dated.map((row) => {
-              const start = Math.min(Math.max(daysBetween(first, row.span.start), 0), days - 1);
+              const start = Math.min(
+                Math.max(daysBetween(first, row.span.start), 0),
+                days - 1,
+              );
               const end = Math.min(daysBetween(first, row.span.end), days - 1);
               return (
                 <li key={row.id} className="vl-timeline-row">
                   <button
                     type="button"
                     className="vl-timeline-bar"
-                    style={{ gridColumn: `${String(start + 1)} / ${String(end + 2)}` }}
+                    style={{
+                      gridColumn: `${String(start + 1)} / ${String(end + 2)}`,
+                    }}
                     onClick={() => {
                       onOpen(row.id);
                     }}

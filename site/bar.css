@@ -1,0 +1,216 @@
+/*
+ * SPDX-FileCopyrightText: 2026 The Vellum contributors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * The one site bar (site/bar.html) on every page of the website: the
+ * landing page, the docs home, every guide, the decision records and older
+ * releases' guides (ADR 0071, D310). The same file is loaded everywhere, so
+ * the bar cannot drift between page types. It wraps instead of pushing
+ * off screen (#248); theme.js keeps --vb-height at its real height, which
+ * the help books use to start the page below it. Sizes are in px, not rem: the
+ * landing page's 1rem is 16 px but a help book's is 10 px (D307).
+ *
+ * Colours are the landing page's Material 3 tokens. Dark follows the
+ * reader's toggle (theme.js puts data-theme on <html>), or the system
+ * setting before the script runs.
+ */
+
+:root {
+  --vb-bg: #ffffff;
+  --vb-ink: #1f1f1f;
+  --vb-ink-2: #444746;
+  --vb-line: #dde3ea;
+  --vb-line-strong: #c4c7c5;
+  --vb-primary: #0b57d0;
+  --vb-font:
+    "Google Sans Flex", "Vellum Sans Fallback", "Google Sans", Roboto,
+    system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --vb-height: 64px;
+}
+:root[data-theme="dark"] {
+  --vb-bg: #131314;
+  --vb-ink: #e3e3e3;
+  --vb-ink-2: #c4c7c5;
+  --vb-line: #333537;
+  --vb-line-strong: #444746;
+  --vb-primary: #a8c7fa;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --vb-bg: #131314;
+    --vb-ink: #e3e3e3;
+    --vb-ink-2: #c4c7c5;
+    --vb-line: #333537;
+    --vb-line-strong: #444746;
+    --vb-primary: #a8c7fa;
+  }
+}
+
+.vellum-site {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--vb-line);
+  background: color-mix(in srgb, var(--vb-bg) 92%, transparent);
+  backdrop-filter: saturate(1.4) blur(12px);
+  font: 400 15px/1.4 var(--vb-font);
+}
+.vellum-bar {
+  box-sizing: border-box;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 28px;
+  max-width: 1200px;
+  min-height: 64px;
+  margin-inline: auto;
+  padding: 8px 24px;
+}
+.vellum-brand {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 10px;
+  color: var(--vb-ink);
+  min-width: 0;
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+.vellum-brand img {
+  display: block;
+  width: 30px;
+  height: 30px;
+}
+.vellum-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.vellum-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--vb-ink-2);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+.vellum-nav a:hover,
+.vellum-nav a[aria-current] {
+  color: var(--vb-primary);
+}
+.vellum-nav a[aria-current] {
+  font-weight: 500;
+}
+.vellum-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+.vellum-github {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 8px 18px;
+  border: 1px solid var(--vb-line-strong);
+  border-radius: 999px;
+  color: var(--vb-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+.vellum-github:hover {
+  background: color-mix(in srgb, var(--vb-primary) 8%, transparent);
+}
+.vellum-site a:focus-visible,
+.vellum-site .theme-toggle:focus-visible {
+  outline: 3px solid var(--vb-primary);
+  outline-offset: 2px;
+}
+
+/* The light and dark toggle (theme.js, D308): a moon in light, a sun in dark.
+ */
+.vellum-site .theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--vb-line-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--vb-ink-2);
+  cursor: pointer;
+}
+:root:not([data-theme-toggle]) .vellum-site .theme-toggle,
+.vellum-site .theme-toggle[aria-pressed="true"] .theme-moon,
+.vellum-site .theme-toggle:not([aria-pressed="true"]) .theme-sun {
+  display: none;
+}
+.vellum-site .theme-toggle:hover {
+  background: color-mix(in srgb, var(--vb-primary) 8%, transparent);
+  color: var(--vb-primary);
+}
+
+/* Other releases' guides, at the end of the bar in a help book. */
+.vellum-versions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px 8px;
+  color: var(--vb-ink-2);
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+.vellum-versions a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--vb-ink-2);
+}
+.vellum-versions a[aria-current] {
+  color: var(--vb-primary);
+  font-weight: 600;
+}
+
+/* Narrow screens: the links move to a row of their own. */
+@media (max-width: 900px) {
+  :root {
+    --vb-height: 108px;
+  }
+  .vellum-bar {
+    gap: 6px 16px;
+    padding-inline: 16px;
+  }
+  .vellum-nav {
+    order: 3;
+    width: 100%;
+    padding-block-end: 4px;
+  }
+}
+
+@media (forced-colors: active) {
+  .vellum-site {
+    border-bottom-color: CanvasText;
+  }
+  .vellum-github,
+  .vellum-site .theme-toggle {
+    border-color: ButtonText;
+  }
+}
+
+@media print {
+  .vellum-site {
+    display: none;
+  }
+}

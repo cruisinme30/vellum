@@ -82,7 +82,11 @@ impl From<&InboxEntry> for InboxItem {
 }
 
 /// Adds `notification` to the front of `inbox` under `id`.
-pub fn add(inbox: &mut Vec<InboxEntry>, notification: &Notification, id: String) {
+pub fn add(
+    inbox: &mut Vec<InboxEntry>,
+    notification: &Notification,
+    id: String,
+) {
     inbox.retain(|e| e.read || e.subject != notification.subject);
     inbox.insert(
         0,
@@ -132,7 +136,8 @@ mod tests {
             body: String::new(),
             url: format!("/issue/{subject}"),
             actor: Some("ada".to_owned()),
-            at: Timestamp::from_second(minute * 60).unwrap_or(Timestamp::UNIX_EPOCH),
+            at: Timestamp::from_second(minute * 60)
+                .unwrap_or(Timestamp::UNIX_EPOCH),
         }
     }
 

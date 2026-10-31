@@ -12,7 +12,8 @@ use opentelemetry::KeyValue;
 use opentelemetry::metrics::Counter;
 use vellum_crypto::{CryptoError, KeyProvider};
 use vellum_store::{
-    Blob, BlobEntry, BlobMeta, BlobPath, BlobStore, Precondition, StoreError, StoreResult,
+    Blob, BlobEntry, BlobMeta, BlobPath, BlobStore, Precondition, StoreError,
+    StoreResult,
 };
 
 use crate::policy::{Mode, ModePolicy};
@@ -41,7 +42,9 @@ pub struct Sealed<S, K, P> {
     plaintext_reads: Counter<u64>,
 }
 
-impl<S: BlobStore, K: KeyProvider + std::fmt::Debug, P: ModePolicy> Sealed<S, K, P> {
+impl<S: BlobStore, K: KeyProvider + std::fmt::Debug, P: ModePolicy>
+    Sealed<S, K, P>
+{
     /// Wraps `inner`, sealing with `keys` wherever `policy` says encrypted.
     pub fn new(inner: S, keys: Arc<K>, policy: P) -> Self {
         let plaintext_reads = opentelemetry::global::meter("vellum")
@@ -61,6 +64,11 @@ impl<S: BlobStore, K: KeyProvider + std::fmt::Debug, P: ModePolicy> Sealed<S, K,
         &self.inner
     }
 
+    /// The key provider objects are sealed with.
+    pub fn keys(&self) -> &K {
+        &self.keys
+    }
+
     /// Rewrites one object into the form the policy wants now: seals
     /// plaintext in an encrypted space, re-wraps envelopes whose KEK is not
     /// current (rotation), and opens envelopes in a plaintext space. Uses
@@ -70,7 +78,11 @@ impl<S: BlobStore, K: KeyProvider + std::fmt::Debug, P: ModePolicy> Sealed<S, K,
     /// # Errors
     /// Store errors, including `PreconditionFailed` on a race, and
     /// `Backend` for encryption failures.
-    #[tracing::instrument(name = "sealed.reseal", skip(self), fields(path = %path))]
+    #[tracing::instrument(
+        name = "sealed.reseal",
+        skip(self),
+        fields(path = %path)
+    )]
     pub async fn reseal(&self, path: &BlobPath) -> StoreResult<bool> {
         let blob = self.inner.get(path).await?;
         if vellum_crypto::recipients::is_recipient_envelope(&blob.bytes) {
@@ -78,9 +90,11 @@ impl<S: BlobStore, K: KeyProvider + std::fmt::Debug, P: ModePolicy> Sealed<S, K,
         }
         let sealed = vellum_crypto::is_envelope(&blob.bytes);
         let next = match (self.policy.mode_for(path), sealed) {
-            (Mode::Encrypted, true) => vellum_crypto::rewrap(self.keys.as_ref(), &blob.bytes)
-                .await
-                .map_err(crypto_error)?,
+            (Mode::Encrypted, true) => {
+                vellum_crypto::rewrap(self.keys.as_ref(), &blob.bytes)
+                    .await
+                    .map_err(crypto_error)?
+            }
             (Mode::Encrypted, false) => Some(
                 vellum_crypto::seal(self.keys.as_ref(), &blob.bytes)
                     .await
@@ -102,7 +116,11 @@ impl<S: BlobStore, K: KeyProvider + std::fmt::Debug, P: ModePolicy> Sealed<S, K,
         Ok(true)
     }
 
-    async fn decode(&self, path: &BlobPath, stored: Bytes) -> StoreResult<Bytes> {
+    async fn decode(
+        &self,
+        path: &BlobPath,
+        stored: Bytes,
+    ) -> StoreResult<Bytes> {
         // E2E ciphertext is returned as is: only members' devices open it.
         if vellum_crypto::recipients::is_recipient_envelope(&stored) {
             return Ok(stored);
@@ -116,7 +134,8 @@ impl<S: BlobStore, K: KeyProvider + std::fmt::Debug, P: ModePolicy> Sealed<S, K,
         if self.policy.mode_for(path) == Mode::Encrypted {
             self.plaintext_reads
                 .add(1, &[KeyValue::new("backend", self.inner.backend())]);
-            tracing::warn!(path = %path, "plaintext object in an encrypted space; reseal it");
+            tracing::warn!(path = %path, "plaintext object in an encrypted \
+                space; reseal it");
         }
         Ok(stored)
     }
@@ -159,13 +178,19 @@ where
     ) -> StoreResult<BlobMeta> {
         let size = len(&bytes);
         let stored = match self.policy.mode_for(path) {
+            // E2E ciphertext stays as the clients sealed it, so members'
+            // devices can read it straight from the folder or bucket.
+            Mode::Encrypted | Mode::EndToEnd
+                if vellum_crypto::recipients::is_recipient_envelope(&bytes) =>
+            {
+                bytes
+            }
             Mode::Encrypted => Bytes::from(
                 vellum_crypto::seal(self.keys.as_ref(), &bytes)
                     .await
                     .map_err(crypto_error)?,
             ),
             Mode::Plaintext => bytes,
-            Mode::EndToEnd if vellum_crypto::recipients::is_recipient_envelope(&bytes) => bytes,
             Mode::EndToEnd => {
                 return Err(StoreError::Backend(
                     "E2E private space accepts only recipient envelopes".into(),
@@ -176,16 +201,27 @@ where
         Ok(BlobMeta { size, ..meta })
     }
 
-    async fn delete(&self, path: &BlobPath, condition: Precondition) -> StoreResult<()> {
+    async fn delete(
+        &self,
+        path: &BlobPath,
+        condition: Precondition,
+    ) -> StoreResult<()> {
         self.inner.delete(path, condition).await
     }
 
-    async fn rename(&self, from: &BlobPath, to: &BlobPath) -> StoreResult<BlobMeta> {
+    async fn rename(
+        &self,
+        from: &BlobPath,
+        to: &BlobPath,
+    ) -> StoreResult<BlobMeta> {
         let _ = self.inner.rename(from, to).await?;
         self.head(to).await
     }
 
-    fn list(&self, dir: Option<&BlobPath>) -> BoxStream<'static, StoreResult<BlobEntry>> {
+    fn list(
+        &self,
+        dir: Option<&BlobPath>,
+    ) -> BoxStream<'static, StoreResult<BlobEntry>> {
         self.inner.list(dir)
     }
 }

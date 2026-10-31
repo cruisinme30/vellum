@@ -104,7 +104,10 @@ pub mod blob_path {
     ///
     /// # Errors
     /// Only the serializer's own errors.
-    pub fn serialize<S: Serializer>(path: &BlobPath, serializer: S) -> Result<S::Ok, S::Error> {
+    pub fn serialize<S: Serializer>(
+        path: &BlobPath,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(path.as_str())
     }
 
@@ -112,7 +115,9 @@ pub mod blob_path {
     ///
     /// # Errors
     /// Fails for text that is not a valid [`BlobPath`].
-    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<BlobPath, D::Error> {
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<BlobPath, D::Error> {
         let text = String::deserialize(deserializer)?;
         BlobPath::new(text).map_err(D::Error::custom)
     }
@@ -133,7 +138,10 @@ pub fn to_yaml<T: Serialize>(value: &T) -> DriveResult<String> {
 ///
 /// # Errors
 /// Returns [`DriveError::Malformed`] when the bytes are not the expected YAML.
-pub fn from_yaml<T: DeserializeOwned>(path: &BlobPath, bytes: &[u8]) -> DriveResult<T> {
+pub fn from_yaml<T: DeserializeOwned>(
+    path: &BlobPath,
+    bytes: &[u8],
+) -> DriveResult<T> {
     serde_saphyr::from_slice(bytes).map_err(|e| DriveError::Malformed {
         path: path.to_string(),
         reason: e.to_string(),

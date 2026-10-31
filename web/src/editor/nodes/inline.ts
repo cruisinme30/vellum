@@ -12,7 +12,7 @@ import type { NodeType } from "@tiptap/pm/model";
 
 import type { NodeName } from "../schema/blocks.gen";
 import { nodeSpec, tiptapAttributes } from "../schema/spec";
-import { safeUrl } from "../urls";
+import { mediaUrl } from "../urls";
 
 /**
  * An input rule that turns the `token` group of a match into an inline atom
@@ -21,12 +21,17 @@ import { safeUrl } from "../urls";
 export function atomRule(
   find: InputRuleFinder,
   type: () => NodeType,
-  attributes: (groups: Record<string, string | undefined>) => Record<string, string>,
+  attributes: (
+    groups: Record<string, string | undefined>,
+  ) => Record<string, string>,
 ) {
   return new InputRule({
     find,
     handler: ({ state, range, match }) => {
-      const groups = (match.groups ?? match.data ?? {}) as Record<string, string | undefined>;
+      const groups = (match.groups ?? match.data ?? {}) as Record<
+        string,
+        string | undefined
+      >;
       const token = groups["token"] ?? match[0];
       const offset = match[0].lastIndexOf(token);
       const tail = match[0].slice(offset + token.length);
@@ -46,7 +51,12 @@ export function formatDate(value: string, locale = "en"): string {
   if (!parsed) {
     return value;
   }
-  const [, year, month, day] = parsed.map(Number) as [number, number, number, number];
+  const [, year, month, day] = parsed.map(Number) as [
+    number,
+    number,
+    number,
+    number,
+  ];
   return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString(locale, {
     month: "short",
     day: "numeric",
@@ -64,12 +74,16 @@ const inlineBase = (name: NodeName) => {
     atom: true,
     selectable: true,
     addAttributes: () => tiptapAttributes(spec),
-    // Above the default 50: a wiki link is an `<a href>`, which the link mark would take.
+    // Above the default 50: a wiki link is an `<a href>`, which the link mark
+    // would take.
     parseHTML: () => [{ tag: `[data-type="${spec.name}"]`, priority: 60 }],
   };
 };
 
-/** Finds `[[Target]]` or `[[Target|label]]` just typed, without a backtracking regex. */
+/**
+ * Finds `[[Target]]` or `[[Target|label]]` just typed, without a backtracking
+ * regex.
+ */
 export function findWikiLink(text: string): InputRuleMatch | null {
   const start = text.lastIndexOf("[[");
   if (!text.endsWith("]]") || start === -1 || start > text.length - 5) {
@@ -89,7 +103,9 @@ export function findWikiLink(text: string): InputRuleMatch | null {
 }
 
 /** Resolves a wikilink target to a page, for its label and link. */
-export type ResolvePage = (target: string) => { id: string; title: string } | undefined;
+export type ResolvePage = (
+  target: string,
+) => { id: string; title: string } | undefined;
 
 const handle = String.raw`[a-z][a-z0-9_/-]*`;
 
@@ -98,14 +114,19 @@ export const Mention = Node.create({
   ...inlineBase("mention"),
   renderHTML: ({ node, HTMLAttributes }) => [
     "span",
-    mergeAttributes(HTMLAttributes, { "data-type": "mention", class: "vl-chip vl-mention" }),
+    mergeAttributes(HTMLAttributes, {
+      "data-type": "mention",
+      class: "vl-chip vl-mention",
+    }),
     `@${String(node.attrs["handle"])}`,
   ],
   renderText: ({ node }) => `@${String(node.attrs["handle"])}`,
   addInputRules() {
     return [
       atomRule(
-        new RegExp(String.raw`(?:^|\s)(?<token>@(?!today\b)(?<handle>${handle}))\s$`),
+        new RegExp(
+          String.raw`(?:^|\s)(?<token>@(?!today\b)(?<handle>${handle}))\s$`,
+        ),
         () => this.type,
         (g) => ({ handle: g["handle"] ?? "" }),
       ),
@@ -137,7 +158,10 @@ export const WikiLink = Node.create<{ resolve?: ResolvePage }>({
       atomRule(
         findWikiLink,
         () => this.type,
-        (g) => ({ target: g["target"]?.trim() ?? "", label: g["label"]?.trim() ?? "" }),
+        (g) => ({
+          target: g["target"]?.trim() ?? "",
+          label: g["label"]?.trim() ?? "",
+        }),
       ),
     ];
   },
@@ -148,7 +172,10 @@ export const IssueKey = Node.create({
   ...inlineBase("issueKey"),
   renderHTML: ({ node, HTMLAttributes }) => [
     "span",
-    mergeAttributes(HTMLAttributes, { "data-type": "issueKey", class: "vl-chip vl-issue" }),
+    mergeAttributes(HTMLAttributes, {
+      "data-type": "issueKey",
+      class: "vl-chip vl-issue",
+    }),
     String(node.attrs["key"]),
   ],
   renderText: ({ node }) => String(node.attrs["key"]),
@@ -203,7 +230,10 @@ export const MathInline = Node.create({
   ...inlineBase("mathInline"),
   renderHTML: ({ node, HTMLAttributes }) => [
     "span",
-    mergeAttributes(HTMLAttributes, { "data-type": "mathInline", class: "vl-math-inline" }),
+    mergeAttributes(HTMLAttributes, {
+      "data-type": "mathInline",
+      class: "vl-math-inline",
+    }),
     String(node.attrs["literal"]),
   ],
   renderText: ({ node }) => `$${String(node.attrs["literal"])}$`,
@@ -224,7 +254,7 @@ export const InlineImage = Node.create({
   draggable: true,
   parseHTML: () => [{ tag: 'img[data-type="inlineImage"]', priority: 60 }],
   renderHTML: ({ node, HTMLAttributes }) => {
-    const source = safeUrl(String(node.attrs["src"]));
+    const source = mediaUrl(String(node.attrs["src"]));
     const title = String(node.attrs["title"]);
     return [
       "img",
@@ -237,5 +267,6 @@ export const InlineImage = Node.create({
       }),
     ];
   },
-  renderText: ({ node }) => `![${String(node.attrs["alt"])}](${String(node.attrs["src"])})`,
+  renderText: ({ node }) =>
+    `![${String(node.attrs["alt"])}](${String(node.attrs["src"])})`,
 });

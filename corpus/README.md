@@ -14,5 +14,5 @@ Export goldens live in `export/`, mirroring `format/` and `guide/`: for
 every page, `.pdf.txt` is the print PDF's text page by page and
 `.docx.txt` the Word file's structure (paragraph styles, list levels and
 table rows). Rewrite them with `VELLUM_BLESS=1 cargo test -p
-vellum-export --test golden` after an intended change, and review the
+vellum-export --test it golden::` after an intended change, and review the
 diff.

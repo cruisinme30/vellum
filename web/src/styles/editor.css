@@ -30,11 +30,15 @@
   min-width: 0;
 }
 
+/* Wraps on a phone, where the page actions do not fit beside Done. */
 .vl-editor-save {
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
+  min-width: 0;
   margin-inline-start: auto;
 }
 
@@ -42,7 +46,10 @@
   padding-inline: 8px;
   color: var(--md-on-surface-variant);
   font-size: 0.875rem;
-  white-space: nowrap;
+}
+
+.vl-save-status[data-joining] {
+  visibility: hidden;
 }
 
 .vl-save-status[data-status="failed"] {
@@ -61,6 +68,33 @@
   background: var(--md-secondary-container);
   color: var(--md-on-secondary-container);
   font-size: 0.875rem;
+}
+
+.vl-secrets-banner {
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  border-radius: var(--vl-radius-m);
+  border-left: 4px solid var(--md-error);
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.vl-secrets-banner p {
+  margin: 0 0 4px;
+}
+
+.vl-secrets-banner ul {
+  margin: 0;
+  padding-left: 1.25em;
+}
+
+.vl-secrets-banner li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
 }
 
 .vl-toolbar-gap {
@@ -239,6 +273,21 @@
 .vl-issue {
   font-family: var(--vl-mono);
   font-size: 0.8125em;
+}
+
+.vl-issue[role="link"] {
+  cursor: pointer;
+}
+
+/* Live status after the key (#93). */
+.vl-issue-state {
+  margin-inline-start: 6px;
+  font-family: var(--vl-font, inherit);
+  opacity: 0.85;
+}
+
+.vl-issue[data-closed="true"] > span:first-child {
+  text-decoration: line-through;
 }
 
 .vl-wikilink {
@@ -656,7 +705,7 @@
   inset-inline-start: -1px;
   padding: 0 4px;
   border-radius: 4px 4px 4px 0;
-  color: #ffffff;
+  color: #ffffff; /* fixed: on the fixed caret colours, not a theme token */
   font-size: 0.75rem;
   font-weight: 500;
   line-height: 1.4;
@@ -804,4 +853,263 @@
 .vl-version-confirm p {
   flex-basis: 100%;
   margin: 0;
+}
+
+/* Comments (#94): a side panel like version history. */
+.vl-comments {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-end: 0;
+  z-index: 44;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(400px, 100vw);
+  padding: 16px 20px 32px;
+  overflow-y: auto;
+  background: var(--md-surface-container-low);
+  color: var(--md-on-surface);
+  box-shadow: -2px 0 12px rgb(0 0 0 / 20%);
+}
+
+.vl-comments-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vl-comments-head h2 {
+  margin: 6px 0 4px;
+  font-size: 1.5rem;
+  font-weight: 400;
+}
+
+.vl-comment-form,
+.vl-assign-form {
+  display: grid;
+  gap: 8px;
+}
+
+.vl-comment-form label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+
+.vl-comment-form textarea,
+.vl-comment-form input,
+.vl-assign-form input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--vl-radius-m);
+  background: var(--md-surface);
+  color: inherit;
+  font: inherit;
+}
+
+.vl-comment-form .vl-filled-button {
+  justify-self: start;
+}
+
+.vl-assign-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.vl-comment-anchor {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.vl-segmented {
+  display: inline-flex;
+  align-self: start;
+  border: 1px solid var(--md-outline);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.vl-segmented button {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The group clips its corners, so the focus ring draws inside the button. */
+.vl-segmented button:focus-visible {
+  outline-offset: -3px;
+}
+
+.vl-segmented button + button {
+  border-inline-start: 1px solid var(--md-outline);
+}
+
+.vl-segmented button[aria-pressed="true"] {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.vl-thread-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-thread {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--vl-radius-m);
+  background: var(--md-surface);
+  outline: 1px solid var(--md-outline-variant);
+}
+
+.vl-thread-active {
+  outline: 2px solid var(--md-primary);
+}
+
+.vl-thread-quote {
+  margin: 0;
+  padding-inline-start: 8px;
+  border-inline-start: 3px solid var(--md-primary);
+  color: var(--md-on-surface-variant);
+  overflow-wrap: anywhere;
+}
+
+.vl-thread .vl-comment-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-comment p {
+  margin: 0;
+}
+
+.vl-comment-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vl-thread-meta {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.vl-thread-actions,
+.vl-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.vl-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 40px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 16px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.vl-reaction[aria-pressed="true"] {
+  border-color: var(--md-primary);
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.vl-model-badge {
+  margin-inline-start: 6px;
+}
+
+/* Blocks with open threads. */
+.vl-prose .vl-commented {
+  background: color-mix(in srgb, var(--md-primary-container) 45%, transparent);
+  box-shadow: -3px 0 0 var(--md-primary);
+}
+
+.vl-prose .vl-commented-active {
+  background: var(--md-primary-container);
+}
+
+/* File an issue from a selection (R-WK-7). */
+.vl-file-issue {
+  display: grid;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+}
+
+.vl-file-issue label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.875rem;
+}
+
+.vl-file-issue input,
+.vl-file-issue select {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--vl-radius-m);
+  background: var(--md-surface);
+  color: inherit;
+  font: inherit;
+}
+
+.vl-file-issue-anchor {
+  position: relative;
+}
+
+.vl-file-issue-popover {
+  top: calc(100% + 4px);
+  inset-inline-end: 0;
+}
+
+/* Who else has the page open (#98). */
+.vl-presence {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 4px;
+  list-style: none;
+}
+
+.vl-avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-inline-start: -6px;
+  border: 2px solid var(--md-surface);
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.vl-avatar:first-child {
+  margin-inline-start: 0;
+}
+
+.vl-avatar-more {
+  background: var(--md-surface-container-highest);
+  color: var(--md-on-surface);
 }

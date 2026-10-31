@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// Conditional skips say why in their message: a browser or setup lacks the feature.
+// Conditional skips say why in their message: a browser or setup lacks the
+// feature.
 /* eslint-disable sonarjs/no-skipped-tests */
 
 import { expect, test } from "./fixtures";
@@ -18,6 +19,12 @@ import { TARGETS } from "./targets";
  */
 const DEFAULT_MODE = MODES[0]?.name;
 
+// The stand-in servers answer on the browser context. WebKit sends a
+// request its service worker makes past those routes to the real preview
+// server, which answers 404 (D285), so the audit runs without one. The
+// loading spec covers the service worker.
+test.use({ serviceWorkers: "block" });
+
 for (const target of TARGETS) {
   test.describe(target.name, () => {
     for (const mode of MODES) {
@@ -29,7 +36,10 @@ for (const target of TARGETS) {
           "Chromium-only media feature",
         );
         const problems = await auditTarget(page, target, mode, testInfo);
-        const { fresh, known } = triage(problems, `${target.name} › ${mode.name}`);
+        const { fresh, known } = triage(
+          problems,
+          `${target.name} › ${mode.name}`,
+        );
         for (const description of known)
           testInfo.annotations.push({ type: "known issue", description });
         expect(describe(fresh)).toEqual([]);

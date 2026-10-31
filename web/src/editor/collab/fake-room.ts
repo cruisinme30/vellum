@@ -37,7 +37,8 @@ export class FakeRoom {
 
   constructor() {
     // The room keeps no awareness of its own.
-    // eslint-disable-next-line unicorn/no-null -- y-protocols removes a state with null
+    // Y-protocols removes a state with null.
+    // eslint-disable-next-line unicorn/no-null
     this.awareness.setLocalState(null);
   }
 
@@ -83,7 +84,10 @@ export class FakeRoom {
       switch (message.type) {
         case "sync-step-1": {
           socket.deliver([
-            { type: "sync-step-2", update: Y.encodeStateAsUpdate(this.doc, message.stateVector) },
+            {
+              type: "sync-step-2",
+              update: Y.encodeStateAsUpdate(this.doc, message.stateVector),
+            },
           ]);
           break;
         }
@@ -104,7 +108,9 @@ export class FakeRoom {
         }
         case "custom": {
           if (message.tag === MSG_DONE && this.answerDone) {
-            socket.deliver([{ type: "custom", tag: MSG_DONE, payload: new Uint8Array() }]);
+            socket.deliver([
+              { type: "custom", tag: MSG_DONE, payload: new Uint8Array() },
+            ]);
           }
           break;
         }

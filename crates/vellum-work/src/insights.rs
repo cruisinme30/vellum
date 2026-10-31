@@ -25,7 +25,9 @@ use crate::issue::Issue;
 pub const MAX_DAYS: i64 = 2 * 366;
 
 /// What to measure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Measure {
     /// Created to completed, for issues completed in the range.
@@ -51,7 +53,10 @@ impl Measure {
 
     /// The moment that places an issue in the range, and the duration it
     /// contributes, if any.
-    fn sample(self, issue: &Issue) -> Option<(OffsetDateTime, Option<Duration>)> {
+    fn sample(
+        self,
+        issue: &Issue,
+    ) -> Option<(OffsetDateTime, Option<Duration>)> {
         match self {
             Self::LeadTime => issue
                 .completed_at
@@ -60,7 +65,9 @@ impl Measure {
                 .completed_at
                 .zip(issue.started_at)
                 .map(|(done, start)| (done, Some(done - start))),
-            Self::TriageTime => issue.triaged_at.map(|at| (at, Some(at - issue.created_at))),
+            Self::TriageTime => {
+                issue.triaged_at.map(|at| (at, Some(at - issue.created_at)))
+            }
             Self::Throughput => issue.completed_at.map(|done| (done, None)),
             Self::Created => Some((issue.created_at, None)),
         }
@@ -68,7 +75,9 @@ impl Measure {
 }
 
 /// How to break results down.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Pivot {
     /// One bucket with everything.
@@ -96,7 +105,9 @@ impl Pivot {
         match self {
             Self::None => vec![None],
             Self::Team => vec![Some(issue.team.to_string())],
-            Self::Assignee => vec![issue.assignee.as_ref().map(ToString::to_string)],
+            Self::Assignee => {
+                vec![issue.assignee.as_ref().map(ToString::to_string)]
+            }
             Self::Priority => vec![Some(issue.priority.to_string())],
             Self::Label if issue.labels.is_empty() => vec![None],
             Self::Label => issue.labels.iter().cloned().map(Some).collect(),
@@ -121,7 +132,11 @@ impl Interval {
     /// The start of the interval holding `day`.
     fn start(self, day: Date) -> Date {
         match self {
-            Self::Week => day - Duration::days(i64::from(day.weekday().number_days_from_monday())),
+            Self::Week => {
+                day - Duration::days(i64::from(
+                    day.weekday().number_days_from_monday(),
+                ))
+            }
             Self::Month => day.replace_day(1).unwrap_or(day),
         }
     }
@@ -221,7 +236,10 @@ impl Stats {
         durations.sort_unstable();
         let hours = |d: Duration| d.as_seconds_f64() / 3600.0;
         let total: Duration = durations.iter().copied().sum();
-        #[allow(clippy::cast_precision_loss, reason = "counts are far below 2^52")]
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "counts are far below 2^52"
+        )]
         let mean = hours(total) / durations.len() as f64;
         Self {
             count,
@@ -276,7 +294,12 @@ type Samples = Vec<(Date, Option<Duration>)>;
 /// # Errors
 ///
 /// Returns the [`Query::check`] error.
-pub fn run(graph: &WorkGraph, query: &Query, ctx: &Ctx, me: Option<&UserRef>) -> Result<Insights> {
+pub fn run(
+    graph: &WorkGraph,
+    query: &Query,
+    ctx: &Ctx,
+    me: Option<&UserRef>,
+) -> Result<Insights> {
     query.check()?;
     let ectx = graph.eval_context(ctx, me);
     let from = query.from.with_time(Time::MIDNIGHT).assume_utc();
@@ -320,11 +343,17 @@ pub fn run(graph: &WorkGraph, query: &Query, ctx: &Ctx, me: Option<&UserRef>) ->
 }
 
 fn summarise(samples: &Samples) -> Stats {
-    let mut durations: Vec<Duration> = samples.iter().filter_map(|(_, d)| *d).collect();
+    let mut durations: Vec<Duration> =
+        samples.iter().filter_map(|(_, d)| *d).collect();
     Stats::of(samples.len(), &mut durations)
 }
 
-fn series(samples: &Samples, interval: Interval, from: Date, to: Date) -> Vec<Point> {
+fn series(
+    samples: &Samples,
+    interval: Interval,
+    from: Date,
+    to: Date,
+) -> Vec<Point> {
     let mut out = Vec::new();
     let mut start = interval.start(from);
     while start < to {

@@ -11,9 +11,12 @@ in version history and never go stale as screenshots.
 
 ::: cards
 
-- 🧜 **Mermaid** Every Mermaid diagram type, rendered on the server and themed to the page.
-- 🏛 **Architecture** Lanes and arrows for system overviews, with no layout to fight.
-- 🧰 **Kroki** D2, PlantUML, Graphviz, Excalidraw and draw.io, when your admin enables the Kroki service.
+- 🧜 **Mermaid** Every Mermaid diagram type, rendered on the server and themed to
+  the page.
+- 🏛 **Architecture** Lanes and arrows for system overviews, with no layout to
+  fight.
+- 🧰 **Kroki** D2, PlantUML, Graphviz, Excalidraw and draw.io, when your admin
+  enables the Kroki service.
 
 :::
 
@@ -35,5 +38,7 @@ block menu. **Copy source** copies the text.
 ## In this part
 
 - [Mermaid diagrams](mermaid.md) shows every Mermaid type.
-- [Architecture and Kroki diagrams](kroki.md) covers the `architecture` fence and the Kroki types.
-- [Diagram errors](errors.md) explains what you see when a diagram does not parse.
+- [Architecture and Kroki diagrams](kroki.md) covers the `architecture` fence
+  and the Kroki types.
+- [Diagram errors](errors.md) explains what you see when a diagram does not
+  parse.

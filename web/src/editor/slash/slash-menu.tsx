@@ -1,7 +1,13 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 
 import type { Translate } from "../../i18n/i18n";
 import { Icon } from "../../shell/icon";
@@ -17,15 +23,32 @@ export interface SlashMenuProperties {
   readonly listId: string;
   readonly onActive: (optionId: string | undefined) => void;
   readonly ref?: Ref<SlashMenuHandle>;
+  /**
+   * Message IDs of the list's name and its empty state; the block menu's by
+   * default.
+   */
+  readonly labelKey?: string;
+  readonly emptyKey?: string;
 }
 
-/** Lets the editor forward arrow keys and Enter while focus stays in the text. */
+/**
+ * Lets the editor forward arrow keys and Enter while focus stays in the text.
+ */
 export interface SlashMenuHandle {
   onKeyDown: (event: KeyboardEvent) => boolean;
 }
 
 /** The slash menu: a listbox the editor drives with `aria-activedescendant`. */
-export function SlashMenu({ items, command, t, listId, onActive, ref }: SlashMenuProperties) {
+export function SlashMenu({
+  items,
+  command,
+  t,
+  listId,
+  onActive,
+  ref,
+  labelKey = "slash-label",
+  emptyKey = "slash-empty",
+}: SlashMenuProperties) {
   const [active, setActive] = useState(0);
   const list = useRef<HTMLDivElement>(null);
   const index = Math.min(active, Math.max(0, items.length - 1));
@@ -40,7 +63,9 @@ export function SlashMenu({ items, command, t, listId, onActive, ref }: SlashMen
   useEffect(() => {
     onActive(current ? `${listId}-${current.id}` : undefined);
     if (current) {
-      const option = list.current?.querySelector("#" + CSS.escape(`${listId}-${current.id}`));
+      const option = list.current?.querySelector(
+        "#" + CSS.escape(`${listId}-${current.id}`),
+      );
       if (option && "scrollIntoView" in option) {
         option.scrollIntoView({ block: "nearest" });
       }
@@ -78,14 +103,17 @@ export function SlashMenu({ items, command, t, listId, onActive, ref }: SlashMen
   if (items.length === 0) {
     return (
       <div className="vl-slash" role="status">
-        <p className="vl-muted">{t("slash-empty")}</p>
+        <p className="vl-muted">{t(emptyKey)}</p>
       </div>
     );
   }
 
   // Consecutive entries of one section form a group, so the visual order
   // is always the order the arrow keys walk.
-  const runs: { section: string; entries: { item: SlashItem; position: number }[] }[] = [];
+  const runs: {
+    section: string;
+    entries: { item: SlashItem; position: number }[];
+  }[] = [];
   for (const [position, item] of items.entries()) {
     const last = runs.at(-1);
     if (last?.section === item.section) {
@@ -95,14 +123,23 @@ export function SlashMenu({ items, command, t, listId, onActive, ref }: SlashMen
     }
   }
   return (
-    <div className="vl-slash" id={listId} role="listbox" aria-label={t("slash-label")} ref={list}>
+    <div
+      className="vl-slash"
+      id={listId}
+      role="listbox"
+      aria-label={t(labelKey)}
+      ref={list}
+    >
       {runs.map((run, runIndex) => (
         <div
           key={`${run.section}-${String(runIndex)}`}
           role="group"
           aria-labelledby={`${listId}-group-${String(runIndex)}`}
         >
-          <div className="vl-slash-section" id={`${listId}-group-${String(runIndex)}`}>
+          <div
+            className="vl-slash-section"
+            id={`${listId}-group-${String(runIndex)}`}
+          >
             {run.section}
           </div>
           {run.entries.map(({ item, position }) => (

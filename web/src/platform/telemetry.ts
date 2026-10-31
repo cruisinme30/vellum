@@ -12,7 +12,10 @@ type Attributes = Readonly<Record<string, string | number | boolean>>;
 
 /** Where measurements go. */
 export interface TelemetrySink {
-  /** Records one value of a histogram, in milliseconds unless the name says otherwise. */
+  /**
+   * Records one value of a histogram, in milliseconds unless the name says
+   * otherwise.
+   */
   histogram(name: string, value: number, attributes?: Attributes): void;
   /** Adds to a counter. */
   count(name: string, attributes?: Attributes): void;

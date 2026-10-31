@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { customScheme, validateTheme, type CustomTheme } from "./theme-file";
 import {
   buildScheme,
   DEFAULT_SEED,
@@ -11,24 +12,94 @@ import {
 } from "./themes";
 
 /** Interface density (R-TH-5). */
-type Density = "comfortable" | "compact";
+export const DENSITIES = ["comfortable", "compact", "spacious"] as const;
+type Density = (typeof DENSITIES)[number];
+
+/**
+ * Motion: follow the system setting, or always reduce, or always allow
+ * (R-TH-5).
+ */
+export const MOTIONS = ["system", "reduce", "full"] as const;
+type Motion = (typeof MOTIONS)[number];
+
+/** Reading fonts: Roboto, Atkinson Hyperlegible, or OpenDyslexic (R-TH-5). */
+export const FONTS = ["default", "hyperlegible", "dyslexic"] as const;
+export type ReadingFont = (typeof FONTS)[number];
+
+/** Text sizes, as a percentage of the browser's size (R-TH-5). */
+export const TEXT_SIZES = [87.5, 100, 112.5, 125, 150, 175] as const;
+
+/** A theme choice: a built-in theme, or the user's custom theme. */
+export type ThemeChoice = ThemeName | "custom";
 
 /** A user's appearance settings. */
 export interface Appearance {
-  readonly theme: ThemeName;
-  /** The organisation or user seed colour, `#rrggbb`. */
-  readonly seed: string;
+  readonly theme: ThemeChoice;
+  /** The user's accent colour, `#rrggbb`; absent follows the organisation's. */
+  readonly seed: string | undefined;
   readonly density: Density;
+  readonly motion: Motion;
+  /** Percentage of the browser's text size, one of {@link TEXT_SIZES}. */
+  readonly textSize: number;
+  readonly font: ReadingFont;
+  /** The custom theme, once the user has made or imported one. */
+  readonly custom: CustomTheme | undefined;
 }
 
 /** What a new user sees. */
 export const DEFAULT_APPEARANCE: Appearance = {
   theme: "system",
-  seed: DEFAULT_SEED,
+  seed: undefined,
   density: "comfortable",
+  motion: "system",
+  textSize: 100,
+  font: "default",
+  custom: undefined,
 };
 
 const STORAGE_KEY = "vellum.appearance";
+
+const pick = <T extends string>(
+  options: readonly T[],
+  value: unknown,
+  fallback: T,
+): T => options.find((option) => option === value) ?? fallback;
+
+function readCustom(value: unknown): CustomTheme | undefined {
+  if (value === undefined) return undefined;
+  // Stored themes pass the same checks as imported files.
+  const result = validateTheme(value);
+  return result.ok ? result.theme : undefined;
+}
+
+/**
+ * A saved accent colour. Vellum's own seed counts as "not chosen": settings
+ * saved before organisation colours existed always held it, and those
+ * users should now follow their organisation's colour.
+ */
+function readSeed(value: unknown): string | undefined {
+  if (typeof value !== "string" || !/^#[\da-f]{6}$/i.test(value))
+    return undefined;
+  const seed = value.toLowerCase();
+  return seed === DEFAULT_SEED ? undefined : seed;
+}
+
+/** Reads one stored settings object, keeping what is valid. */
+function readAppearance(value: Record<string, unknown>): Appearance {
+  const custom = readCustom(value["custom"]);
+  const choices: readonly ThemeChoice[] =
+    custom === undefined ? THEMES : [...THEMES, "custom"];
+  const size = TEXT_SIZES.find((each) => each === value["textSize"]);
+  return {
+    theme: pick(choices, value["theme"], DEFAULT_APPEARANCE.theme),
+    seed: readSeed(value["seed"]),
+    density: pick(DENSITIES, value["density"], DEFAULT_APPEARANCE.density),
+    motion: pick(MOTIONS, value["motion"], DEFAULT_APPEARANCE.motion),
+    textSize: size ?? DEFAULT_APPEARANCE.textSize,
+    font: pick(FONTS, value["font"], DEFAULT_APPEARANCE.font),
+    custom,
+  };
+}
 
 /**
  * Reads saved settings; anything unreadable falls back to the defaults.
@@ -40,27 +111,28 @@ export function loadAppearance(
   pageTheme?: string,
 ): Appearance {
   const preset = THEMES.find((t) => t === pageTheme);
-  const fallback = preset ? { ...DEFAULT_APPEARANCE, theme: preset } : DEFAULT_APPEARANCE;
+  const fallback = preset
+    ? { ...DEFAULT_APPEARANCE, theme: preset }
+    : DEFAULT_APPEARANCE;
   try {
     const raw: unknown = JSON.parse(storage?.getItem(STORAGE_KEY) ?? "null");
-    if (typeof raw !== "object" || raw === null) {
+    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
       return fallback;
     }
-    const value = raw as Record<string, unknown>;
-    const theme = THEMES.find((t) => t === value["theme"]) ?? DEFAULT_APPEARANCE.theme;
-    const seed =
-      typeof value["seed"] === "string" && /^#[\da-f]{6}$/i.test(value["seed"])
-        ? value["seed"].toLowerCase()
-        : DEFAULT_SEED;
-    const density = value["density"] === "compact" ? "compact" : "comfortable";
-    return { theme, seed, density };
+    return readAppearance(raw as Record<string, unknown>);
   } catch {
     return fallback;
   }
 }
 
-/** Saves settings; a browser that refuses storage keeps them for the session only. */
-export function saveAppearance(storage: Pick<Storage, "setItem"> | undefined, value: Appearance) {
+/**
+ * Saves settings; a browser that refuses storage keeps them for the session
+ * only.
+ */
+export function saveAppearance(
+  storage: Pick<Storage, "setItem"> | undefined,
+  value: Appearance,
+) {
   try {
     storage?.setItem(STORAGE_KEY, JSON.stringify(value));
   } catch {
@@ -68,22 +140,104 @@ export function saveAppearance(storage: Pick<Storage, "setItem"> | undefined, va
   }
 }
 
-/** Replaces `system` with the OS preference. */
-export function resolveTheme(theme: ThemeName, prefersDark: boolean): ResolvedTheme {
+/**
+ * Replaces `system` with the OS preference, and `custom` with its start theme.
+ */
+export function resolveTheme(
+  theme: ThemeChoice,
+  prefersDark: boolean,
+  custom?: CustomTheme,
+): ResolvedTheme {
+  if (theme === "custom") {
+    return custom?.base ?? (prefersDark ? "dark" : "light");
+  }
   if (theme === "system") {
     return prefersDark ? "dark" : "light";
   }
   return theme;
 }
 
-/** Writes the theme tokens onto an element, normally `<html>`. */
-export function applyAppearance(root: HTMLElement, value: Appearance, prefersDark: boolean) {
-  const theme = resolveTheme(value.theme, prefersDark);
-  const scheme = buildScheme(theme, value.seed);
+/**
+ * The accent colour in use: the user's, else the organisation's, else Vellum's.
+ */
+export function effectiveSeed(
+  value: Appearance,
+  organisationSeed?: string,
+): string {
+  return value.seed ?? organisationSeed ?? DEFAULT_SEED;
+}
+
+/**
+ * The accent colour the server should draw figures in (D302): a custom
+ * theme's own seed, else the accent in use. Vellum's own seed is
+ * `undefined`, so the common case shares one cached stylesheet.
+ */
+export function figureSeed(
+  value: Appearance,
+  organisationSeed?: string,
+): string | undefined {
+  const seed = (
+    value.theme === "custom" && value.custom !== undefined
+      ? value.custom.seed
+      : effectiveSeed(value, organisationSeed)
+  ).toLowerCase();
+  return seed === DEFAULT_SEED ? undefined : seed;
+}
+
+/** Loads a reading font's faces the first time it is chosen. */
+const FONT_LOADERS: Readonly<Record<ReadingFont, () => Promise<unknown>>> = {
+  default: () => Promise.resolve(),
+  hyperlegible: () =>
+    Promise.all([
+      import("@fontsource/atkinson-hyperlegible/400.css"),
+      import("@fontsource/atkinson-hyperlegible/700.css"),
+    ]),
+  dyslexic: () =>
+    Promise.all([
+      import("@fontsource/opendyslexic/400.css"),
+      import("@fontsource/opendyslexic/700.css"),
+    ]),
+};
+
+/** Fetches a reading font's stylesheet; a failure leaves the fallback fonts. */
+export function loadReadingFont(font: ReadingFont): void {
+  FONT_LOADERS[font]().catch(() => {
+    // Offline before the font was cached: the font stack falls back.
+  });
+}
+
+/**
+ * Writes the theme tokens and reading settings onto an element, normally
+ * `<html>`.
+ */
+export function applyAppearance(
+  root: HTMLElement,
+  value: Appearance,
+  prefersDark: boolean,
+  organisationSeed?: string,
+) {
+  const custom = value.theme === "custom" ? value.custom : undefined;
+  const theme = resolveTheme(value.theme, prefersDark, custom);
+  const scheme =
+    custom === undefined
+      ? buildScheme(theme, effectiveSeed(value, organisationSeed))
+      : customScheme(custom);
   for (const [token, color] of Object.entries(scheme)) {
     root.style.setProperty(`--md-${token}`, color);
   }
   root.dataset["theme"] = theme;
   root.dataset["density"] = value.density;
+  root.dataset["motion"] = value.motion;
+  root.dataset["font"] = value.font;
+  if (custom === undefined) {
+    delete root.dataset["customTheme"];
+  } else {
+    root.dataset["customTheme"] = custom.name;
+  }
+  if (value.textSize === 100) {
+    root.style.removeProperty("font-size");
+  } else {
+    root.style.fontSize = `${String(value.textSize)}%`;
+  }
   root.style.colorScheme = isDark(theme) ? "dark" : "light";
 }

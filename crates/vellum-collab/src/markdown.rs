@@ -41,8 +41,8 @@ use std::sync::Arc;
 use serde_json::{Map, Number as JsonNumber, Value};
 use vellum_contracts::blocks::{MarkType, NodeType};
 use vellum_format::{
-    Alignment, Attributes, Block, Container, ContainerKind, Document, Fence, FenceKind,
-    FrontMatter, Inline, List, ListItem, Table,
+    Alignment, Attributes, Block, Container, ContainerKind, Document, Fence,
+    FenceKind, FrontMatter, Inline, List, ListItem, Table,
 };
 use vellum_kernel::{BlockId, Result};
 use yrs::{Any, Number};
@@ -71,7 +71,8 @@ const WRAPPING_MARKS: [MarkType; 7] = [
     MarkType::Superscript,
 ];
 
-/// [`MarkdownCodec`] over `vellum_format::parse` and `vellum_format::serialize`.
+/// [`MarkdownCodec`] over `vellum_format::parse` and
+/// `vellum_format::serialize`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FormatCodec;
 
@@ -109,15 +110,19 @@ pub fn from_document(document: &Document) -> DocTree {
                 .map(|(key, value)| (key.clone(), json_to_any(value)))
                 .collect();
             if fields.len() > 1 {
-                let order: Vec<Any> = fields.keys().map(|key| Any::from(key.clone())).collect();
-                let _previous =
-                    meta.insert(FRONT_MATTER_ORDER.to_owned(), Any::Array(order.into()));
+                let order: Vec<Any> =
+                    fields.keys().map(|key| Any::from(key.clone())).collect();
+                let _previous = meta.insert(
+                    FRONT_MATTER_ORDER.to_owned(),
+                    Any::Array(order.into()),
+                );
             }
             meta
         }
-        Some(FrontMatter::Raw(raw)) => {
-            BTreeMap::from([(RAW_FRONT_MATTER.to_owned(), Any::from(raw.clone()))])
-        }
+        Some(FrontMatter::Raw(raw)) => BTreeMap::from([(
+            RAW_FRONT_MATTER.to_owned(),
+            Any::from(raw.clone()),
+        )]),
     };
     DocTree {
         meta,
@@ -142,7 +147,10 @@ fn block_to_element(block: &Block) -> Element {
                     .with_attr("title", title.clone()),
                 *id,
             ),
-            _ => with_block_id(node(NodeType::Paragraph, inlines_to_nodes(content)), *id),
+            _ => with_block_id(
+                node(NodeType::Paragraph, inlines_to_nodes(content)),
+                *id,
+            ),
         },
         Block::Heading {
             level,
@@ -155,14 +163,16 @@ fn block_to_element(block: &Block) -> Element {
             with_attributes(with_block_id(element, *id), attrs)
         }
         Block::ThematicBreak => node(NodeType::HorizontalRule, Vec::new()),
-        Block::BlockQuote { blocks, id } => {
-            with_block_id(node(NodeType::Blockquote, blocks_to_nodes(blocks)), *id)
-        }
+        Block::BlockQuote { blocks, id } => with_block_id(
+            node(NodeType::Blockquote, blocks_to_nodes(blocks)),
+            *id,
+        ),
         Block::List(list) => list_to_element(list),
         Block::Fence(fence) => {
             let element = if fence.kind() == FenceKind::Code {
-                let element = node(NodeType::CodeBlock, literal_to_nodes(&fence.literal))
-                    .with_attr("language", fence.lang.clone());
+                let element =
+                    node(NodeType::CodeBlock, literal_to_nodes(&fence.literal))
+                        .with_attr("language", fence.lang.clone());
                 if fence.args.is_empty() {
                     element
                 } else {
@@ -175,9 +185,10 @@ fn block_to_element(block: &Block) -> Element {
             };
             with_attributes(with_block_id(element, fence.id), &fence.attrs)
         }
-        Block::Math { literal, id } => {
-            with_block_id(node(NodeType::MathBlock, literal_to_nodes(literal)), *id)
-        }
+        Block::Math { literal, id } => with_block_id(
+            node(NodeType::MathBlock, literal_to_nodes(literal)),
+            *id,
+        ),
         Block::Table(table) => table_to_element(table),
         Block::Container(container) => {
             let element = typed_container(container).unwrap_or_else(|| {
@@ -190,7 +201,10 @@ fn block_to_element(block: &Block) -> Element {
                     .with_attr("name", container.name.clone())
                     .with_attr("arg", container.arg.clone())
             });
-            with_attributes(with_block_id(element, container.id), &container.attrs)
+            with_attributes(
+                with_block_id(element, container.id),
+                &container.attrs,
+            )
         }
     }
 }
@@ -206,7 +220,8 @@ fn typed_container(container: &Container) -> Option<Element> {
     let no_arg = container.arg.is_empty();
     let only_list = |ordered: bool| match body {
         [Block::List(list)]
-            if list.start.is_some() == ordered && list.items.iter().all(|i| i.task.is_none()) =>
+            if list.start.is_some() == ordered
+                && list.items.iter().all(|i| i.task.is_none()) =>
         {
             Some(blocks_to_nodes(body))
         }
@@ -214,42 +229,71 @@ fn typed_container(container: &Container) -> Option<Element> {
     };
     Some(match kind {
         ContainerKind::Callout => {
-            let kind = vellum_contracts::blocks::CalloutKind::from_name(&container.name)?;
-            let element =
-                node(NodeType::Callout, blocks_to_nodes(body)).with_attr("kind", kind.name());
+            let kind = vellum_contracts::blocks::CalloutKind::from_name(
+                &container.name,
+            )?;
+            let element = node(NodeType::Callout, blocks_to_nodes(body))
+                .with_attr("kind", kind.name());
             if no_arg {
                 element
             } else {
                 element.with_attr("title", container.arg.clone())
             }
         }
-        ContainerKind::Details => node(NodeType::Details, blocks_to_nodes(body))
-            .with_attr("summary", container.arg.clone()),
+        ContainerKind::Details => {
+            node(NodeType::Details, blocks_to_nodes(body))
+                .with_attr("summary", container.arg.clone())
+        }
         ContainerKind::Columns if no_arg && container.sections.len() >= 2 => {
             let columns = container
                 .sections
                 .iter()
-                .map(|blocks| Node::Element(node(NodeType::Column, blocks_to_nodes(blocks))))
+                .map(|blocks| {
+                    Node::Element(node(
+                        NodeType::Column,
+                        blocks_to_nodes(blocks),
+                    ))
+                })
                 .collect();
             node(NodeType::Columns, columns)
         }
-        ContainerKind::Tabs if no_arg => node(NodeType::Tabs, split_tabs(body)?),
-        ContainerKind::Toc if no_arg && body.is_empty() => node(NodeType::Toc, Vec::new()),
-        ContainerKind::Stats if no_arg => node(NodeType::Stats, only_list(false)?),
-        ContainerKind::Facts if no_arg => node(NodeType::Facts, only_list(false)?),
-        ContainerKind::Progress if no_arg => node(NodeType::Progress, only_list(false)?),
-        ContainerKind::Cards if no_arg => node(NodeType::Cards, only_list(false)?),
-        ContainerKind::Steps if no_arg => node(NodeType::Steps, only_list(true)?),
-        ContainerKind::Pages if no_arg && body.is_empty() => node(NodeType::Pages, Vec::new()),
-        ContainerKind::Pages if no_arg => node(NodeType::Pages, only_list(false)?),
+        ContainerKind::Tabs if no_arg => {
+            node(NodeType::Tabs, split_tabs(body)?)
+        }
+        ContainerKind::Toc if no_arg && body.is_empty() => {
+            node(NodeType::Toc, Vec::new())
+        }
+        ContainerKind::Stats if no_arg => {
+            node(NodeType::Stats, only_list(false)?)
+        }
+        ContainerKind::Facts if no_arg => {
+            node(NodeType::Facts, only_list(false)?)
+        }
+        ContainerKind::Progress if no_arg => {
+            node(NodeType::Progress, only_list(false)?)
+        }
+        ContainerKind::Cards if no_arg => {
+            node(NodeType::Cards, only_list(false)?)
+        }
+        ContainerKind::Steps if no_arg => {
+            node(NodeType::Steps, only_list(true)?)
+        }
+        ContainerKind::Pages if no_arg && body.is_empty() => {
+            node(NodeType::Pages, Vec::new())
+        }
+        ContainerKind::Pages if no_arg => {
+            node(NodeType::Pages, only_list(false)?)
+        }
         ContainerKind::Link => {
             // The body is one line holding the card's title.
             let title = match body {
                 [] => String::new(),
-                [Block::Paragraph { content, id: None }] => match content.as_slice() {
-                    [Inline::Text { text }] => text.clone(),
-                    _ => return None,
-                },
+                [Block::Paragraph { content, id: None }] => {
+                    match content.as_slice() {
+                        [Inline::Text { text }] => text.clone(),
+                        _ => return None,
+                    }
+                }
                 _ => return None,
             };
             node(NodeType::LinkCard, Vec::new())
@@ -257,7 +301,8 @@ fn typed_container(container: &Container) -> Option<Element> {
                 .with_attr("title", title)
         }
         ContainerKind::Embed if body.is_empty() => {
-            node(NodeType::Embed, Vec::new()).with_attr("url", container.arg.clone())
+            node(NodeType::Embed, Vec::new())
+                .with_attr("url", container.arg.clone())
         }
         _ => return None,
     })
@@ -292,14 +337,17 @@ fn split_tabs(body: &[Block]) -> Option<Vec<Node>> {
     Some(
         tabs.into_iter()
             .map(|(title, blocks)| {
-                Node::Element(node(NodeType::Tab, blocks).with_attr("title", title))
+                Node::Element(
+                    node(NodeType::Tab, blocks).with_attr("title", title),
+                )
             })
             .collect(),
     )
 }
 
 fn list_to_element(list: &List) -> Element {
-    let all_tasks = !list.items.is_empty() && list.items.iter().all(|item| item.task.is_some());
+    let all_tasks = !list.items.is_empty()
+        && list.items.iter().all(|item| item.task.is_some());
     let task_list = all_tasks && list.start.is_none();
     let items = list
         .items
@@ -309,7 +357,8 @@ fn list_to_element(list: &List) -> Element {
             Node::Element(item.task.map_or_else(
                 || node(NodeType::ListItem, blocks.clone()),
                 |done| {
-                    let task = node(NodeType::TaskItem, blocks.clone()).with_attr("checked", done);
+                    let task = node(NodeType::TaskItem, blocks.clone())
+                        .with_attr("checked", done);
                     with_attributes(task, &item.attrs)
                 },
             ))
@@ -317,7 +366,8 @@ fn list_to_element(list: &List) -> Element {
         .collect();
     let element = match list.start {
         _ if task_list => node(NodeType::TaskList, items),
-        Some(start) => node(NodeType::OrderedList, items).with_attr("start", u64_to_any(start)),
+        Some(start) => node(NodeType::OrderedList, items)
+            .with_attr("start", u64_to_any(start)),
         None => node(NodeType::BulletList, items),
     };
     if list.tight {
@@ -333,7 +383,8 @@ fn table_to_element(table: &Table) -> Element {
             .iter()
             .enumerate()
             .map(|(column, inlines)| {
-                let paragraph = node(NodeType::Paragraph, inlines_to_nodes(inlines));
+                let paragraph =
+                    node(NodeType::Paragraph, inlines_to_nodes(inlines));
                 let align = match table.alignments.get(column) {
                     Some(Alignment::Left) => "left",
                     Some(Alignment::Center) => "center",
@@ -341,7 +392,8 @@ fn table_to_element(table: &Table) -> Element {
                     Some(Alignment::None) | None => "none",
                 };
                 Node::Element(
-                    node(cell_kind, vec![Node::Element(paragraph)]).with_attr("align", align),
+                    node(cell_kind, vec![Node::Element(paragraph)])
+                        .with_attr("align", align),
                 )
             })
             .collect();
@@ -439,14 +491,27 @@ fn flatten(inlines: &[Inline], marks: &Marks, out: &mut Vec<Piece>) {
     let atom = |element: Element| Piece::Atom(element, marks.clone());
     for inline in inlines {
         match inline {
-            Inline::Text { text } => out.push(Piece::Text(text.clone(), marks.clone())),
-            Inline::Code { code } => {
-                out.push(Piece::Text(code.clone(), with(MarkType::Code, empty())));
+            Inline::Text { text } => {
+                out.push(Piece::Text(text.clone(), marks.clone()));
             }
-            Inline::SoftBreak => out.push(Piece::Text("\n".to_owned(), marks.clone())),
-            Inline::HardBreak => out.push(atom(node(NodeType::HardBreak, Vec::new()))),
-            Inline::Emphasis { content } => flatten(content, &with(MarkType::Italic, empty()), out),
-            Inline::Strong { content } => flatten(content, &with(MarkType::Bold, empty()), out),
+            Inline::Code { code } => {
+                out.push(Piece::Text(
+                    code.clone(),
+                    with(MarkType::Code, empty()),
+                ));
+            }
+            Inline::SoftBreak => {
+                out.push(Piece::Text("\n".to_owned(), marks.clone()));
+            }
+            Inline::HardBreak => {
+                out.push(atom(node(NodeType::HardBreak, Vec::new())));
+            }
+            Inline::Emphasis { content } => {
+                flatten(content, &with(MarkType::Italic, empty()), out);
+            }
+            Inline::Strong { content } => {
+                flatten(content, &with(MarkType::Bold, empty()), out);
+            }
             Inline::Strikethrough { content } => {
                 flatten(content, &with(MarkType::Strike, empty()), out);
             }
@@ -468,7 +533,11 @@ fn flatten(inlines: &[Inline], marks: &Marks, out: &mut Vec<Piece>) {
                     ("href".to_owned(), Any::from(url.clone())),
                     ("title".to_owned(), Any::from(title.clone())),
                 ]);
-                flatten(content, &with(MarkType::Link, Any::Map(link.into())), out);
+                flatten(
+                    content,
+                    &with(MarkType::Link, Any::Map(link.into())),
+                    out,
+                );
             }
             Inline::Image { url, title, alt } => out.push(atom(
                 node(NodeType::InlineImage, Vec::new())
@@ -482,13 +551,16 @@ fn flatten(inlines: &[Inline], marks: &Marks, out: &mut Vec<Piece>) {
                     .with_attr("label", label.clone().unwrap_or_default()),
             )),
             Inline::Mention { handle } => out.push(atom(
-                node(NodeType::Mention, Vec::new()).with_attr("handle", handle.clone()),
+                node(NodeType::Mention, Vec::new())
+                    .with_attr("handle", handle.clone()),
             )),
             Inline::IssueKey { key } => out.push(atom(
-                node(NodeType::IssueKey, Vec::new()).with_attr("key", key.clone()),
+                node(NodeType::IssueKey, Vec::new())
+                    .with_attr("key", key.clone()),
             )),
             Inline::Date { date } => out.push(atom(
-                node(NodeType::Date, Vec::new()).with_attr("date", date.clone()),
+                node(NodeType::Date, Vec::new())
+                    .with_attr("date", date.clone()),
             )),
         }
     }
@@ -499,7 +571,8 @@ fn marks_to_any(marks: &Marks) -> Any {
     let marks: Vec<Any> = marks
         .iter()
         .map(|(mark, attrs)| {
-            let mut entry = HashMap::from([("type".to_owned(), Any::from(mark.clone()))]);
+            let mut entry =
+                HashMap::from([("type".to_owned(), Any::from(mark.clone()))]);
             if matches!(attrs, Any::Map(map) if !map.is_empty()) {
                 let _previous = entry.insert("attrs".to_owned(), attrs.clone());
             }
@@ -541,7 +614,9 @@ fn marks_from_any(value: Option<&Any>) -> Marks {
 #[must_use]
 pub fn to_document(doc: &DocTree) -> Document {
     let front_matter = match doc.meta.get(RAW_FRONT_MATTER) {
-        Some(Any::String(raw)) if doc.meta.len() == 1 => Some(FrontMatter::Raw(raw.to_string())),
+        Some(Any::String(raw)) if doc.meta.len() == 1 => {
+            Some(FrontMatter::Raw(raw.to_string()))
+        }
         _ if doc.meta.is_empty() => None,
         _ => Some(FrontMatter::Fields(fields(&doc.meta))),
     };
@@ -553,7 +628,8 @@ pub fn to_document(doc: &DocTree) -> Document {
 
 /// Front matter fields in file order, then any new keys sorted.
 fn fields(meta: &BTreeMap<String, Any>) -> Map<String, Value> {
-    let is_field = |key: &str| key != RAW_FRONT_MATTER && key != FRONT_MATTER_ORDER;
+    let is_field =
+        |key: &str| key != RAW_FRONT_MATTER && key != FRONT_MATTER_ORDER;
     let mut out = Map::new();
     if let Some(Any::Array(order)) = meta.get(FRONT_MATTER_ORDER) {
         for key in order.iter() {
@@ -574,7 +650,8 @@ fn fields(meta: &BTreeMap<String, Any>) -> Map<String, Value> {
 }
 
 fn is_inline(name: &str) -> bool {
-    NodeType::from_name(name).is_some_and(|kind| kind.is_inline() && kind != NodeType::Text)
+    NodeType::from_name(name)
+        .is_some_and(|kind| kind.is_inline() && kind != NodeType::Text)
 }
 
 fn nodes_to_blocks(nodes: &[Node]) -> Vec<Block> {
@@ -656,7 +733,9 @@ fn element_to_blocks(element: &Element, out: &mut Vec<Block>) {
             literal: nodes_to_literal(children),
             id: block_id(attrs),
         }),
-        NodeType::Table => out.extend(element_to_table(element).map(Block::Table)),
+        NodeType::Table => {
+            out.extend(element_to_table(element).map(Block::Table));
+        }
         NodeType::Image => out.push(Block::Paragraph {
             content: vec![image(attrs)],
             id: block_id(attrs),
@@ -672,15 +751,17 @@ fn element_to_container(element: &Element) -> Option<Container> {
     let attrs = &element.attrs;
     let children = &element.children;
     let text = |key: &str| attr_str(attrs, key).unwrap_or_default().to_owned();
-    let container = |name: String, arg: String, sections: Vec<Vec<Block>>| Container {
-        name,
-        arg,
-        attrs: attributes(attrs),
-        id: block_id(attrs),
-        sections,
+    let container =
+        |name: String, arg: String, sections: Vec<Vec<Block>>| Container {
+            name,
+            arg,
+            attrs: attributes(attrs),
+            id: block_id(attrs),
+            sections,
+        };
+    let named = |name: &str, arg: String| {
+        container(name.to_owned(), arg, vec![nodes_to_blocks(children)])
     };
-    let named =
-        |name: &str, arg: String| container(name.to_owned(), arg, vec![nodes_to_blocks(children)]);
     match NodeType::from_name(&element.name)? {
         NodeType::Container => Some(named(&text("name"), text("arg"))),
         NodeType::Callout => {
@@ -693,7 +774,9 @@ fn element_to_container(element: &Element) -> Option<Container> {
                 .iter()
                 .map(|child| match child {
                     Node::Element(column) => nodes_to_blocks(&column.children),
-                    Node::Text(_) => nodes_to_blocks(std::slice::from_ref(child)),
+                    Node::Text(_) => {
+                        nodes_to_blocks(std::slice::from_ref(child))
+                    }
                 })
                 .collect();
             Some(container("columns".to_owned(), String::new(), sections))
@@ -707,7 +790,9 @@ fn element_to_container(element: &Element) -> Option<Container> {
                 body.push(Block::Heading {
                     level: 2,
                     content: vec![Inline::Text {
-                        text: attr_str(&tab.attrs, "title").unwrap_or("Tab").to_owned(),
+                        text: attr_str(&tab.attrs, "title")
+                            .unwrap_or("Tab")
+                            .to_owned(),
                     }],
                     attrs: Attributes::default(),
                     id: None,
@@ -741,16 +826,17 @@ fn element_to_container(element: &Element) -> Option<Container> {
 }
 
 fn element_to_list(element: &Element, kind: NodeType) -> List {
-    let start =
-        (kind == NodeType::OrderedList).then(|| attr_u64(&element.attrs, "start").unwrap_or(1));
+    let start = (kind == NodeType::OrderedList)
+        .then(|| attr_u64(&element.attrs, "start").unwrap_or(1));
     let tight = attr_bool(&element.attrs, "tight").unwrap_or(true);
     let items = element
         .children
         .iter()
         .map(|child| match child {
             Node::Element(item) => {
-                let task = (NodeType::from_name(&item.name) == Some(NodeType::TaskItem))
-                    .then(|| attr_bool(&item.attrs, "checked").unwrap_or(false));
+                let task = (NodeType::from_name(&item.name)
+                    == Some(NodeType::TaskItem))
+                .then(|| attr_bool(&item.attrs, "checked").unwrap_or(false));
                 ListItem {
                     task,
                     attrs: if task.is_some() {
@@ -825,7 +911,7 @@ fn element_to_table(element: &Element) -> Option<Table> {
 fn cell_inlines(cell: &Element) -> Vec<Inline> {
     let mut out = Vec::new();
     for block in nodes_to_blocks(&cell.children) {
-        let (Block::Paragraph { content, .. } | Block::Heading { content, .. }) = block else {
+        let Some(content) = inline_content(block) else {
             continue;
         };
         if !out.is_empty() && !content.is_empty() {
@@ -847,10 +933,24 @@ fn nodes_to_literal(nodes: &[Node]) -> String {
     text
 }
 
+/// The inline content of a paragraph or heading; `None` for other blocks.
+fn inline_content(block: Block) -> Option<Vec<Inline>> {
+    match block {
+        Block::Paragraph { content, .. } | Block::Heading { content, .. } => {
+            Some(content)
+        }
+        _ => None,
+    }
+}
+
 fn collect_text(nodes: &[Node], out: &mut String) {
     for node in nodes {
         match node {
-            Node::Text(runs) => runs.iter().for_each(|run| out.push_str(&run.text)),
+            Node::Text(runs) => {
+                for run in runs {
+                    out.push_str(&run.text);
+                }
+            }
             Node::Element(element) => collect_text(&element.children, out),
         }
     }
@@ -865,11 +965,11 @@ fn nodes_to_inlines(nodes: &[Node]) -> Vec<Inline> {
 fn collect_pieces(nodes: &[Node], out: &mut Vec<Piece>) {
     for node in nodes {
         match node {
-            Node::Text(runs) => out.extend(
-                runs.iter()
-                    .filter(|run| !run.text.is_empty())
-                    .map(|run| Piece::Text(run.text.clone(), run.marks.clone())),
-            ),
+            Node::Text(runs) => {
+                out.extend(runs.iter().filter(|run| !run.text.is_empty()).map(
+                    |run| Piece::Text(run.text.clone(), run.marks.clone()),
+                ));
+            }
             Node::Element(element) if is_inline(&element.name) => {
                 let marks = marks_from_any(element.attrs.get("marks"));
                 out.push(Piece::Atom(element.clone(), marks));
@@ -912,9 +1012,13 @@ fn build_inlines(pieces: &[Piece], open: &Marks) -> Vec<Inline> {
             }
             Some((span, _, mark, value)) => {
                 let mut inner = open.clone();
-                let _previous = inner.insert(mark.name().to_owned(), value.clone());
+                let _previous =
+                    inner.insert(mark.name().to_owned(), value.clone());
                 let end = index + span;
-                let content = build_inlines(pieces.get(index..end).unwrap_or_default(), &inner);
+                let content = build_inlines(
+                    pieces.get(index..end).unwrap_or_default(),
+                    &inner,
+                );
                 out.push(wrap(mark, value, content));
                 index = end;
             }
@@ -925,7 +1029,9 @@ fn build_inlines(pieces: &[Piece], open: &Marks) -> Vec<Inline> {
 
 fn leaf(piece: &Piece, out: &mut Vec<Inline>) {
     match piece {
-        Piece::Text(text, marks) if marks.contains_key(MarkType::Code.name()) => {
+        Piece::Text(text, marks)
+            if marks.contains_key(MarkType::Code.name()) =>
+        {
             out.push(Inline::Code { code: text.clone() });
         }
         Piece::Text(text, _) => {
@@ -1027,7 +1133,10 @@ fn merge_text(inlines: Vec<Inline>) -> Vec<Inline> {
 // Attributes and values
 // ---------------------------------------------------------------------------
 
-fn attr_str<'a>(attrs: &'a BTreeMap<String, Any>, key: &str) -> Option<&'a str> {
+fn attr_str<'a>(
+    attrs: &'a BTreeMap<String, Any>,
+    key: &str,
+) -> Option<&'a str> {
     match attrs.get(key) {
         Some(Any::String(text)) => Some(text),
         _ => None,
@@ -1043,7 +1152,9 @@ fn attr_bool(attrs: &BTreeMap<String, Any>, key: &str) -> Option<bool> {
 
 fn attr_u64(attrs: &BTreeMap<String, Any>, key: &str) -> Option<u64> {
     match attrs.get(key)? {
-        Any::Number(number) => number.as_i64().and_then(|value| u64::try_from(value).ok()),
+        Any::Number(number) => {
+            number.as_i64().and_then(|value| u64::try_from(value).ok())
+        }
         Any::String(text) => text.parse().ok(),
         _ => None,
     }
@@ -1060,7 +1171,8 @@ fn attributes(attrs: &BTreeMap<String, Any>) -> Attributes {
 }
 
 fn u64_to_any(value: u64) -> Any {
-    Number::try_from(value).map_or_else(|big| Any::from(big.to_string()), Any::Number)
+    Number::try_from(value)
+        .map_or_else(|big| Any::from(big.to_string()), Any::Number)
 }
 
 /// Converts a front matter value. Maps lose their key order: Yjs maps are
@@ -1072,10 +1184,14 @@ fn json_to_any(value: &Value) -> Any {
         Value::Number(number) => match (number.as_i64(), number.as_u64()) {
             (Some(int), _) => Any::Number(Number::Int(int)),
             (None, Some(int)) => u64_to_any(int),
-            (None, None) => Any::Number(Number::Float(number.as_f64().unwrap_or_default())),
+            (None, None) => {
+                Any::Number(Number::Float(number.as_f64().unwrap_or_default()))
+            }
         },
         Value::String(text) => Any::from(text.clone()),
-        Value::Array(items) => Any::Array(items.iter().map(json_to_any).collect::<Vec<_>>().into()),
+        Value::Array(items) => {
+            Any::Array(items.iter().map(json_to_any).collect::<Vec<_>>().into())
+        }
         Value::Object(map) => Any::Map(
             map.iter()
                 .map(|(key, value)| (key.clone(), json_to_any(value)))
@@ -1095,7 +1211,9 @@ fn any_to_json(value: &Any) -> Value {
             JsonNumber::from_f64(*float).map_or(Value::Null, Value::Number)
         }
         Any::String(text) => Value::String(text.to_string()),
-        Any::Array(items) => Value::Array(items.iter().map(any_to_json).collect()),
+        Any::Array(items) => {
+            Value::Array(items.iter().map(any_to_json).collect())
+        }
         Any::Map(map) => {
             let sorted: BTreeMap<&String, &Any> = map.iter().collect();
             Value::Object(

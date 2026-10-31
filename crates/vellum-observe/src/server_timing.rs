@@ -48,7 +48,8 @@ pub fn record(name: &str, duration: Duration) {
     let _ = METRICS.try_with(|m| {
         let mut metrics = m.borrow_mut();
         if let Some(existing) = metrics.iter_mut().find(|x| x.name == name) {
-            existing.duration = Some(existing.duration.unwrap_or_default() + duration);
+            existing.duration =
+                Some(existing.duration.unwrap_or_default() + duration);
         } else {
             metrics.push(Metric {
                 name,

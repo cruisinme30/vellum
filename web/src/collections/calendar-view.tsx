@@ -12,7 +12,10 @@ import { uniqueRows, type ViewProperties } from "./view-properties";
 
 /** Rows on a day: those whose span covers it. */
 const onDay = (rows: readonly RowView[], day: string) =>
-  rows.filter((row) => row.span !== undefined && row.span.start <= day && day <= row.span.end);
+  rows.filter(
+    (row) =>
+      row.span !== undefined && row.span.start <= day && day <= row.span.end,
+  );
 
 /**
  * The calendar view: a month grid with each row on the days its date (or
@@ -22,7 +25,9 @@ export function CalendarView({ result, onOpen }: ViewProperties) {
   const t = useT();
   const rows = uniqueRows(result);
   const dated = rows.filter((row) => row.span !== undefined);
-  const [month, setMonth] = useState(() => monthOf(dated[0]?.span?.start ?? today()));
+  const [month, setMonth] = useState(() =>
+    monthOf(dated[0]?.span?.start ?? today()),
+  );
   const now = today();
   const label = formatDay(month, { month: "long", year: "numeric" });
   const weeks = monthWeeks(month);
@@ -69,7 +74,11 @@ export function CalendarView({ result, onOpen }: ViewProperties) {
         <thead>
           <tr>
             {weeks[0]?.map((day) => (
-              <th key={day} scope="col" abbr={formatDay(day, { weekday: "long" })}>
+              <th
+                key={day}
+                scope="col"
+                abbr={formatDay(day, { weekday: "long" })}
+              >
                 {formatDay(day, { weekday: "short" })}
               </th>
             ))}
@@ -111,7 +120,11 @@ export function CalendarView({ result, onOpen }: ViewProperties) {
           ))}
         </tbody>
       </table>
-      {undated > 0 && <p className="vl-muted">{t("collection-undated", { count: undated })}</p>}
+      {undated > 0 && (
+        <p className="vl-muted">
+          {t("collection-undated", { count: undated })}
+        </p>
+      )}
     </div>
   );
 }

@@ -37,8 +37,8 @@ of that trait and the merge rules in `vellum-store`.
   absent, or only if the stored version still has a given `ETag`. A writer
   always states the version it started from, so a stale write is refused
   and goes to the merge path instead of overwriting.
-- `ETag` values are opaque per adapter. The local folder uses a `SHA-256` content
-  hash, which stays exact on filesystems with one-second timestamps.
+- `ETag` values are opaque per adapter. The local folder uses a `SHA-256`
+  content hash, which stays exact on filesystems with one-second timestamps.
 - Paths are the intersection of what every backend accepts, and the
   local adapter refuses to traverse symbolic links.
 - One shared conformance suite proves each adapter and decorator,

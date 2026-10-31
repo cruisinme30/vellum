@@ -19,13 +19,13 @@ vellum: 1
 
 ## Context
 
-Every Vellum file is untrusted input: a collaborator, a synced folder, an
-import or an MCP client can write any bytes, and the server parses them on
-save, render and index. The brief (section 11 and 12) asks for a hardened,
-self-hosted service that meets its latency and memory budgets under load.
-The project lead asked for continuous red teaming: attack what has
-merged, prove each finding, and make sure the fix lands (#259). The first sweep found a 3 KB
-document that aborts the process with a stack overflow (#260).
+Every Vellum file is untrusted input: a collaborator, a synced folder, an import
+or an MCP client can write any bytes, and the server parses them on save, render
+and index. The brief (section 11 and 12) asks for a hardened, self-hosted
+service that meets its latency and memory budgets under load. The project lead
+asked for continuous red teaming: attack what has merged, prove each finding,
+and make sure the fix lands (#259). The first sweep found a 3 KB document that
+aborts the process with a stack overflow (#260).
 
 ## Decisions
 
@@ -47,8 +47,8 @@ document that aborts the process with a stack overflow (#260).
 
 ### D121: attack suites live in the repository
 
-- Each crate that reads untrusted input has `tests/hostile.rs` (or
-  `tests/hostile_*.rs`): small, deterministic attack cases that run in the
+- Each crate that reads untrusted input has `tests/it/hostile.rs` (or
+  `tests/it/hostile_*.rs`): small, deterministic attack cases that run in the
   fast suite on every pull request.
 - Coverage-guided fuzz targets live in `fuzz/` (cargo-fuzz, nightly
   toolchain) and run in the nightly full suite with a time budget; a crash

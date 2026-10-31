@@ -106,7 +106,10 @@ export class SyncScheduler {
 
   /** The delay before the next retry: 1 s doubling, capped, with jitter. */
   #backoff(): number {
-    const base = Math.min(this.#maxBackoffMs, 1000 * 2 ** Math.max(0, this.#failures - 1));
+    const base = Math.min(
+      this.#maxBackoffMs,
+      1000 * 2 ** Math.max(0, this.#failures - 1),
+    );
     return Math.round(base * (0.5 + this.#random() / 2));
   }
 

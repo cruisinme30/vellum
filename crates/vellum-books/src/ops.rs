@@ -102,11 +102,14 @@ impl Book {
             Place::FirstChildOf(node) => self.resolve(node)?.child(0),
             Place::LastChildOf(node) => {
                 let slot = self.resolve(node)?;
-                let count = self.summary.chapter(&slot).map_or(0, |c| c.children.len());
+                let count =
+                    self.summary.chapter(&slot).map_or(0, |c| c.children.len());
                 slot.child(count)
             }
             Place::Start(section) => Slot::top(*section, 0),
-            Place::End(section) => Slot::top(*section, self.summary.items(*section).len()),
+            Place::End(section) => {
+                Slot::top(*section, self.summary.items(*section).len())
+            }
         })
     }
 
@@ -137,7 +140,8 @@ impl Book {
         self.check_depth(&slot, 1)?;
         let id = ids.next_id();
         // A placeholder path; relayout gives it its real name.
-        let temp = self.unique_path("", &format!("{}.md", path::slugify(&title)))?;
+        let temp =
+            self.unique_path("", &format!("{}.md", path::slugify(&title)))?;
         let mut summary = self.summary.clone();
         summary.insert(
             &slot,
@@ -187,11 +191,14 @@ impl Book {
             .chapter(slot)
             .ok_or_else(|| BookError::UnknownPosition(slot.to_string()))?;
         if chapter.location.is_some() {
-            return Err(BookError::NotAllowed(format!("{slot} is not a draft")));
+            return Err(BookError::NotAllowed(format!(
+                "{slot} is not a draft"
+            )));
         }
         let title = chapter.name.clone();
         let id = ids.next_id();
-        let temp = self.unique_path("", &format!("{}.md", path::slugify(&title)))?;
+        let temp =
+            self.unique_path("", &format!("{}.md", path::slugify(&title)))?;
         if let Some(chapter) = self.summary.chapter_mut(slot) {
             chapter.location = Some(temp.clone());
         }
@@ -222,7 +229,11 @@ impl Book {
     /// # Errors
     ///
     /// Returns an error when `index` is past the end.
-    pub fn add_separator(&mut self, section: Section, index: usize) -> Result<()> {
+    pub fn add_separator(
+        &mut self,
+        section: Section,
+        index: usize,
+    ) -> Result<()> {
         self.summary
             .insert(&Slot::top(section, index), Item::Separator)
     }
@@ -265,7 +276,8 @@ impl Book {
             ));
         }
         let height = self.summary.chapter(&from).map_or(1, Chapter::height);
-        let old_parent = from.parent().and_then(|p| self.id_of_slot(&p).cloned());
+        let old_parent =
+            from.parent().and_then(|p| self.id_of_slot(&p).cloned());
         let mut summary = self.summary.clone();
         let item = summary.remove(&from)?;
         adjust_after_removal(&mut dest, &from);
@@ -301,7 +313,8 @@ impl Book {
             }
             let is_root_intro = slot.depth() == 1 && path.as_str() == README;
             if !is_root_intro {
-                let stems = BTreeMap::from([(slot.clone(), path::slugify(&title))]);
+                let stems =
+                    BTreeMap::from([(slot.clone(), path::slugify(&title))]);
                 self.relayout(&[slot], &stems)?;
             }
         }
@@ -334,8 +347,13 @@ impl Book {
     }
 
     /// A path that no chapter uses yet, adding `-2`, `-3`… to the stem.
-    pub(crate) fn unique_path(&self, dir: &str, file: &str) -> Result<ChapterPath> {
-        let taken: BTreeSet<String> = self.files.keys().map(|p| p.as_str().to_owned()).collect();
+    pub(crate) fn unique_path(
+        &self,
+        dir: &str,
+        file: &str,
+    ) -> Result<ChapterPath> {
+        let taken: BTreeSet<String> =
+            self.files.keys().map(|p| p.as_str().to_owned()).collect();
         unique(dir, file, &taken)
     }
 
@@ -366,7 +384,8 @@ impl Book {
         }
         let mut moves = BTreeMap::new();
         for (slot, target) in assigned {
-            if let Some(current) = self.summary.chapter(&slot).and_then(|c| c.location.clone())
+            if let Some(current) =
+                self.summary.chapter(&slot).and_then(|c| c.location.clone())
                 && current != target
             {
                 let _ = moves.insert(current, target);
@@ -376,7 +395,11 @@ impl Book {
         Ok(())
     }
 
-    fn children_dir(&self, slot: &Slot, assigned: &BTreeMap<Slot, ChapterPath>) -> String {
+    fn children_dir(
+        &self,
+        slot: &Slot,
+        assigned: &BTreeMap<Slot, ChapterPath>,
+    ) -> String {
         let Some(chapter) = self.summary.chapter(slot) else {
             return String::new();
         };
@@ -394,7 +417,11 @@ impl Book {
             )
     }
 
-    fn parent_dir(&self, slot: &Slot, assigned: &BTreeMap<Slot, ChapterPath>) -> String {
+    fn parent_dir(
+        &self,
+        slot: &Slot,
+        assigned: &BTreeMap<Slot, ChapterPath>,
+    ) -> String {
         slot.parent()
             .map(|parent| self.children_dir(&parent, assigned))
             .unwrap_or_default()
@@ -413,7 +440,9 @@ impl Book {
         if let Some(current) = &chapter.location {
             let dir = self.parent_dir(slot, assigned);
             let has_children = !chapter.children.is_empty();
-            let root_intro = slot.depth() == 1 && current.as_str() == README && !has_children;
+            let root_intro = slot.depth() == 1
+                && current.as_str() == README
+                && !has_children;
             let stem = stems.get(slot).cloned().unwrap_or_else(|| {
                 if current.is_readme() {
                     let own_dir = current.dir();
@@ -452,9 +481,9 @@ impl Book {
                     };
                     let candidate_dir = join_dir(&dir, &candidate_stem);
                     let prefix = format!("{candidate_dir}/");
-                    let busy = taken
-                        .iter()
-                        .any(|t| t.starts_with(&prefix) && !own.contains(t.as_str()));
+                    let busy = taken.iter().any(|t| {
+                        t.starts_with(&prefix) && !own.contains(t.as_str())
+                    });
                     if !busy {
                         break ChapterPath::join(&candidate_dir, README)?;
                     }
@@ -474,7 +503,10 @@ impl Book {
 
     /// Renames files (`old → new`) in the summary, manifest and file map,
     /// and rewrites relative links to and from the moved files.
-    pub(crate) fn relocate(&mut self, moves: &BTreeMap<ChapterPath, ChapterPath>) {
+    pub(crate) fn relocate(
+        &mut self,
+        moves: &BTreeMap<ChapterPath, ChapterPath>,
+    ) {
         if moves.is_empty() {
             return;
         }
@@ -482,7 +514,8 @@ impl Book {
             moves.iter().map(|(old, new)| (new, old)).collect();
         // The set of chapter paths before the move, to tell chapters from
         // assets when resolving links.
-        let before: BTreeSet<String> = self.files.keys().map(|p| p.as_str().to_owned()).collect();
+        let before: BTreeSet<String> =
+            self.files.keys().map(|p| p.as_str().to_owned()).collect();
         let mut files = BTreeMap::new();
         for (path, text) in std::mem::take(&mut self.files) {
             let new = moves.get(&path).cloned().unwrap_or(path);
@@ -495,9 +528,11 @@ impl Book {
                 .map_or_else(|| path.dir(), |old| old.dir())
                 .to_owned();
             let new_dir = path.dir();
-            let edits = rewrite_relative(text, &old_dir, new_dir, moves, &before);
+            let edits =
+                rewrite_relative(text, &old_dir, new_dir, moves, &before);
             if !edits.is_empty() {
-                let _ = rewritten.insert(path.clone(), markdown::apply(text, edits));
+                let _ = rewritten
+                    .insert(path.clone(), markdown::apply(text, edits));
             }
         }
         files.extend(rewritten);
@@ -521,8 +556,12 @@ fn rewrite_summary(
     summary: &mut crate::summary::Summary,
     moves: &BTreeMap<ChapterPath, ChapterPath>,
 ) {
-    fn visit(chapter: &mut Chapter, moves: &BTreeMap<ChapterPath, ChapterPath>) {
-        if let Some(new) = chapter.location.as_ref().and_then(|p| moves.get(p)) {
+    fn visit(
+        chapter: &mut Chapter,
+        moves: &BTreeMap<ChapterPath, ChapterPath>,
+    ) {
+        if let Some(new) = chapter.location.as_ref().and_then(|p| moves.get(p))
+        {
             chapter.location = Some(new.clone());
         }
         for child in &mut chapter.children {
@@ -584,7 +623,8 @@ pub(crate) fn adjust_after_removal(dest: &mut Slot, removed: &Slot) {
     if dest.path.get(..level) != removed.path.get(..level) {
         return;
     }
-    if let (Some(d), Some(r)) = (dest.path.get_mut(level), removed.path.get(level))
+    if let (Some(d), Some(r)) =
+        (dest.path.get_mut(level), removed.path.get(level))
         && *d > *r
     {
         *d -= 1;
@@ -599,7 +639,11 @@ fn join_dir(dir: &str, name: &str) -> String {
     }
 }
 
-pub(crate) fn unique(dir: &str, file: &str, taken: &BTreeSet<String>) -> Result<ChapterPath> {
+pub(crate) fn unique(
+    dir: &str,
+    file: &str,
+    taken: &BTreeSet<String>,
+) -> Result<ChapterPath> {
     let stem = file.trim_end_matches(".md");
     let mut n = 1;
     loop {
@@ -619,7 +663,9 @@ pub(crate) fn unique(dir: &str, file: &str, taken: &BTreeSet<String>) -> Result<
 pub(crate) fn clean_title(title: &str) -> Result<String> {
     let title = title.split_whitespace().collect::<Vec<_>>().join(" ");
     if title.is_empty() {
-        return Err(BookError::NotAllowed("a title cannot be empty".to_owned()));
+        return Err(BookError::NotAllowed(
+            "a title cannot be empty".to_owned(),
+        ));
     }
     Ok(title)
 }
@@ -636,7 +682,8 @@ mod tests {
 
     fn assert_consistent(book: &Book) {
         for (id, entry) in &book.manifest().nodes {
-            let text = book.files().get(&entry.path).expect("file for every node");
+            let text =
+                book.files().get(&entry.path).expect("file for every node");
             assert_eq!(
                 markdown::front_matter(text, "id").as_deref(),
                 Some(id.as_str())
@@ -644,7 +691,8 @@ mod tests {
             assert!(book.summary().find(&entry.path).is_some());
         }
         assert_eq!(book.files().len(), book.manifest().nodes.len());
-        let again = crate::summary::Summary::parse(&book.summary_text()).unwrap();
+        let again =
+            crate::summary::Summary::parse(&book.summary_text()).unwrap();
         assert_eq!(&again, book.summary());
     }
 
@@ -755,7 +803,8 @@ mod tests {
             "system-design/data-stores.md"
         );
         assert_eq!(
-            markdown::front_matter(book.text(&id(4)).unwrap(), "title").as_deref(),
+            markdown::front_matter(book.text(&id(4)).unwrap(), "title")
+                .as_deref(),
             Some("System design")
         );
         assert!(book.text(&id(5)).unwrap().contains("(../glossary.md)"));

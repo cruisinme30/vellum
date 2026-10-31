@@ -12,6 +12,7 @@ for ((i = 0; i < count; i++)); do
   name="$(yq ".[${i}].name" "${file}")"
   color="$(yq ".[${i}].color" "${file}")"
   description="$(yq ".[${i}].description" "${file}")"
-  gh label create "${name}" --color "${color}" --description "${description}" --force
+  gh label create "${name}" --color "${color}" --description "${description}" \
+    --force
 done
 echo "Synced ${count} labels."

@@ -29,7 +29,9 @@ use crate::compute::{Cell, CellError, Computer};
 use crate::error::SchemaError;
 use crate::formula::percent;
 use crate::row::{parse_bool, parse_number};
-use crate::schema::{NumberFormat, Property, PropertyType, Schema, SelectOption};
+use crate::schema::{
+    NumberFormat, Property, PropertyType, Schema, SelectOption,
+};
 use crate::telemetry;
 use crate::value::{DateValue, Value};
 
@@ -46,7 +48,16 @@ pub const MAX_CLAUSE_CHARS: usize = 1_000;
 
 /// How a view lays out rows.
 #[derive(
-    Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize, schemars::JsonSchema,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Default,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
 )]
 #[serde(rename_all = "snake_case")]
 pub enum ViewKind {
@@ -81,7 +92,17 @@ impl ViewKind {
 }
 
 /// A filter operator.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    Serialize,
+    Deserialize,
+    schemars::JsonSchema,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum FilterOp {
     /// Equals (any item, for lists).
@@ -124,7 +145,9 @@ impl FilterOp {
 }
 
 /// One filter; a view keeps rows matching all of its filters.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct Filter {
     /// The property key.
     pub key: String,
@@ -178,8 +201,9 @@ impl Filter {
         let mut best: Option<(usize, &str, FilterOp, bool)> = None;
         for (needle, op, unary) in OPS {
             if let Some(at) = lower.find(needle) {
-                let better =
-                    best.is_none_or(|(b, n, ..)| at < b || (at == b && needle.len() > n.len()));
+                let better = best.is_none_or(|(b, n, ..)| {
+                    at < b || (at == b && needle.len() > n.len())
+                });
                 if better {
                     best = Some((at, needle, op, unary));
                 }
@@ -192,7 +216,8 @@ impl Filter {
         } else {
             name
         };
-        let value = haystack.get(at + needle.len()..).unwrap_or_default().trim();
+        let value =
+            haystack.get(at + needle.len()..).unwrap_or_default().trim();
         if unary && !value.is_empty() {
             return Err(format!("{} takes no value", op.text()));
         }
@@ -207,13 +232,16 @@ impl Filter {
     }
 
     pub(crate) fn to_text(&self) -> String {
-        let value = if self.value.trim() != self.value || self.value.contains(' ') {
-            format!("\"{}\"", self.value)
-        } else {
-            self.value.clone()
-        };
+        let value =
+            if self.value.trim() != self.value || self.value.contains(' ') {
+                format!("\"{}\"", self.value)
+            } else {
+                self.value.clone()
+            };
         match self.op {
-            FilterOp::Empty | FilterOp::NotEmpty => format!("{} {}", self.key, self.op.text()),
+            FilterOp::Empty | FilterOp::NotEmpty => {
+                format!("{} {}", self.key, self.op.text())
+            }
             op => format!("{} {} {value}", self.key, op.text()),
         }
     }
@@ -226,7 +254,9 @@ fn unquote(s: &str) -> &str {
 }
 
 /// One sort key.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema,
+)]
 pub struct Sort {
     /// The property key.
     pub key: String,
@@ -311,7 +341,10 @@ impl ViewDef {
     /// # Errors
     ///
     /// Returns [`SchemaError::View`] naming the bad filter, sort or key.
-    pub(crate) fn from_raw(raw: &ViewDefRaw, schema: &Schema) -> Result<Self, SchemaError> {
+    pub(crate) fn from_raw(
+        raw: &ViewDefRaw,
+        schema: &Schema,
+    ) -> Result<Self, SchemaError> {
         let name = raw.name.clone().unwrap_or_else(|| "All".into());
         let err = |message: String| SchemaError::View {
             view: name.clone(),
@@ -383,14 +416,20 @@ impl ViewDef {
     }
 
     /// Applies fence-style overrides on top of this view.
-    pub(crate) fn overlay(&mut self, raw: &ViewDefRaw, schema: &Schema) -> Result<(), SchemaError> {
+    pub(crate) fn overlay(
+        &mut self,
+        raw: &ViewDefRaw,
+        schema: &Schema,
+    ) -> Result<(), SchemaError> {
         let extra = Self::from_raw(raw, schema)?;
-        check_bounds(self.filters.len() + extra.filters.len(), extra.sorts.len()).map_err(
-            |message| SchemaError::View {
-                view: self.name.clone(),
-                message,
-            },
-        )?;
+        check_bounds(
+            self.filters.len() + extra.filters.len(),
+            extra.sorts.len(),
+        )
+        .map_err(|message| SchemaError::View {
+            view: self.name.clone(),
+            message,
+        })?;
         self.filters.extend(extra.filters);
         if !extra.sorts.is_empty() {
             self.sorts = extra.sorts;
@@ -510,7 +549,9 @@ pub struct CellView {
 }
 
 /// Start and end dates of a calendar entry or timeline bar.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, Serialize, schemars::JsonSchema,
+)]
 pub struct DateSpan {
     /// Start.
     pub start: DateValue,
@@ -640,7 +681,10 @@ pub(crate) fn run(
     let columns: Vec<&Property> = schema
         .properties
         .iter()
-        .filter(|p| matches!(p.kind, PropertyType::Title) || !view.hidden.contains(&p.key))
+        .filter(|p| {
+            matches!(p.kind, PropertyType::Title)
+                || !view.hidden.contains(&p.key)
+        })
         .collect();
     let date_key = view.date.clone().or_else(|| {
         schema
@@ -660,20 +704,24 @@ pub(crate) fn run(
                 cell_view(computer, p, cell)
             })
             .collect();
-        let span = if matches!(view.kind, ViewKind::Calendar | ViewKind::Timeline) {
-            date_key.as_deref().and_then(|k| {
-                let start = computer.value(collection, *id, k).ok()?.as_date()?;
-                let end = view
-                    .end
-                    .as_deref()
-                    .and_then(|e| computer.value(collection, *id, e).ok()?.as_date())
-                    .filter(|e| *e >= start)
-                    .unwrap_or(start);
-                Some(DateSpan { start, end })
-            })
-        } else {
-            None
-        };
+        let span =
+            if matches!(view.kind, ViewKind::Calendar | ViewKind::Timeline) {
+                date_key.as_deref().and_then(|k| {
+                    let start =
+                        computer.value(collection, *id, k).ok()?.as_date()?;
+                    let end = view
+                        .end
+                        .as_deref()
+                        .and_then(|e| {
+                            computer.value(collection, *id, e).ok()?.as_date()
+                        })
+                        .filter(|e| *e >= start)
+                        .unwrap_or(start);
+                    Some(DateSpan { start, end })
+                })
+            } else {
+                None
+            };
         let title = c.row(*id).map(|r| r.title(schema)).unwrap_or_default();
         views.push(RowView {
             id: *id,
@@ -684,7 +732,9 @@ pub(crate) fn run(
     }
 
     let groups = match view.group.as_deref().and_then(|g| schema.property(g)) {
-        Some(p) => group(computer, collection, p, views, view.kind == ViewKind::Board),
+        Some(p) => {
+            group(computer, collection, p, views, view.kind == ViewKind::Board)
+        }
         None => vec![Group {
             value: None,
             label: String::new(),
@@ -753,7 +803,9 @@ fn select(
             let vals = view
                 .sorts
                 .iter()
-                .map(|s| computer.value(collection, *id, &s.key).unwrap_or_default())
+                .map(|s| {
+                    computer.value(collection, *id, &s.key).unwrap_or_default()
+                })
                 .collect();
             (*id, vals)
         })
@@ -793,7 +845,11 @@ fn option_index(p: Option<&Property>, v: &Value) -> Option<usize> {
     p?.kind.options().iter().position(|o| o.name == name)
 }
 
-pub(crate) fn compare_for_sort(prop: Option<&Property>, a: &Value, b: &Value) -> Ordering {
+pub(crate) fn compare_for_sort(
+    prop: Option<&Property>,
+    a: &Value,
+    b: &Value,
+) -> Ordering {
     match (option_index(prop, a), option_index(prop, b)) {
         (Some(i), Some(j)) => i.cmp(&j),
         (Some(_), None) => Ordering::Less,
@@ -803,7 +859,11 @@ pub(crate) fn compare_for_sort(prop: Option<&Property>, a: &Value, b: &Value) ->
 }
 
 /// Display text for each item of a cell (relation items become titles).
-pub(crate) fn item_texts(computer: &Computer<'_>, p: &Property, v: &Value) -> Vec<String> {
+pub(crate) fn item_texts(
+    computer: &Computer<'_>,
+    p: &Property,
+    v: &Value,
+) -> Vec<String> {
     match &p.kind {
         PropertyType::Relation { to, .. } => {
             let target = computer.workspace().collection(*to);
@@ -835,7 +895,11 @@ fn display_value(p: &Property, v: &Value) -> String {
 }
 
 /// The display text of a cell.
-pub(crate) fn display(computer: &Computer<'_>, p: &Property, cell: &Cell) -> String {
+pub(crate) fn display(
+    computer: &Computer<'_>,
+    p: &Property,
+    cell: &Cell,
+) -> String {
     match cell {
         Ok(Value::Bool(b)) => display_value(p, &Value::Bool(*b)),
         Ok(v) => item_texts(computer, p, v).join(", "),
@@ -859,7 +923,12 @@ fn cell_view(computer: &Computer<'_>, p: &Property, cell: Cell) -> CellView {
     }
 }
 
-fn matches(computer: &Computer<'_>, p: &Property, cell: &Cell, f: &Filter) -> bool {
+fn matches(
+    computer: &Computer<'_>,
+    p: &Property,
+    cell: &Cell,
+    f: &Filter,
+) -> bool {
     let v = cell.as_ref().cloned().unwrap_or_default();
     let texts = item_texts(computer, p, &v);
     let needle = f.value.to_lowercase();
@@ -868,8 +937,12 @@ fn matches(computer: &Computer<'_>, p: &Property, cell: &Cell, f: &Filter) -> bo
         FilterOp::NotEmpty => !v.is_empty(),
         FilterOp::Is => equals(computer, p, &v, &texts, &f.value),
         FilterOp::Not => !equals(computer, p, &v, &texts, &f.value),
-        FilterOp::Contains => texts.iter().any(|t| t.to_lowercase().contains(&needle)),
-        FilterOp::NotContains => !texts.iter().any(|t| t.to_lowercase().contains(&needle)),
+        FilterOp::Contains => {
+            texts.iter().any(|t| t.to_lowercase().contains(&needle))
+        }
+        FilterOp::NotContains => {
+            !texts.iter().any(|t| t.to_lowercase().contains(&needle))
+        }
         FilterOp::Lt | FilterOp::Le | FilterOp::Gt | FilterOp::Ge => {
             let Some(ord) = order(computer, &v, &f.value) else {
                 return false;
@@ -907,8 +980,11 @@ fn equals(
         Value::Empty if matches!(p.kind, PropertyType::Checkbox) => {
             parse_bool(operand) == Some(false)
         }
-        Value::Number(n) => parse_number(operand).is_some_and(|x| (x - n).abs() < 1e-9),
-        Value::Date(d) => operand_date(computer, operand).is_some_and(|x| x.date() == d.date()),
+        Value::Number(n) => {
+            parse_number(operand).is_some_and(|x| (x - n).abs() < 1e-9)
+        }
+        Value::Date(d) => operand_date(computer, operand)
+            .is_some_and(|x| x.date() == d.date()),
         _ => {
             let want = operand.to_lowercase();
             texts.iter().any(|t| t.to_lowercase() == want)
@@ -916,7 +992,11 @@ fn equals(
     }
 }
 
-fn order(computer: &Computer<'_>, v: &Value, operand: &str) -> Option<Ordering> {
+fn order(
+    computer: &Computer<'_>,
+    v: &Value,
+    operand: &str,
+) -> Option<Ordering> {
     match v {
         Value::Number(n) => parse_number(operand).map(|x| n.total_cmp(&x)),
         Value::Date(d) => operand_date(computer, operand).map(|x| {
@@ -939,7 +1019,8 @@ fn group(
     board: bool,
 ) -> Vec<Group> {
     // Collect each row's group values.
-    let mut keyed: Vec<(Vec<(Value, String)>, RowView)> = Vec::with_capacity(rows.len());
+    let mut keyed: Vec<(Vec<(Value, String)>, RowView)> =
+        Vec::with_capacity(rows.len());
     for r in rows {
         let cell = computer.value(collection, r.id, &p.key).unwrap_or_default();
         let items: Vec<(Value, String)> = match (&p.kind, &cell) {
@@ -1025,7 +1106,8 @@ mod tests {
             (f.key.as_str(), f.op, f.value.as_str()),
             ("pr", FilterOp::Not, "P2")
         );
-        let f = Filter::parse("Requirement contains \"replay days\"", &s).unwrap();
+        let f =
+            Filter::parse("Requirement contains \"replay days\"", &s).unwrap();
         assert_eq!(
             (f.op, f.value.as_str()),
             (FilterOp::Contains, "replay days")

@@ -6,8 +6,9 @@
 # and the release drills. Each stack has its own project name, port and
 # generated secrets under $STACK_STATE (default: a temp folder).
 #
-#   stack.sh has-serve IMAGE                 exit 0 if IMAGE has `vellum serve`
-#   stack.sh up IMAGE PROJECT PORT [KEK]     start and wait for /readyz
+#   stack.sh up IMAGE PROJECT PORT [KEK]     start and wait for /readyz;
+#                                            REPLICAS=2 adds a second
+#                                            Vellum on PORT+1
 #   stack.sh up-deps PROJECT PORT [KEK]      start everything but Vellum
 #   stack.sh down PROJECT                    stop and delete volumes
 set -euo pipefail
@@ -17,13 +18,17 @@ compose_file="${here}/compose.yaml"
 state="${STACK_STATE:-${RUNNER_TEMP:-/tmp}/vellum-stacks}"
 mkdir -p "${state}"
 
-random() { head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32; }
+# random: 64 hex characters (32 random bytes). Base64 with its symbols
+# removed came out shorter than 32 characters about one time in three,
+# below the 32 bytes VELLUM_CLUSTER_KEY needs.
+random() { head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 
 # compose PROJECT ARGS...: docker compose for that stack.
 compose() {
   local project="$1"
   shift
-  docker compose -f "${compose_file}" -p "${project}" --env-file "${state}/${project}.env" "$@"
+  docker compose -f "${compose_file}" -p "${project}" \
+    --env-file "${state}/${project}.env" "$@"
 }
 
 # write_env PROJECT IMAGE PORT [KEK]: secrets for a new stack; an existing
@@ -42,6 +47,8 @@ VELLUM_PORT=${port}
 VELLUM_PUBLIC_URL=http://localhost:${port}
 POSTGRES_PASSWORD=$(random)
 MINIO_ROOT_PASSWORD=$(random)
+VELLUM_CLUSTER_KEY=$(random)
+VELLUM_PORT_B=$((port + 1))
 VELLUM_KEK_FILE=${kek}
 VELLUM_CSRF_FILE=${csrf}
 VELLUM_LOG=info
@@ -65,9 +72,6 @@ wait_ready() {
 command="${1:-}"
 shift || true
 case "${command}" in
-  has-serve)
-    docker run --rm "$1" serve --help >/dev/null 2>&1
-    ;;
   up)
     image="$1" project="$2" port="$3"
     write_env "${project}" "${image}" "${port}" "${4:-}"
@@ -76,6 +80,14 @@ case "${command}" in
     if ! wait_ready "${port}"; then
       compose "${project}" logs vellum | tail -100
       exit 1
+    fi
+    if [[ "${REPLICAS:-1}" -ge 2 ]]; then
+      # Started after the first, which runs the migrations and the rescan.
+      compose "${project}" --profile replicas up -d --no-build vellum-b
+      if ! wait_ready "$((port + 1))"; then
+        compose "${project}" --profile replicas logs vellum-b | tail -100
+        exit 1
+      fi
     fi
     ;;
   up-deps)
@@ -94,11 +106,13 @@ case "${command}" in
     compose "$@"
     ;;
   down)
-    compose "$1" down --volumes --remove-orphans
+    compose "$1" --profile replicas down --volumes --remove-orphans
     ;;
   *)
-    echo "usage: stack.sh has-serve IMAGE | up IMAGE PROJECT PORT [KEK] | up-deps PROJECT PORT [KEK]" >&2
-    echo "       | start-vellum PROJECT IMAGE PORT | compose PROJECT ARGS... | down PROJECT" >&2
+    echo "usage: stack.sh up IMAGE PROJECT PORT [KEK] | up-deps PROJECT PORT" \
+      "[KEK]" >&2
+    echo "       | start-vellum PROJECT IMAGE PORT | compose PROJECT ARGS..." \
+      "| down PROJECT" >&2
     exit 2
     ;;
 esac

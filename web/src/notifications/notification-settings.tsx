@@ -3,6 +3,7 @@
 
 import { useEffect, useId, useState } from "react";
 
+import { ViewTitle } from "../help/help-link";
 import { useT } from "../i18n/i18n";
 import { describeError } from "../views/sign-in";
 
@@ -26,7 +27,10 @@ const SNOOZES = [
 ] as const;
 
 /** Whether a snooze is still running at `now`. */
-export function snoozeActive(snoozedUntil: string | undefined, now: number): boolean {
+export function snoozeActive(
+  snoozedUntil: string | undefined,
+  now: number,
+): boolean {
   if (snoozedUntil === undefined) return false;
   const until = Date.parse(snoozedUntil);
   return Number.isFinite(until) && until > now;
@@ -42,7 +46,11 @@ type Load =
     };
 
 /** `/settings/notifications`: what reaches you, where, and when. */
-export function NotificationSettingsView({ now = Date.now }: { readonly now?: () => number }) {
+export function NotificationSettingsView({
+  now = Date.now,
+}: {
+  readonly now?: () => number;
+}) {
   const t = useT();
   const { store, device } = useNotificationServices();
   const [load, setLoad] = useState<Load>({ state: "loading" });
@@ -56,10 +64,15 @@ export function NotificationSettingsView({ now = Date.now }: { readonly now?: ()
     let live = true;
     store.load().then(
       (preferences) => {
-        if (live) setLoad({ state: "ready", saved: preferences, draft: preferences });
+        if (live)
+          setLoad({ state: "ready", saved: preferences, draft: preferences });
       },
       (error_: unknown) => {
-        if (live) setLoad({ state: "failed", error: describeError(error_, t("auth-error")) });
+        if (live)
+          setLoad({
+            state: "failed",
+            error: describeError(error_, t("auth-error")),
+          });
       },
     );
     return () => {
@@ -121,7 +134,7 @@ export function NotificationSettingsView({ now = Date.now }: { readonly now?: ()
 
   return (
     <form className="vl-view vl-notify" onSubmit={save} aria-busy={busy}>
-      <h1>{t("notify-title")}</h1>
+      <ViewTitle title={t("notify-title")} help="app.notifications" />
       <p className="vl-muted">{t("notify-intro")}</p>
 
       <ChannelTable draft={draft} onChange={edit} />
@@ -130,7 +143,11 @@ export function NotificationSettingsView({ now = Date.now }: { readonly now?: ()
       <Muted draft={draft} onChange={edit} />
 
       <div className="vl-notify-actions">
-        <button type="submit" className="vl-filled-button" disabled={busy || !dirty}>
+        <button
+          type="submit"
+          className="vl-filled-button"
+          disabled={busy || !dirty}
+        >
           {t("notify-save")}
         </button>
         <button
@@ -190,7 +207,9 @@ function ChannelTable({ draft, onChange }: SectionProperties) {
                   <th scope="row">
                     {label}
                     {isUrgent(kind) ? (
-                      <span className="vl-notify-urgent">{t("notify-urgent")}</span>
+                      <span className="vl-notify-urgent">
+                        {t("notify-urgent")}
+                      </span>
                     ) : undefined}
                   </th>
                   {CHANNELS.map((channel) => (
@@ -203,7 +222,14 @@ function ChannelTable({ draft, onChange }: SectionProperties) {
                           kind: label,
                         })}
                         onChange={(event) => {
-                          onChange(withChannel(draft, kind, channel, event.target.checked));
+                          onChange(
+                            withChannel(
+                              draft,
+                              kind,
+                              channel,
+                              event.target.checked,
+                            ),
+                          );
                         }}
                       />
                     </td>
@@ -237,12 +263,17 @@ function EmailDelay({ draft, onChange }: SectionProperties) {
           value={draft.emailDelayMinutes}
           aria-describedby={`${id}-hint`}
           onChange={(event) => {
-            onChange({ ...draft, emailDelayMinutes: Number(event.target.value) });
+            onChange({
+              ...draft,
+              emailDelayMinutes: Number(event.target.value),
+            });
           }}
         >
           {options.map((minutes) => (
             <option key={minutes} value={minutes}>
-              {minutes === 0 ? t("notify-email-now") : t("notify-minutes", { n: minutes })}
+              {minutes === 0
+                ? t("notify-email-now")
+                : t("notify-minutes", { n: minutes })}
             </option>
           ))}
         </select>
@@ -254,7 +285,11 @@ function EmailDelay({ draft, onChange }: SectionProperties) {
   );
 }
 
-function Snooze({ draft, onChange, now }: SectionProperties & { readonly now: () => number }) {
+function Snooze({
+  draft,
+  onChange,
+  now,
+}: SectionProperties & { readonly now: () => number }) {
   const t = useT();
   const active = snoozeActive(draft.snoozedUntil, now());
   return (
@@ -281,7 +316,11 @@ function Snooze({ draft, onChange, now }: SectionProperties & { readonly now: ()
       ) : (
         <>
           <p className="vl-muted">{t("notify-snooze-hint")}</p>
-          <div className="vl-notify-chips" role="group" aria-label={t("notify-snooze")}>
+          <div
+            className="vl-notify-chips"
+            role="group"
+            aria-label={t("notify-snooze")}
+          >
             {SNOOZES.map(([label, minutes]) => (
               <button
                 key={label}
@@ -290,7 +329,9 @@ function Snooze({ draft, onChange, now }: SectionProperties & { readonly now: ()
                 onClick={() => {
                   onChange({
                     ...draft,
-                    snoozedUntil: new Date(now() + minutes * 60_000).toISOString(),
+                    snoozedUntil: new Date(
+                      now() + minutes * 60_000,
+                    ).toISOString(),
                   });
                 }}
               >
@@ -311,7 +352,10 @@ function Muted({ draft, onChange }: SectionProperties) {
   const add = () => {
     const value = subject.trim();
     if (value === "" || draft.muted.includes(value)) return;
-    onChange({ ...draft, muted: [...draft.muted, value].toSorted((a, b) => a.localeCompare(b)) });
+    onChange({
+      ...draft,
+      muted: [...draft.muted, value].toSorted((a, b) => a.localeCompare(b)),
+    });
     setSubject("");
   };
   return (
@@ -329,7 +373,10 @@ function Muted({ draft, onChange }: SectionProperties) {
                 className="vl-text-button"
                 aria-label={t("notify-unmute-label", { subject: item })}
                 onClick={() => {
-                  onChange({ ...draft, muted: draft.muted.filter((each) => each !== item) });
+                  onChange({
+                    ...draft,
+                    muted: draft.muted.filter((each) => each !== item),
+                  });
                 }}
               >
                 {t("notify-unmute")}

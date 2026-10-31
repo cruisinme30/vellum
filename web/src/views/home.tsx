@@ -21,19 +21,31 @@ export function HomeView() {
   const starred = workspace.pages.filter((p) => p.starred);
   return (
     <div className="vl-view">
-      <h1>{t("home-greeting", { name: (user?.name ?? workspace.me.name).replace(/ .*/s, "") })}</h1>
+      <h1>
+        {t("home-greeting", {
+          name: (user?.name ?? workspace.me.name).replace(/ .*/s, ""),
+        })}
+      </h1>
       <nav className="vl-home-shortcuts" aria-label={t("home-shortcuts")}>
+        <Link to="/drive">{t("drive")}</Link>
         <Link to="/my-work">{t("my-work")}</Link>
         <Link to="/issues">{t("issues")}</Link>
         <Link to="/books">{t("books")}</Link>
+        <Link to="/import">{t("import-title")}</Link>
       </nav>
       <section aria-labelledby="home-recent">
         <h2 id="home-recent">{t("home-recent")}</h2>
-        <PageList items={recent.map((page) => ({ page }))} empty={t("home-recent-empty")} />
+        <PageList
+          items={recent.map((page) => ({ page }))}
+          empty={t("home-recent-empty")}
+        />
       </section>
       <section aria-labelledby="home-starred">
         <h2 id="home-starred">{t("nav-favorites")}</h2>
-        <PageList items={starred.map((page) => ({ page }))} empty={t("favorites-empty")} />
+        <PageList
+          items={starred.map((page) => ({ page }))}
+          empty={t("favorites-empty")}
+        />
       </section>
     </div>
   );
@@ -47,7 +59,9 @@ export function FavoritesView() {
     <div className="vl-view">
       <h1>{t("nav-favorites")}</h1>
       <PageList
-        items={workspace.pages.filter((p) => p.starred).map((page) => ({ page }))}
+        items={workspace.pages
+          .filter((p) => p.starred)
+          .map((page) => ({ page }))}
         empty={t("favorites-empty")}
       />
     </div>

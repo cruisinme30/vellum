@@ -80,13 +80,18 @@ macro_rules! ulid_newtype {
         }
 
         impl Serialize for $name {
-            fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+            fn serialize<S: Serializer>(
+                &self,
+                serializer: S
+            ) -> Result<S::Ok, S::Error> {
                 serializer.serialize_str(&self.0)
             }
         }
 
         impl<'de> Deserialize<'de> for $name {
-            fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+            fn deserialize<D: Deserializer<'de>>(
+                deserializer: D
+            ) -> Result<Self, D::Error> {
                 let raw = String::deserialize(deserializer)?;
                 Self::parse(&raw).map_err(serde::de::Error::custom)
             }
@@ -169,7 +174,8 @@ impl IdSource for SequentialIds {
         let mut n = self.next;
         for _ in 0..16 {
             let index = usize::try_from(n % 32).unwrap_or_default();
-            digits.insert(0, char::from(*CROCKFORD.get(index).unwrap_or(&b'0')));
+            digits
+                .insert(0, char::from(*CROCKFORD.get(index).unwrap_or(&b'0')));
             n /= 32;
         }
         self.next += 1;

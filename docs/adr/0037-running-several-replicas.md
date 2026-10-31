@@ -11,9 +11,9 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D150, D151, D159, D160
-- Issue: #432, #433, #434, #435, #437
-- Pull requests: none yet (delivered as a bundle)
+- Decisions: D150, D151, D159, D160, D278
+- Issue: #432, #433, #434, #435, #437, #441
+- Pull requests: none yet (delivered as a bundle and a batch; D278 in a batch)
 
 :::
 
@@ -60,6 +60,16 @@ safe to run as several replicas. Each fix adds its decision here.
 - When the list changes, rooms a replica no longer owns are drained and
   their editors reconnect to the new owner. An unreachable owner means the
   replica serves the room itself, so re-home costs one reconnect.
+
+### `D278`: `vellum serve` runs live editing across replicas
+
+- Serve mounts D151's forwarding router when `VELLUM_CLUSTER_KEY` and
+  `VELLUM_NODE_ADDRESS` are set (chart and compose set both); without the
+  key every room is served locally. A key under 32 bytes stops startup; a
+  key without an address logs a warning and serves rooms locally.
+- The replica's name is its change-feed origin, so a restarted pod is a
+  new owner. Replicas with no address own no rooms. Shutdown leaves the
+  list before saving rooms, so editors move to the new owner at once.
 
 ### `D159`: the workspace files live in the bucket `VELLUM_BLOB_URL` names
 
@@ -127,3 +137,12 @@ safe to run as several replicas. Each fix adds its decision here.
 - Sign-in costs one indexed query per request and writes are serialised
   workspace-wide; per-record queries can replace the cache if load tests
   show it. Break-glass codes are still a file on one replica.
+
+### Proving it under load
+
+- The nightly load test runs two replicas over one Postgres and bucket
+  and spreads its requests over both (#441). A separate check writes on
+  one replica, reads on the other and fails when that takes over a second
+  at p95 or five seconds at worst.
+- The load scripts drive the routes `vellum openapi` lists; a test in
+  the `vellum-cli` crate fails when one of them is no longer served.

@@ -22,7 +22,8 @@ echo "Auto-merge allowed on ${repo}."
 
 ruleset_id="$(gh api "repos/${repo}/rulesets" --jq '
   map(select(.target == "branch")) | .[].id' | while read -r id; do
-    if gh api "repos/${repo}/rulesets/${id}" --jq '.conditions.ref_name.include[]' |
+    if gh api "repos/${repo}/rulesets/${id}" \
+      --jq '.conditions.ref_name.include[]' |
       grep -qx 'refs/heads/develop'; then
       echo "${id}"
     fi
@@ -51,6 +52,7 @@ gh api "repos/${repo}/rulesets/${ruleset_id}" |
     name, target, enforcement, conditions, bypass_actors,
     rules: ([.rules[] | select(.type != "merge_queue")] + [$queue])
   }' |
-  gh api --method PUT "repos/${repo}/rulesets/${ruleset_id}" --input - >/dev/null
+  gh api --method PUT "repos/${repo}/rulesets/${ruleset_id}" \
+    --input - >/dev/null
 
 echo "Merge queue enabled on develop (ruleset ${ruleset_id})."

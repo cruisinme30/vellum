@@ -15,7 +15,9 @@ use std::collections::HashMap;
 use vellum_contracts::{Principal, Scope};
 use vellum_kernel::{BlockId, DocId, Error, ErrorKind, UserId};
 
-use crate::caldav::{self, DavError, Depth, ListInfo, Multistatus, Object, Report, Resource};
+use crate::caldav::{
+    self, DavError, Depth, ListInfo, Multistatus, Object, Report, Resource,
+};
 use crate::capture;
 use crate::checklist::{self, Checklist};
 use crate::feed::{self, FeedOptions};
@@ -26,7 +28,8 @@ use crate::projection;
 use crate::service::{Me, TasksService};
 
 /// The path prefixes [`TasksService::handle_raw`] serves.
-pub const PREFIXES: [&str; 4] = [FEED_PREFIX, caldav::PREFIX, "/capture/", "/connect/"];
+pub const PREFIXES: [&str; 4] =
+    [FEED_PREFIX, caldav::PREFIX, "/capture/", "/connect/"];
 
 /// The calendar feed: `GET /feeds/tasks/<token>.ics`.
 pub const FEED_PREFIX: &str = "/feeds/tasks/";
@@ -87,12 +90,20 @@ impl RawResponse {
         }
     }
 
-    pub(crate) fn with_header(mut self, name: &str, value: impl Into<String>) -> Self {
+    pub(crate) fn with_header(
+        mut self,
+        name: &str,
+        value: impl Into<String>,
+    ) -> Self {
         self.headers.push((name.to_owned(), value.into()));
         self
     }
 
-    fn with_body(mut self, content_type: &str, body: impl Into<Vec<u8>>) -> Self {
+    fn with_body(
+        mut self,
+        content_type: &str,
+        body: impl Into<Vec<u8>>,
+    ) -> Self {
         self.body = body.into();
         self.with_header("Content-Type", content_type)
     }
@@ -127,8 +138,12 @@ impl RawResponse {
     fn from_dav(err: &DavError) -> Self {
         let response = Self::new(err.status());
         match err.body() {
-            Some(body) => response.with_body("application/xml; charset=utf-8", body),
-            None => response.with_body("text/plain; charset=utf-8", err.to_string()),
+            Some(body) => {
+                response.with_body("application/xml; charset=utf-8", body)
+            }
+            None => {
+                response.with_body("text/plain; charset=utf-8", err.to_string())
+            }
         }
     }
 }
@@ -168,8 +183,14 @@ impl DavList {
         let objects = tasks
             .iter()
             .map(|task| {
-                let parent = task.parent.and_then(|p| uids.get(&p)).map(String::as_str);
-                let todo = ical::to_vtodo(task, parent, &me.profile.time_zone, doc.modified);
+                let parent =
+                    task.parent.and_then(|p| uids.get(&p)).map(String::as_str);
+                let todo = ical::to_vtodo(
+                    task,
+                    parent,
+                    &me.profile.time_zone,
+                    doc.modified,
+                );
                 Object {
                     uid: ical::uid(task),
                     ical: ical::calendar(None, vec![todo]).to_ical(),
@@ -228,11 +249,14 @@ impl TasksService {
         result.unwrap_or_else(|err| RawResponse::from_error(&err))
     }
 
-    async fn feed(&self, request: &RawRequest, segment: &str) -> Result<RawResponse, Error> {
+    async fn feed(
+        &self,
+        request: &RawRequest,
+        segment: &str,
+    ) -> Result<RawResponse, Error> {
         if !matches!(request.method.as_str(), "GET" | "HEAD") {
-            return Ok(
-                RawResponse::text(405, "method not allowed").with_header("Allow", "GET, HEAD")
-            );
+            return Ok(RawResponse::text(405, "method not allowed")
+                .with_header("Allow", "GET, HEAD"));
         }
         let Some(token) = feed::token_from_path(segment) else {
             return Ok(RawResponse::text(404, "not found"));
@@ -266,12 +290,11 @@ impl TasksService {
 
     async fn dav(&self, request: &RawRequest) -> Result<RawResponse, Error> {
         let Some(user) = request.principal.user_id() else {
-            return Ok(
-                RawResponse::text(401, "sign in with an app password").with_header(
+            return Ok(RawResponse::text(401, "sign in with an app password")
+                .with_header(
                     "WWW-Authenticate",
                     "Basic realm=\"Vellum\", charset=\"UTF-8\"",
-                ),
-            );
+                ));
         };
         let writes = matches!(request.method.as_str(), "PUT" | "DELETE");
         request.principal.require_scope(if writes {
@@ -316,16 +339,27 @@ impl TasksService {
         }))
     }
 
-    async fn dav_lists(&self, user: UserId, me: &Me) -> Result<Vec<DavList>, Error> {
+    async fn dav_lists(
+        &self,
+        user: UserId,
+        me: &Me,
+    ) -> Result<Vec<DavList>, Error> {
         let files = self.workspace.task_files(user).await?;
         Ok(files
             .into_iter()
-            .filter(|f| matches!(f.context.origin, Origin::Inbox | Origin::List))
+            .filter(|f| {
+                matches!(f.context.origin, Origin::Inbox | Origin::List)
+            })
             .map(|f| DavList::new(f, me))
             .collect())
     }
 
-    async fn dav_list(&self, user: UserId, me: &Me, list: &str) -> Result<Option<DavList>, Error> {
+    async fn dav_list(
+        &self,
+        user: UserId,
+        me: &Me,
+        list: &str,
+    ) -> Result<Option<DavList>, Error> {
         let Ok(doc) = list.parse::<DocId>() else {
             return Ok(None);
         };
@@ -427,11 +461,15 @@ impl TasksService {
                             user: owner,
                             list: id,
                             uid,
-                        }) if owner == *handle && id == list.info.id => list.find(&uid),
+                        }) if owner == *handle && id == list.info.id => {
+                            list.find(&uid)
+                        }
                         _ => None,
                     };
                     match found {
-                        Some((_, object)) => ms.object(handle, &list.info.id, object, &props),
+                        Some((_, object)) => {
+                            ms.object(handle, &list.info.id, object, &props);
+                        }
                         None => ms.not_found(&href),
                     }
                 }
@@ -497,7 +535,9 @@ impl TasksService {
         let now = me.now.timestamp();
         let todo = match ical::from_vtodo(text, &me.profile.time_zone, now) {
             Ok(todo) => todo,
-            Err(err) => return Ok(Err(DavError::UnsupportedData(err.to_string()))),
+            Err(err) => {
+                return Ok(Err(DavError::UnsupportedData(err.to_string())));
+            }
         };
         let current = list.find(uid).map(|(_, o)| caldav::etag(&o.ical));
         if let Err(err) = caldav::check_preconditions(
@@ -518,18 +558,25 @@ impl TasksService {
                 let edited = if created {
                     let mut fields = todo.fields.clone();
                     if !todo.uid.ends_with("@vellum") {
-                        fields.src = Some(format!("{}{}", ical::CALDAV_SRC, todo.uid));
+                        fields.src =
+                            Some(format!("{}{}", ical::CALDAV_SRC, todo.uid));
                     }
                     if todo.done && fields.done.is_none() {
                         fields.done = Some(now);
                     }
-                    checklist::append(&file.text, parent, &todo.title, &fields, block)
+                    checklist::append(
+                        &file.text,
+                        parent,
+                        &todo.title,
+                        &fields,
+                        block,
+                    )
                 } else {
                     put_existing(&file.text, block, &todo, &zoned)
                 };
-                edited
-                    .map(|text| (text, ()))
-                    .map_err(|_| Error::new(ErrorKind::NotFound, "the task is gone"))
+                edited.map(|text| (text, ())).map_err(|_| {
+                    Error::new(ErrorKind::NotFound, "the task is gone")
+                })
             })
             .await?;
         let list = DavList::new(written, me);
@@ -537,7 +584,12 @@ impl TasksService {
             .objects
             .iter()
             .zip(&list.tasks)
-            .find(|(_, t)| matches!(&t.source, Source::Checklist { block: b, .. } if *b == block))
+            .find(|(_, t)| {
+                matches!(
+                    &t.source,
+                    Source::Checklist { block: b, .. } if *b == block
+                )
+            })
             .map(|(o, _)| caldav::etag(&o.ical));
         let mut response = RawResponse::new(if created { 201 } else { 204 });
         if let Some(etag) = etag {
@@ -576,15 +628,21 @@ impl TasksService {
             .edit(user, list.doc.context.doc, |file| {
                 checklist::remove(&file.text, block)
                     .map(|text| (text, ()))
-                    .map_err(|_| Error::new(ErrorKind::NotFound, "the task is gone"))
+                    .map_err(|_| {
+                        Error::new(ErrorKind::NotFound, "the task is gone")
+                    })
             })
             .await?;
         Ok(Ok(RawResponse::new(204)))
     }
 
-    async fn capture_email(&self, request: &RawRequest) -> Result<RawResponse, Error> {
+    async fn capture_email(
+        &self,
+        request: &RawRequest,
+    ) -> Result<RawResponse, Error> {
         if request.method != "POST" {
-            return Ok(RawResponse::text(405, "method not allowed").with_header("Allow", "POST"));
+            return Ok(RawResponse::text(405, "method not allowed")
+                .with_header("Allow", "POST"));
         }
         let Some(token) = request
             .header(RECIPIENT_HEADER)
@@ -600,16 +658,21 @@ impl TasksService {
             return Ok(RawResponse::text(404, "unknown address"));
         };
         let me = self.me(user).await?;
-        let Ok(task) = capture::from_email(&request.body, me.now.datetime()) else {
+        let Ok(task) = capture::from_email(&request.body, me.now.datetime())
+        else {
             return Ok(RawResponse::text(400, "cannot read the message"));
         };
         self.add_capture(user, &me, &task).await?;
         Ok(RawResponse::new(202))
     }
 
-    async fn capture_slack(&self, request: &RawRequest) -> Result<RawResponse, Error> {
+    async fn capture_slack(
+        &self,
+        request: &RawRequest,
+    ) -> Result<RawResponse, Error> {
         if request.method != "POST" {
-            return Ok(RawResponse::text(405, "method not allowed").with_header("Allow", "POST"));
+            return Ok(RawResponse::text(405, "method not allowed")
+                .with_header("Allow", "POST"));
         }
         let Some(secret) = &self.config.slack_signing_secret else {
             return Ok(RawResponse::text(404, "Slack capture is not set up"));
@@ -638,14 +701,44 @@ impl TasksService {
             .slack_user(saved.team.clone(), saved.slack_user.clone())
             .await?
         else {
-            return Ok(RawResponse::text(
-                403,
-                "link your Slack account in Vellum first",
-            ));
+            // Not linked yet: answer with a link that, opened while signed
+            // in to Vellum, links this Slack user (#163, D177).
+            let code = capture::slack_link_code(
+                secret,
+                &saved.team,
+                &saved.slack_user,
+                self.now(),
+            );
+            let text = format!(
+                "Link your Slack account to Vellum to save messages as tasks: \
+                    {}/my-work?slack_link={code} (the link works for 15 \
+                    minutes). Then use Save as task again.",
+                self.config.base_url
+            );
+            return Ok(self.slack_reply(saved.response_url, text).await);
         };
         let me = self.me(user).await?;
         self.add_capture(user, &me, &saved.capture).await?;
-        Ok(RawResponse::new(200))
+        let text =
+            format!("Saved to your Vellum inbox: {}", saved.capture.title);
+        Ok(self.slack_reply(saved.response_url, text).await)
+    }
+
+    /// Tells the Slack user `text`: through `response_url` (Slack ignores
+    /// the body of a message shortcut's answer) and in the body (which a
+    /// slash command shows).
+    async fn slack_reply(
+        &self,
+        response_url: Option<String>,
+        text: String,
+    ) -> RawResponse {
+        if let Some(url) = response_url {
+            self.workspace.slack_say(url, text.clone()).await;
+        }
+        let body =
+            serde_json::json!({ "response_type": "ephemeral", "text": text })
+                .to_string();
+        RawResponse::new(200).with_body("application/json", body)
     }
 
     async fn add_capture(
@@ -686,7 +779,8 @@ fn put_existing(
         // Ticking a repeating task moves it on, as in the web app.
         fields.done = None;
         let text = checklist::update(text, block, &todo.title, &fields)?;
-        return checklist::complete(&text, block, now, false).map(|(text, _)| text);
+        return checklist::complete(&text, block, now, false)
+            .map(|(text, _)| text);
     }
     if !todo.done {
         fields.done = None;

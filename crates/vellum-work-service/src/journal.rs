@@ -3,8 +3,8 @@
 
 //! The Work journal: how several replicas share one set of Work files.
 //!
-//! Every replica holds the Work engine in memory. To keep the copies in
-//! step, each command is numbered in one small blob, `.vellum/work/journal.json`,
+//! Every replica holds the Work engine in memory. To keep the copies in step,
+//! each command is numbered in one small blob, `.vellum/work/journal.json`,
 //! next to the files it changes. A command:
 //!
 //! 1. reads the journal and loads the files other replicas changed since
@@ -157,7 +157,8 @@ impl Journal {
             rev: next.rev,
             paths,
             pending: true,
-            expires_ms: now_ms.saturating_add(u64::try_from(LEASE.as_millis()).unwrap_or(0)),
+            expires_ms: now_ms
+                .saturating_add(u64::try_from(LEASE.as_millis()).unwrap_or(0)),
             writer: writer.to_owned(),
         });
         let drop = next.entries.len().saturating_sub(KEEP);
@@ -180,7 +181,8 @@ impl Journal {
 }
 
 fn path() -> BlobPath {
-    BlobPath::new(PATH).unwrap_or_else(|_| unreachable!("the journal path is valid"))
+    BlobPath::new(PATH)
+        .unwrap_or_else(|_| unreachable!("the journal path is valid"))
 }
 
 fn unavailable(what: &str, e: impl std::fmt::Display) -> Error {
@@ -195,8 +197,9 @@ fn unavailable(what: &str, e: impl std::fmt::Display) -> Error {
 pub async fn read(store: &dyn BlobStore) -> Result<Read, Error> {
     match store.get(&path()).await {
         Ok(blob) => {
-            let journal = serde_json::from_slice(&blob.bytes)
-                .map_err(|e| unavailable("the Work journal is unreadable", e))?;
+            let journal = serde_json::from_slice(&blob.bytes).map_err(|e| {
+                unavailable("the Work journal is unreadable", e)
+            })?;
             Ok(Read {
                 journal,
                 etag: Some(blob.meta.etag),
@@ -221,11 +224,16 @@ pub async fn write(
     journal: &Journal,
     etag: Option<&Etag>,
 ) -> Result<Option<Etag>, Error> {
-    let bytes = serde_json::to_vec(journal).map_err(|e| unavailable("journal", e))?;
-    let condition = etag.map_or(Precondition::IfAbsent, |e| Precondition::IfMatch(e.clone()));
+    let bytes =
+        serde_json::to_vec(journal).map_err(|e| unavailable("journal", e))?;
+    let condition = etag
+        .map_or(Precondition::IfAbsent, |e| Precondition::IfMatch(e.clone()));
     match store.put(&path(), Bytes::from(bytes), condition).await {
         Ok(meta) => Ok(Some(meta.etag)),
-        Err(StoreError::PreconditionFailed { .. } | StoreError::AlreadyExists(_)) => Ok(None),
+        Err(
+            StoreError::PreconditionFailed { .. }
+            | StoreError::AlreadyExists(_),
+        ) => Ok(None),
         Err(e) => Err(unavailable("cannot write the Work journal", e)),
     }
 }

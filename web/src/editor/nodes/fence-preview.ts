@@ -40,7 +40,9 @@ const list = (raw: string) =>
 export function keyValues(body: string): [key: string, value: string][] {
   return body.split("\n").flatMap((line): [string, string][] => {
     const colon = line.indexOf(":");
-    return colon <= 0 ? [] : [[line.slice(0, colon).trim(), line.slice(colon + 1).trim()]];
+    return colon <= 0
+      ? []
+      : [[line.slice(0, colon).trim(), line.slice(colon + 1).trim()]];
   });
 }
 
@@ -48,18 +50,29 @@ export function keyValues(body: string): [key: string, value: string][] {
 export function parseChart(body: string): ChartPreview | undefined {
   const pairs = keyValues(body);
   const fields = new Map(pairs.filter(([key]) => OPTIONS.has(key)));
-  const slices = pairs.filter(([key, value]) => !OPTIONS.has(key) && NUMBER.test(value));
-  const labels = fields.has("labels") ? list(fields.get("labels") ?? "") : slices.map(([l]) => l);
+  const slices = pairs.filter(
+    ([key, value]) => !OPTIONS.has(key) && NUMBER.test(value),
+  );
+  const labels = fields.has("labels")
+    ? list(fields.get("labels") ?? "")
+    : slices.map(([l]) => l);
   const values = fields.has("values")
     ? list(fields.get("values") ?? "").map(Number)
     : slices.map(([, v]) => Number(v));
   if (values.length === 0 || values.some((v) => !Number.isFinite(v))) {
     return undefined;
   }
-  return { title: fields.get("title") ?? "", type: fields.get("type") ?? "bar", labels, values };
+  return {
+    title: fields.get("title") ?? "",
+    type: fields.get("type") ?? "bar",
+    labels,
+    values,
+  };
 }
 
-/** Parses a CSV body: the first row is the header. Quotes are not special in v1. */
+/**
+ * Parses a CSV body: the first row is the header. Quotes are not special in v1.
+ */
 export function parseCsv(body: string): string[][] {
   return body
     .split("\n")
@@ -68,5 +81,13 @@ export function parseCsv(body: string): string[][] {
     .map((line) => line.split(",").map((cell) => cell.trim()));
 }
 
-/** Kroki-rendered diagram languages: drawn by the sidecar when it is enabled. */
-export const KROKI = new Set(["d2", "plantuml", "graphviz", "excalidraw", "drawio"]);
+/**
+ * Kroki-rendered diagram languages: drawn by the sidecar when it is enabled.
+ */
+export const KROKI = new Set([
+  "d2",
+  "plantuml",
+  "graphviz",
+  "excalidraw",
+  "drawio",
+]);

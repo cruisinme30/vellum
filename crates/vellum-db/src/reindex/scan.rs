@@ -15,8 +15,7 @@
 //! `name.shortcut.yaml` is a shortcut. `.vellum/` is never indexed.
 
 use std::collections::HashSet;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::UNIX_EPOCH;
 
 use serde::Deserialize;
@@ -24,8 +23,8 @@ use sha2::{Digest as _, Sha256};
 use vellum_kernel::ObjectId;
 
 use super::{
-    DocKind, DocumentRow, FileReader, FolderRow, Problem, ProblemKind, Snapshot, SpaceKind,
-    SpaceRow,
+    DocKind, DocumentRow, FileReader, FolderRow, Problem, ProblemKind,
+    Snapshot, SpaceKind, SpaceRow, Tree,
 };
 
 const FOLDER_MANIFEST: &str = ".vellum-folder.yaml";
@@ -64,6 +63,7 @@ struct Parent {
 
 pub(super) struct Scanner<'a> {
     root: &'a Path,
+    tree: &'a dyn Tree,
     reader: &'a dyn FileReader,
     now_ms: i64,
     seen: HashSet<ObjectId>,
@@ -71,9 +71,15 @@ pub(super) struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
-    pub(super) fn new(root: &'a Path, reader: &'a dyn FileReader, now_ms: i64) -> Self {
+    pub(super) fn new(
+        root: &'a Path,
+        tree: &'a dyn Tree,
+        reader: &'a dyn FileReader,
+        now_ms: i64,
+    ) -> Self {
         Self {
             root,
+            tree,
             reader,
             now_ms,
             seen: HashSet::new(),
@@ -83,8 +89,8 @@ impl<'a> Scanner<'a> {
 
     pub(super) fn run(mut self) -> Snapshot {
         for (parent, kind) in SPACE_PARENTS {
-            for dir in Self::sorted_entries(&self.root.join(parent)) {
-                if dir.is_dir() {
+            for dir in self.tree.entries(&self.root.join(parent)) {
+                if self.tree.is_dir(&dir) {
                     self.space(&dir, kind);
                 }
             }
@@ -117,24 +123,34 @@ impl<'a> Scanner<'a> {
     }
 
     fn walk(&mut self, space_root: &Path, dir: &Path, parent: &Parent) {
-        for path in Self::sorted_entries(dir) {
+        for path in self.tree.entries(dir) {
             let name = file_name(&path);
             if name.starts_with('.')
-                || (parent.container == Some(DocKind::Book) && name == "SUMMARY.md")
+                || (parent.container == Some(DocKind::Book)
+                    && name == "SUMMARY.md")
             {
                 continue;
             }
             let rel = relative_to(space_root, &path);
-            if path.is_dir() {
+            if self.tree.is_dir(&path) {
                 self.directory(space_root, &path, &name, rel, parent);
             } else if let Some(stem) = name.strip_suffix(".md") {
                 let kind = match (parent.container, parent.kind) {
                     (Some(DocKind::Collection), _) => DocKind::Row,
-                    (None, SpaceKind::Team) if rel.starts_with("issues/") => DocKind::Issue,
+                    (None, SpaceKind::Team) if rel.starts_with("issues/") => {
+                        DocKind::Issue
+                    }
                     (None, SpaceKind::Tasks) => DocKind::TaskList,
                     _ => DocKind::Page,
                 };
-                let _ = self.document(&path, rel, stem, kind, Header::from_front_matter, parent);
+                let _ = self.document(
+                    &path,
+                    rel,
+                    stem,
+                    kind,
+                    Header::from_front_matter,
+                    parent,
+                );
             } else if let Some(stem) = name.strip_suffix(".shortcut.yaml") {
                 let _ = self.document(
                     &path,
@@ -166,7 +182,9 @@ impl<'a> Scanner<'a> {
         });
         if let Some((stem, manifest, kind)) = container {
             let file = dir.join(manifest);
-            if let Some(id) = self.document(&file, rel, stem, kind, Header::from_yaml, parent) {
+            if let Some(id) =
+                self.document(&file, rel, stem, kind, Header::from_yaml, parent)
+            {
                 let mut inner = parent.clone();
                 inner.chain.push(id);
                 inner.container = Some(kind);
@@ -175,10 +193,12 @@ impl<'a> Scanner<'a> {
             return;
         }
         let mut inner = parent.clone();
-        let structural =
-            parent.kind == SpaceKind::Team && parent.chain.len() == 1 && name == "issues";
+        let structural = parent.kind == SpaceKind::Team
+            && parent.chain.len() == 1
+            && name == "issues";
         if parent.container.is_some() || structural {
-            // Plain grouping (a team's `issues/`, a collection's `rows/`), not a folder.
+            // Plain grouping (a team's `issues/`, a collection's `rows/`), not
+            // a folder.
             self.walk(space_root, dir, &inner);
             return;
         }
@@ -222,9 +242,9 @@ impl<'a> Scanner<'a> {
             }
         };
         let id = self.claim(file, header.id.as_deref())?;
-        let modified_at = fs::metadata(file)
-            .and_then(|m| m.modified())
-            .ok()
+        let modified_at = self
+            .tree
+            .modified(file)
             .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
             .map_or(self.now_ms, |d| {
                 i64::try_from(d.as_millis()).unwrap_or(i64::MAX)
@@ -236,9 +256,10 @@ impl<'a> Scanner<'a> {
             kind,
             path: rel,
             title: header.title.unwrap_or_else(|| stem.to_owned()),
-            status: header
-                .status
-                .filter(|s| ["draft", "in-review", "verified", "outdated"].contains(&s.as_str())),
+            status: header.status.filter(|s| {
+                ["draft", "in-review", "verified", "outdated"]
+                    .contains(&s.as_str())
+            }),
             content_hash: hex(&Sha256::digest(&bytes)),
             byte_size: i64::try_from(bytes.len()).unwrap_or(i64::MAX),
             modified_at,
@@ -250,13 +271,15 @@ impl<'a> Scanner<'a> {
     /// Reads a folder's `.vellum-folder.yaml` and claims its ID.
     fn manifest(&mut self, dir: &Path) -> Option<(ObjectId, Header)> {
         let file = dir.join(FOLDER_MANIFEST);
-        if !file.is_file() {
+        if !self.tree.is_file(&file) {
             self.problem(dir, ProblemKind::MissingId);
             return None;
         }
         let bytes = self.read(&file)?;
         match Header::from_yaml(&bytes) {
-            Ok(header) => self.claim(dir, header.id.as_deref()).map(|id| (id, header)),
+            Ok(header) => {
+                self.claim(dir, header.id.as_deref()).map(|id| (id, header))
+            }
             Err(detail) => {
                 self.problem(&file, ProblemKind::Unreadable(detail));
                 None
@@ -310,15 +333,6 @@ impl<'a> Scanner<'a> {
     fn relative(&self, path: &Path) -> String {
         relative_to(self.root, path)
     }
-
-    fn sorted_entries(dir: &Path) -> Vec<PathBuf> {
-        let Ok(entries) = fs::read_dir(dir) else {
-            return Vec::new();
-        };
-        let mut paths: Vec<PathBuf> = entries.filter_map(|e| e.ok().map(|e| e.path())).collect();
-        paths.sort();
-        paths
-    }
 }
 
 impl Header {
@@ -341,7 +355,9 @@ impl Header {
         };
         let end = rest
             .match_indices("---")
-            .find(|(i, _)| *i == 0 || rest.as_bytes().get(i - 1) == Some(&b'\n'))
+            .find(|(i, _)| {
+                *i == 0 || rest.as_bytes().get(i - 1) == Some(&b'\n')
+            })
             .map_or(rest.len(), |(i, _)| i);
         Self::from_yaml(rest.get(..end).unwrap_or_default().as_bytes())
     }

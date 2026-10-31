@@ -423,6 +423,9 @@ pub struct ExportArtifact {
     pub mime_type: String,
     /// Size in bytes.
     pub size: u64,
+    /// The file itself, base64, when small enough to hand over inline.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data: Option<String>,
 }
 
 /// One change since a point in time.
@@ -476,6 +479,17 @@ pub struct ListingPage {
     pub next_cursor: Option<String>,
 }
 
+/// A page template a model can start a draft from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Template {
+    /// The name to pass to `get_template` (lowercase, hyphenated).
+    pub name: String,
+    /// The template page's title.
+    pub title: String,
+    /// `vellum://template/<name>`.
+    pub uri: String,
+}
+
 /// Facts about the deployment, for `llms.txt`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SiteInfo {
@@ -497,9 +511,17 @@ pub trait Workspace: Send + Sync {
         query: SearchQuery,
     ) -> Result<Vec<SearchHit>, WorkspaceError>;
     /// A page as Markdown with front matter.
-    async fn get_doc(&self, actor: &Actor, id: &str) -> Result<Document, WorkspaceError>;
+    async fn get_doc(
+        &self,
+        actor: &Actor,
+        id: &str,
+    ) -> Result<Document, WorkspaceError>;
     /// A page found by its app path, for `?format=md`.
-    async fn get_doc_by_path(&self, actor: &Actor, path: &str) -> Result<Document, WorkspaceError>;
+    async fn get_doc_by_path(
+        &self,
+        actor: &Actor,
+        path: &str,
+    ) -> Result<Document, WorkspaceError>;
     /// Selected blocks of a page.
     async fn get_blocks(
         &self,
@@ -514,9 +536,17 @@ pub trait Workspace: Send + Sync {
         id: &str,
     ) -> Result<Vec<OutlineNode>, WorkspaceError>;
     /// A book: `book.yaml`, `SUMMARY.md` and numbering, as Markdown.
-    async fn get_book(&self, actor: &Actor, id: &str) -> Result<Document, WorkspaceError>;
+    async fn get_book(
+        &self,
+        actor: &Actor,
+        id: &str,
+    ) -> Result<Document, WorkspaceError>;
     /// A space's tree as a Markdown nested list of links.
-    async fn space_tree(&self, actor: &Actor, slug: &str) -> Result<Document, WorkspaceError>;
+    async fn space_tree(
+        &self,
+        actor: &Actor,
+        slug: &str,
+    ) -> Result<Document, WorkspaceError>;
     /// Writes a new page.
     async fn create_page(
         &self,
@@ -534,7 +564,11 @@ pub trait Workspace: Send + Sync {
         by: Attribution,
     ) -> Result<WriteReceipt, WorkspaceError>;
     /// Reads an issue by key.
-    async fn get_issue(&self, actor: &Actor, key: &str) -> Result<Issue, WorkspaceError>;
+    async fn get_issue(
+        &self,
+        actor: &Actor,
+        key: &str,
+    ) -> Result<Issue, WorkspaceError>;
     /// Files an issue; model-filed issues land in the team's triage.
     async fn create_issue(
         &self,
@@ -605,8 +639,20 @@ pub trait Workspace: Send + Sync {
         cursor: Option<String>,
         limit: u32,
     ) -> Result<ListingPage, WorkspaceError>;
-    /// A named page template's Markdown (for the `write-prd` prompt).
-    async fn get_template(&self, actor: &Actor, name: &str) -> Result<String, WorkspaceError>;
+    /// A named page template's Markdown (for the `write-prd` prompt and the
+    /// `get_template` tool).
+    async fn get_template(
+        &self,
+        actor: &Actor,
+        name: &str,
+    ) -> Result<String, WorkspaceError>;
+    /// The page templates the actor can use, by name and title.
+    async fn list_templates(
+        &self,
+        _actor: &Actor,
+    ) -> Result<Vec<Template>, WorkspaceError> {
+        Ok(Vec::new())
+    }
     /// Deployment facts for `llms.txt`.
     async fn site_info(&self) -> Result<SiteInfo, WorkspaceError>;
 }

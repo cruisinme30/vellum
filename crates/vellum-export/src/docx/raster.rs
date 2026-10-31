@@ -46,7 +46,8 @@ pub fn rasterize_svg(svg: &[u8], scale: f32) -> Option<Vec<u8>> {
     let scale = scale
         .min(MAX_EDGE / size.width().max(1.0))
         .min(MAX_EDGE / size.height().max(1.0));
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // bounded by MAX_EDGE
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    // bounded by MAX_EDGE
     let (width, height) = (
         (size.width() * scale).ceil().max(1.0) as u32,
         (size.height() * scale).ceil().max(1.0) as u32,

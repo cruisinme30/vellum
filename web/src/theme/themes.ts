@@ -3,8 +3,17 @@
 
 import { contrast, parseHex, toLch, tone } from "./color";
 
-/** The built-in themes (R-TH-1). `system` follows the OS light or dark setting. */
-export const THEMES = ["system", "light", "dark", "high-contrast", "sepia", "dim"] as const;
+/**
+ * The built-in themes (R-TH-1). `system` follows the OS light or dark setting.
+ */
+export const THEMES = [
+  "system",
+  "light",
+  "dark",
+  "high-contrast",
+  "sepia",
+  "dim",
+] as const;
 /** A built-in theme name. */
 export type ThemeName = (typeof THEMES)[number];
 /** A resolved theme, after `system` is replaced by light or dark. */
@@ -41,9 +50,18 @@ const ROLES = [
 type Role = (typeof ROLES)[number];
 
 /** Callout kinds and their fixed hues, so meaning never depends on the seed. */
-const CALLOUTS = { info: 255, warn: 70, good: 145, crit: 25, tip: 305, note: -1 } as const;
+const CALLOUTS = {
+  info: 255,
+  warn: 70,
+  good: 145,
+  crit: 25,
+  tip: 305,
+  note: -1,
+} as const;
 
-/** Every token of a scheme: roles plus `callout-<kind>` and `callout-<kind>-bg`. */
+/**
+ * Every token of a scheme: roles plus `callout-<kind>` and `callout-<kind>-bg`.
+ */
 export type Scheme = Readonly<Record<string, string>>;
 
 interface Tones {
@@ -188,7 +206,10 @@ const TONES: Readonly<Record<ResolvedTheme, Tones>> = {
   sepia: SEPIA,
 };
 
-/** The brief's light theme values (§13), used exactly when the seed is the default. */
+/**
+ * The brief's light theme values (§13), used exactly when the seed is the
+ * default.
+ */
 const BRIEF_LIGHT: Partial<Record<Role, string>> = {
   primary: "#4f5b92",
   "primary-container": "#dde1ff",
@@ -202,8 +223,13 @@ const BRIEF_LIGHT: Partial<Record<Role, string>> = {
 };
 
 /** Builds every token of a theme from a seed colour. */
-export function buildScheme(theme: ResolvedTheme, seedHex: string = DEFAULT_SEED): Scheme {
-  const seed = toLch(parseHex(seedHex) ?? parseHex(DEFAULT_SEED) ?? { r: 0, g: 0, b: 0 });
+export function buildScheme(
+  theme: ResolvedTheme,
+  seedHex: string = DEFAULT_SEED,
+): Scheme {
+  const seed = toLch(
+    parseHex(seedHex) ?? parseHex(DEFAULT_SEED) ?? { r: 0, g: 0, b: 0 },
+  );
   const spec = TONES[theme];
   const neutral = { ...seed, h: spec.neutralHue ?? seed.h };
   const palettes = {
@@ -225,7 +251,11 @@ export function buildScheme(theme: ResolvedTheme, seedHex: string = DEFAULT_SEED
     const base = hue < 0 ? neutral : { l: 50, c: 40, h: hue };
     const chroma = hue < 0 ? spec.neutralChroma * 2 : 40;
     out[`callout-${kind}`] = tone(base, chroma, spec.calloutFg);
-    out[`callout-${kind}-bg`] = tone(base, Math.min(chroma, 18), spec.calloutBg);
+    out[`callout-${kind}-bg`] = tone(
+      base,
+      Math.min(chroma, 18),
+      spec.calloutBg,
+    );
   }
   return out;
 }
@@ -264,21 +294,24 @@ export const CONTRAST_RULES: readonly ContrastRule[] = [
   })),
 ];
 
-/** A contrast rule a scheme breaks, with the ratio it reached. */
-export interface ContrastFailure extends ContrastRule {
+/** A contrast rule with the ratio a scheme reaches. */
+export interface ContrastResult extends ContrastRule {
   readonly ratio: number;
+}
+
+/** A contrast rule a scheme breaks, with the ratio it reached. */
+export type ContrastFailure = ContrastResult;
+
+/** Every contrast rule with the ratio the scheme reaches (R-TH-2). */
+export function contrastReport(scheme: Scheme): ContrastResult[] {
+  return CONTRAST_RULES.map((rule) => {
+    const fg = parseHex(scheme[rule.fg] ?? "");
+    const bg = parseHex(scheme[rule.bg] ?? "");
+    return { ...rule, ratio: fg && bg ? contrast(fg, bg) : 0 };
+  });
 }
 
 /** Validates a scheme against {@link CONTRAST_RULES} (R-TH-2). */
 export function checkContrast(scheme: Scheme): ContrastFailure[] {
-  const failures: ContrastFailure[] = [];
-  for (const rule of CONTRAST_RULES) {
-    const fg = parseHex(scheme[rule.fg] ?? "");
-    const bg = parseHex(scheme[rule.bg] ?? "");
-    const ratio = fg && bg ? contrast(fg, bg) : 0;
-    if (ratio < rule.min) {
-      failures.push({ ...rule, ratio });
-    }
-  }
-  return failures;
+  return contrastReport(scheme).filter((result) => result.ratio < result.min);
 }

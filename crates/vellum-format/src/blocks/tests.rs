@@ -24,7 +24,8 @@ fn lines_of(read: &Read<Data>) -> Vec<usize> {
 
 #[test]
 fn code_and_callouts_are_not_data() {
-    let parsed = crate::parse("```rust\nfn main() {}\n```\n\n::: note\nHi\n:::\n");
+    let parsed =
+        crate::parse("```rust\nfn main() {}\n```\n\n::: note\nHi\n:::\n");
     assert!(
         parsed
             .document
@@ -37,8 +38,9 @@ fn code_and_callouts_are_not_data() {
 #[test]
 fn chart_with_series_and_options() {
     let read = read(
-        "```chart\ntitle: Blocked requests per week\ntype: line\nlabels: [W40, W41, W42]\n\
-         EMEA: [120, 1_185, 160]\nAPAC: [90, 95, 99]\nunit: req\nymin: 0\nlegend: true\n```\n",
+        "```chart\ntitle: Blocked requests per week\ntype: line\n\
+         labels: [W40, W41, W42]\nEMEA: [120, 1_185, 160]\nAPAC: [90, 95, 99]\n\
+         unit: req\nymin: 0\nlegend: true\n```\n",
     );
     let Data::Chart(chart) = read.data else {
         panic!()
@@ -67,7 +69,10 @@ fn chart_slices_become_labels() {
 
 #[test]
 fn chart_reports_bad_lines_and_keeps_the_rest() {
-    let read = read("```chart\ntype: radar\nlabels: [a, b]\nvalues: [1, x]\nnonsense\n```\n");
+    let read = read(
+        "```chart\ntype: radar\nlabels: [a, b]\n\
+         values: [1, x]\nnonsense\n```\n",
+    );
     assert_eq!(lines_of(&read), [1, 3, 4, 0]);
     let Data::Chart(chart) = read.data else {
         panic!()
@@ -78,7 +83,10 @@ fn chart_reports_bad_lines_and_keeps_the_rest() {
 
 #[test]
 fn live_chart_reads_attributes() {
-    let read = read("```chart {source=\"collection:okrs\" x=\"quarter\" y=\"score\"}\n```\n");
+    let read = read(
+        "```chart {source=\"collection:okrs\" \
+         x=\"quarter\" y=\"score\"}\n```\n",
+    );
     let Data::Chart(chart) = read.data else {
         panic!()
     };
@@ -90,7 +98,8 @@ fn live_chart_reads_attributes() {
 #[test]
 fn timeline_entries() {
     let read = read(
-        "```timeline\nOct 6 | Beta opens | Invite-only\n2026-11-24 | General availability\nlonely\n```\n",
+        "```timeline\nOct 6 | Beta opens | Invite-only\n\
+            2026-11-24 | General availability\nlonely\n```\n",
     );
     assert_eq!(lines_of(&read), [3]);
     let Data::Timeline(timeline) = read.data else {
@@ -105,8 +114,9 @@ fn timeline_entries() {
 #[test]
 fn roadmap_bars_and_milestones() {
     let read = read(
-        "```roadmap\nrange: 2026-10-01 .. 2027-03-31\nReplay engine | 2026-10-01 | 2026-12-15\n\
-         GA | 2026-11-24 | milestone\nLater | soon | 2027-01-01\n```\n",
+        "```roadmap\nrange: 2026-10-01 .. 2027-03-31\n\
+         Replay engine | 2026-10-01 | 2026-12-15\nGA | 2026-11-24 | milestone\n\
+         Later | soon | 2027-01-01\n```\n",
     );
     assert_eq!(lines_of(&read), [4]);
     let Data::Roadmap(roadmap) = read.data else {
@@ -122,7 +132,8 @@ fn roadmap_bars_and_milestones() {
 #[test]
 fn risk_matrix_scores() {
     let read = read(
-        "```risk-matrix\nData loss | likelihood 1 | impact 5\nSlow search | Impact 2 | likelihood 3\n\
+        "```risk-matrix\nData loss | likelihood 1 | impact 5\n\
+         Slow search | Impact 2 | likelihood 3\n\
          Unscored | likelihood 9 | impact 1\n```\n",
     );
     assert_eq!(lines_of(&read), [3]);
@@ -135,8 +146,10 @@ fn risk_matrix_scores() {
 
 #[test]
 fn board_columns_and_tags() {
-    let read =
-        read("```board\n- orphan\n## Todo\n- Write runbook [P1]\n## Done\n- Diff report\n```\n");
+    let read = read(
+        "```board\n- orphan\n## Todo\n- Write runbook [P1]\n## Done\n\
+            - Diff report\n```\n",
+    );
     assert_eq!(lines_of(&read), [1]);
     let Data::Board(board) = read.data else {
         panic!()
@@ -150,7 +163,8 @@ fn board_columns_and_tags() {
 #[test]
 fn table_csv_and_options() {
     let read = read(
-        "```table sortable bar=Revenue sum=Revenue\nRegion,Revenue\n\"EMEA, North\",120\nAPAC\n```\n",
+        "```table sortable bar=Revenue sum=Revenue\nRegion,Revenue\n\
+            \"EMEA, North\",120\nAPAC\n```\n",
     );
     assert_eq!(lines_of(&read), [3]);
     let Data::Table(table) = read.data else {
@@ -201,14 +215,18 @@ fn calculator_inputs_and_outputs() {
 
 #[test]
 fn image_and_collection_keys() {
-    let read = self::read("```image\nsrc: /media/map.png\nalt: Region map\nzoom: 2\n```\n");
+    let read = self::read(
+        "```image\nsrc: /media/map.png\nalt: Region map\nzoom: 2\n```\n",
+    );
     assert_eq!(lines_of(&read), [3]);
     let Data::Image(image) = read.data else {
         panic!()
     };
     assert_eq!(image.src, "/media/map.png");
 
-    let read = self::read("```collection\nsource: collection:okrs\nview: By owner\n```\n");
+    let read = self::read(
+        "```collection\nsource: collection:okrs\nview: By owner\n```\n",
+    );
     let Data::Collection(view) = read.data else {
         panic!()
     };
@@ -221,7 +239,10 @@ fn image_and_collection_keys() {
 
 #[test]
 fn stats_with_trends() {
-    let read = read("::: stats\n- 94% · Uptime · ▲ 6 pts\n- 12 · Open incidents\n- lonely\n:::\n");
+    let read = read(
+        "::: stats\n- 94% · Uptime · ▲ 6 pts\n- 12 · Open incidents\n- lonely\n\
+            :::\n",
+    );
     assert_eq!(lines_of(&read), [3]);
     let Data::Stats(stats) = read.data else {
         panic!()
@@ -234,7 +255,8 @@ fn stats_with_trends() {
 
 #[test]
 fn facts_keep_inline_content() {
-    let read = read("::: facts\n- Owner: @priya\n- Due: 2026-11-24\n- nothing\n:::\n");
+    let read =
+        read("::: facts\n- Owner: @priya\n- Due: 2026-11-24\n- nothing\n:::\n");
     assert_eq!(lines_of(&read), [3]);
     let Data::Facts(facts) = read.data else {
         panic!()
@@ -250,7 +272,9 @@ fn facts_keep_inline_content() {
 
 #[test]
 fn progress_bars() {
-    let read = read("::: progress\n- Replay engine · 70%\n- Overdone · 140%\n- 50%\n:::\n");
+    let read = read(
+        "::: progress\n- Replay engine · 70%\n- Overdone · 140%\n- 50%\n:::\n",
+    );
     assert_eq!(lines_of(&read), [3]);
     let Data::Progress(progress) = read.data else {
         panic!()
@@ -261,7 +285,9 @@ fn progress_bars() {
 
 #[test]
 fn cards_and_steps() {
-    let read = self::read("::: cards\n- 🚀 **Launch** Ship it\n- **Plain** card\n:::\n");
+    let read = self::read(
+        "::: cards\n- 🚀 **Launch** Ship it\n- **Plain** card\n:::\n",
+    );
     let Data::Cards(cards) = read.data else {
         panic!()
     };
@@ -270,7 +296,8 @@ fn cards_and_steps() {
     assert_eq!(cards.cards[0].body, text("Ship it"));
     assert_eq!(cards.cards[1].icon, None);
 
-    let read = self::read("::: steps\n1. **Install** the CLI\n2. Sign in\n:::\n");
+    let read =
+        self::read("::: steps\n1. **Install** the CLI\n2. Sign in\n:::\n");
     let Data::Steps(steps) = read.data else {
         panic!()
     };
@@ -280,7 +307,10 @@ fn cards_and_steps() {
 
 #[test]
 fn tabs_split_at_level_two_headings() {
-    let read = read("::: tabs\nIntro\n\n## macOS\n\nUse brew.\n\n## Linux\n\nUse apt.\n:::\n");
+    let read = read(
+        "::: tabs\nIntro\n\n## macOS\n\nUse brew.\n\n## Linux\n\nUse apt.\n\
+            :::\n",
+    );
     assert_eq!(lines_of(&read), [0]);
     let Data::Tabs(tabs) = read.data else {
         panic!()

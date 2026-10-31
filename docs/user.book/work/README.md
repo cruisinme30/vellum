@@ -11,6 +11,30 @@ projects and Git automation, fast enough to drive from the keyboard.
 Every issue is a Markdown file, so specifications, checklists and
 diagrams live in the issue itself.
 
+```image
+src: assets/board.jpg
+alt: The ENG team's board in Vellum, with issue cards in Backlog, Todo, In progress and Done columns
+caption: The gateway team's board. Drag a card to change its status, or press S on a selected card.
+```
+
+An issue moves through its team's workflow. Triage is where new issues
+from outside the team wait; everything after it is the team's own.
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> Triage: reported
+  Triage --> Backlog: accepted
+  Triage --> Canceled: declined
+  Backlog --> Todo: planned into a cycle
+  Todo --> InProgress: started
+  InProgress --> InReview: pull request opened
+  InReview --> Done: pull request merged
+  InProgress --> Todo: paused
+  Done --> [*]
+  Canceled --> [*]
+```
+
 ## Teams {#teams}
 
 A team owns a set of issues, a workflow and a key prefix. Northstar's

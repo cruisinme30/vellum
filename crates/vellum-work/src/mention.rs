@@ -29,7 +29,9 @@ pub fn mentions(markdown: &str) -> Vec<UserRef> {
         let bytes = text.as_bytes();
         for (i, _) in text.match_indices('@') {
             let before = i.checked_sub(1).and_then(|p| bytes.get(p).copied());
-            if before.is_some_and(|b| b.is_ascii_alphanumeric() || b"._-@/".contains(&b)) {
+            if before.is_some_and(|b| {
+                b.is_ascii_alphanumeric() || b"._-@/".contains(&b)
+            }) {
                 continue;
             }
             if escaped(bytes, i) {
@@ -38,7 +40,9 @@ pub fn mentions(markdown: &str) -> Vec<UserRef> {
             let rest = text.get(i + 1..).unwrap_or_default();
             let end = rest
                 .find(|c: char| {
-                    !(c.is_ascii_lowercase() || c.is_ascii_digit() || "._-".contains(c))
+                    !(c.is_ascii_lowercase()
+                        || c.is_ascii_digit()
+                        || "._-".contains(c))
                 })
                 .unwrap_or(rest.len());
             let handle = rest
@@ -142,7 +146,11 @@ pub fn blocks(markdown: &str) -> Vec<Block<'_>> {
     out
 }
 
-fn push_block<'a>(out: &mut Vec<Block<'a>>, markdown: &'a str, range: std::ops::Range<usize>) {
+fn push_block<'a>(
+    out: &mut Vec<Block<'a>>,
+    markdown: &'a str,
+    range: std::ops::Range<usize>,
+) {
     let text = markdown.get(range.clone()).unwrap_or_default().trim_end();
     let id = text
         .rsplit_once(" ^")
@@ -208,7 +216,9 @@ fn blank_code_spans(line: &str) -> String {
 pub fn issue_keys(text: &str) -> Vec<IssueKey> {
     let mut out = Vec::new();
     for line in prose(text) {
-        for word in line.split(|c: char| !(c.is_ascii_alphanumeric() || c == '-')) {
+        for word in
+            line.split(|c: char| !(c.is_ascii_alphanumeric() || c == '-'))
+        {
             if let Ok(key) = IssueKey::parse(word)
                 && key.to_string() == word
                 && !out.contains(&key)
@@ -231,14 +241,17 @@ mod tests {
     #[test]
     fn finds_mentions_at_word_starts() {
         assert_eq!(
-            handles("@priya can you check with @dev.ops, and (@sam)? Thanks @priya."),
+            handles(
+                "@priya can you check with @dev.ops, and (@sam)? Thanks @priya."
+            ),
             ["priya", "dev.ops", "sam"]
         );
     }
 
     #[test]
     fn ignores_emails_dates_code_and_capitals() {
-        let text = "mail priya@northstar.dev @today `@dev`\n```\n@sam\n```\n@Priya @me";
+        let text = "mail priya@northstar.dev @today `@dev`\n```\n@sam\n```\n\
+            @Priya @me";
         assert!(handles(text).is_empty(), "{:?}", handles(text));
     }
 
@@ -250,18 +263,21 @@ mod tests {
 
     #[test]
     fn finds_issue_keys_outside_code() {
-        let keys: Vec<String> =
-            issue_keys("Fixes ENG-142 and OPS-7; not `ENG-9` or xENG-1 or ENG-1-2")
-                .iter()
-                .map(ToString::to_string)
-                .collect();
+        let keys: Vec<String> = issue_keys(
+            "Fixes ENG-142 and OPS-7; not `ENG-9` or xENG-1 or ENG-1-2",
+        )
+        .iter()
+        .map(ToString::to_string)
+        .collect();
         assert_eq!(keys, ["ENG-142", "OPS-7"]);
     }
 
     #[test]
     fn splits_blocks_with_ids() {
-        let doc = "---\nid: x\n---\n# Plan ^blk-aaaaaaaa\n\nShip it\nsoon ^blk-bbbbbbbb\n\n```\n\n^blk-cccccccc\n```\n\nno id\n";
-        let found: Vec<(Option<&str>, &str)> = blocks(doc).iter().map(|b| (b.id, b.text)).collect();
+        let doc = "---\nid: x\n---\n# Plan ^blk-aaaaaaaa\n\nShip it\n\
+            soon ^blk-bbbbbbbb\n\n```\n\n^blk-cccccccc\n```\n\nno id\n";
+        let found: Vec<(Option<&str>, &str)> =
+            blocks(doc).iter().map(|b| (b.id, b.text)).collect();
         assert_eq!(
             found,
             [

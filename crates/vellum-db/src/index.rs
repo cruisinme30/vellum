@@ -9,15 +9,18 @@ use std::time::Duration;
 
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use sqlx::sqlite::{
-    SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions, SqliteSynchronous,
+    SqliteConnectOptions, SqliteJournalMode, SqlitePool, SqlitePoolOptions,
+    SqliteSynchronous,
 };
 
 use crate::config::IndexConfig;
 use crate::error::{Error, Result};
 use crate::telemetry::traced;
 
-static SQLITE_MIGRATIONS: sqlx::migrate::Migrator = sqlx::migrate!("./migrations/sqlite");
-static POSTGRES_MIGRATIONS: sqlx::migrate::Migrator = sqlx::migrate!("./migrations/postgres");
+static SQLITE_MIGRATIONS: sqlx::migrate::Migrator =
+    sqlx::migrate!("./migrations/sqlite");
+static POSTGRES_MIGRATIONS: sqlx::migrate::Migrator =
+    sqlx::migrate!("./migrations/postgres");
 
 /// Which database the index lives in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,26 +60,65 @@ pub enum IndexPool<'a> {
 
 /// A migrated, ready-to-use index. Cheap to clone.
 ///
-/// When the last clone of a SQLite index is dropped, its connections are
-/// closed before the drop returns. Keep an `Index`
-/// alive for as long as you use a pool borrowed from [`Index::pool`].
+/// Await [`Index::close`] before the process exits: it returns once every
+/// connection is closed. When the last clone of a SQLite index is dropped
+/// unclosed, its connections are closed too, but on a current-thread
+/// runtime the drop only starts the close (see `SqliteCloser`). Keep an
+/// `Index` alive for as long as you use a pool borrowed from
+/// [`Index::pool`].
 #[derive(Debug, Clone)]
 pub struct Index {
     pub(crate) pool: Pool,
     _closer: Option<Arc<SqliteCloser>>,
 }
 
-/// How long dropping the last SQLite index waits for its connections.
+/// Initialises the OpenSSL that SQLCipher links, without its exit handler.
+///
+/// Left to itself, SQLCipher initialises OpenSSL on first use, and OpenSSL
+/// then registers `OPENSSL_cleanup` with `atexit`. At exit that handler
+/// frees every thread's OpenSSL state (`init_thread_deregister(NULL, 1)`)
+/// without a lock, while each thread that used OpenSSL also frees its own
+/// state from a thread-local destructor when it ends. sqlx runs every
+/// SQLite connection on its own detached worker thread, so a worker that
+/// ends while the process exits frees the same blocks a second time
+/// (`double free or corruption`, `malloc_consolidate(): invalid chunk
+/// size`). OpenSSL documents `OPENSSL_cleanup` as unsafe while other
+/// threads still use the library, and a Rust process never joins its
+/// detached threads before exit.
+///
+/// `openssl_sys::init` asks OpenSSL for `OPENSSL_INIT_NO_ATEXIT`, which only
+/// counts if it comes first, so this runs before the first connection
+/// opens. The OS reclaims OpenSSL's memory when the process ends.
+fn init_openssl_without_exit_cleanup() {
+    openssl_sys::init();
+}
+
+/// How long closing the last SQLite index waits for connections in use.
 const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Closes a SQLite pool when the last [`Index`] clone goes away.
 ///
 /// sqlx closes a dropped SQLite connection later, on that connection's
-/// own worker thread. SQLCipher frees its shared state in an `atexit`
-/// handler. If a process exits while a worker is still closing, the two
-/// race and the process aborts at exit (`double free`, `malloc_consolidate`,
-/// SIGSEGV), which showed up as random test failures. Closing the pool
-/// here, before the drop returns, means no worker is left behind.
+/// own worker thread. SQLCipher frees its shared state (key provider,
+/// private heap, mutexes) in an `atexit` handler. If a process exits while
+/// a worker is still closing an encrypted database, the two race and the
+/// process crashes at exit (SIGSEGV in `sqlite3FreeCodecArg`). OpenSSL's
+/// own exit handler is a separate race, handled by
+/// [`init_openssl_without_exit_cleanup`].
+///
+/// `Pool::close` waits until every connection is back in the pool, and
+/// sqlx puts a released connection back from a task spawned on the
+/// runtime that released it. So closing must never block that runtime:
+///
+/// - Outside a runtime, or on a multi-thread one, the drop waits for the
+///   close; on a runtime worker it does so in `block_in_place`, which hands
+///   the worker's queued tasks to another thread first.
+/// - On a current-thread runtime the only thread that can run those tasks
+///   is the one dropping the index, so the drop starts the close on a
+///   helper thread and returns. Connections still queued on that runtime
+///   close when it next runs them. If the runtime is dropped first, sqlx
+///   drops them unclosed, so code that must not exit with a connection
+///   open (any encrypted index) awaits [`Index::close`] instead.
 #[derive(Debug)]
 struct SqliteCloser(SqlitePool);
 
@@ -85,44 +127,68 @@ impl Drop for SqliteCloser {
         if self.0.is_closed() {
             return;
         }
-        let pool = self.0.clone();
-        // A helper thread with its own runtime works whether the drop runs
-        // inside an async runtime or outside one.
-        let closer = std::thread::Builder::new()
-            .name("vellum-db-close".into())
-            .spawn(move || {
-                let runtime = tokio::runtime::Builder::new_current_thread()
-                    .enable_all()
-                    .build();
-                match runtime {
-                    Ok(runtime) => {
-                        let closed = runtime.block_on(async {
-                            tokio::time::timeout(CLOSE_TIMEOUT, pool.close()).await
-                        });
-                        if closed.is_err() {
-                            tracing::warn!(
-                                "index connections still busy after {CLOSE_TIMEOUT:?}; not waiting"
-                            );
-                        }
-                    }
-                    Err(error) => tracing::warn!(%error, "could not close the index on drop"),
-                }
-            });
-        if let Ok(closer) = closer {
-            let _ = closer.join();
+        let runtime = tokio::runtime::Handle::try_current().ok();
+        let closer = close_in_background(self.0.clone());
+        let Ok(closer) = closer else {
+            return;
+        };
+        match runtime.map(|handle| handle.runtime_flavor()) {
+            None => {
+                let _ = closer.join();
+            }
+            Some(tokio::runtime::RuntimeFlavor::CurrentThread) => {}
+            Some(_) => {
+                let _ = tokio::task::block_in_place(|| closer.join());
+            }
         }
     }
+}
+
+/// Closes `pool` on a thread with its own runtime, which needs nothing
+/// from the caller's runtime except that it keeps running.
+fn close_in_background(
+    pool: SqlitePool,
+) -> std::io::Result<std::thread::JoinHandle<()>> {
+    let spawned = std::thread::Builder::new()
+        .name("vellum-db-close".into())
+        .spawn(move || {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build();
+            match runtime {
+                Ok(runtime) => {
+                    let closed = runtime.block_on(async {
+                        tokio::time::timeout(CLOSE_TIMEOUT, pool.close()).await
+                    });
+                    if closed.is_err() {
+                        tracing::warn!(
+                            "index connections still in use after \
+                                {CLOSE_TIMEOUT:?}; not waiting"
+                        );
+                    }
+                }
+                Err(error) => tracing::warn!(%error, "could not close the \
+                    index on drop"),
+            }
+        });
+    if let Err(error) = &spawned {
+        tracing::warn!(%error, "could not start closing the index");
+    }
+    spawned
 }
 
 impl Index {
     /// Connects, unlocks (SQLCipher), and applies every pending migration.
     ///
     /// # Errors
-    /// Fails if the database is unreachable, the key is wrong, or a migration fails.
+    ///
+    /// Fails if the database is unreachable, the key is wrong, or a
+    /// migration fails.
     #[tracing::instrument(name = "db.open", skip_all, fields(db.system))]
     pub async fn open(config: &IndexConfig) -> Result<Self> {
         let index = match config {
             IndexConfig::Sqlite { path, key } => {
+                init_openssl_without_exit_cleanup();
                 if let Some(parent) = path.parent() {
                     std::fs::create_dir_all(parent)?;
                 }
@@ -141,8 +207,11 @@ impl Index {
                     .connect_with(options)
                     .await
                     .map_err(|err| match err {
-                        // SQLITE_NOTADB: wrong key, or an encrypted file opened without one.
-                        sqlx::Error::Database(db) if db.code().as_deref() == Some("26") => {
+                        // SQLITE_NOTADB: wrong key, or an encrypted file opened
+                        // without one.
+                        sqlx::Error::Database(db)
+                            if db.code().as_deref() == Some("26") =>
+                        {
                             Error::Locked {
                                 path: path.display().to_string(),
                             }
@@ -169,7 +238,8 @@ impl Index {
                 }
             }
         };
-        let _ = tracing::Span::current().record("db.system", index.backend().otel_system());
+        let _ = tracing::Span::current()
+            .record("db.system", index.backend().otel_system());
         index.migrate().await?;
         Ok(index)
     }
@@ -200,9 +270,12 @@ impl Index {
     pub async fn migrate(&self) -> Result<()> {
         let system = self.backend().otel_system();
         match &self.pool {
-            Pool::Sqlite(pool) => traced(system, "migrate", SQLITE_MIGRATIONS.run(pool)).await?,
+            Pool::Sqlite(pool) => {
+                traced(system, "migrate", SQLITE_MIGRATIONS.run(pool)).await?;
+            }
             Pool::Postgres(pool) => {
-                traced(system, "migrate", POSTGRES_MIGRATIONS.run(pool)).await?;
+                traced(system, "migrate", POSTGRES_MIGRATIONS.run(pool))
+                    .await?;
             }
         }
         Ok(())
@@ -216,10 +289,20 @@ impl Index {
         let system = self.backend().otel_system();
         match &self.pool {
             Pool::Sqlite(pool) => {
-                let _ = traced(system, "ping", sqlx::query("SELECT 1").execute(pool)).await?;
+                let _ = traced(
+                    system,
+                    "ping",
+                    sqlx::query("SELECT 1").execute(pool),
+                )
+                .await?;
             }
             Pool::Postgres(pool) => {
-                let _ = traced(system, "ping", sqlx::query("SELECT 1").execute(pool)).await?;
+                let _ = traced(
+                    system,
+                    "ping",
+                    sqlx::query("SELECT 1").execute(pool),
+                )
+                .await?;
             }
         }
         Ok(())
@@ -235,16 +318,17 @@ impl Index {
         let names = match &self.pool {
             Pool::Sqlite(pool) => {
                 let q = sqlx::query_scalar(
-                    "SELECT name FROM sqlite_master WHERE type = 'table' \
-                     AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_sqlx_%' ORDER BY name",
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND \
+                     name NOT LIKE 'sqlite_%' AND name NOT LIKE '_sqlx_%' \
+                     ORDER BY name",
                 );
                 traced(system, "table_names", q.fetch_all(pool)).await?
             }
             Pool::Postgres(pool) => {
                 let q = sqlx::query_scalar(
                     "SELECT table_name::text FROM information_schema.tables \
-                     WHERE table_schema = current_schema() AND table_name NOT LIKE '_sqlx_%' \
-                     ORDER BY table_name",
+                     WHERE table_schema = current_schema() AND table_name NOT \
+                     LIKE '_sqlx_%' ORDER BY table_name",
                 );
                 traced(system, "table_names", q.fetch_all(pool)).await?
             }
@@ -252,7 +336,11 @@ impl Index {
         Ok(names)
     }
 
-    /// Closes every pooled connection.
+    /// Closes every pooled connection, for every clone of this index.
+    ///
+    /// Waits for connections in use to come back, so it runs on the
+    /// caller's runtime and never blocks it. When it returns, every SQLite
+    /// connection is closed, so the process can exit safely.
     pub async fn close(&self) {
         match &self.pool {
             Pool::Sqlite(pool) => pool.close().await,

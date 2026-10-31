@@ -152,7 +152,11 @@ pub enum FileKind {
 ///
 /// [`ImportError::Format`] when the bytes are not that kind of export,
 /// [`ImportError::TooLarge`] past the archive limits.
-#[tracing::instrument(name = "import", skip(bytes, collections), fields(source = source.name(), bytes = bytes.len()))]
+#[tracing::instrument(
+    name = "import",
+    skip(bytes, collections),
+    fields(source = source.name(), bytes = bytes.len())
+)]
 pub fn import(
     source: Source,
     name: &str,
@@ -161,9 +165,10 @@ pub fn import(
 ) -> Result<ImportSet, ImportError> {
     let started = Instant::now();
     let result = match source {
-        Source::Markdown | Source::Obsidian | Source::Outline | Source::Docmost => {
-            markdown::import(source, bytes)
-        }
+        Source::Markdown
+        | Source::Obsidian
+        | Source::Outline
+        | Source::Docmost => markdown::import(source, bytes),
         Source::Notion => notion::import(bytes),
         Source::Confluence => confluence::import(bytes),
         Source::Word => word::import(name, bytes),
@@ -255,13 +260,23 @@ impl Builder {
         }
     }
 
-    pub(crate) fn warn(&mut self, location: impl Into<String>, message: impl Into<String>) {
+    pub(crate) fn warn(
+        &mut self,
+        location: impl Into<String>,
+        message: impl Into<String>,
+    ) {
         self.warnings.push(ExportWarning::new(location, message));
     }
 
     /// Adds a page read from `src`, written at `out` (cleaned and made
     /// unique). Returns its index.
-    pub(crate) fn page(&mut self, src: &str, out: &str, title: &str, text: String) -> usize {
+    pub(crate) fn page(
+        &mut self,
+        src: &str,
+        out: &str,
+        title: &str,
+        text: String,
+    ) -> usize {
         let out = self.unique(&clean_path(out));
         let text = if text.len() > MAX_PAGE_BYTES {
             self.warn(src, "the page is over 10 MB; the rest was cut");
@@ -296,7 +311,12 @@ impl Builder {
     /// Adds a table that becomes a collection at `out` (a folder; the
     /// `.collection` suffix is added). Returns its index for
     /// [`Builder::row_of`].
-    pub(crate) fn table(&mut self, out: &str, title: &str, csv: String) -> usize {
+    pub(crate) fn table(
+        &mut self,
+        out: &str,
+        title: &str,
+        csv: String,
+    ) -> usize {
         let base = clean_path(out);
         let out = self.unique(&format!("{base}.collection"));
         self.tables.push(Table {
@@ -361,16 +381,22 @@ impl Builder {
             for url in missing {
                 self.warnings.push(ExportWarning::new(
                     page.src.clone(),
-                    format!("link target `{url}` is not in the import; kept as written"),
+                    format!(
+                        "link target `{url}` is not in the import; kept as \
+                        written"
+                    ),
                 ));
             }
             docs.push(doc);
         }
 
         let mut set = ImportSet::default();
-        let mut rows: Vec<Vec<(&Page, &str, Document)>> = vec![Vec::new(); self.tables.len()];
+        let mut rows: Vec<Vec<(&Page, &str, Document)>> =
+            vec![Vec::new(); self.tables.len()];
         for ((page, doc), id) in self.pages.iter().zip(docs).zip(&ids) {
-            if let Some(rows) = page.row_of.and_then(|table| rows.get_mut(table)) {
+            if let Some(rows) =
+                page.row_of.and_then(|table| rows.get_mut(table))
+            {
                 rows.push((page, id, doc));
                 continue;
             }
@@ -397,15 +423,18 @@ impl Builder {
             match collections.create(&new) {
                 Ok(built) => {
                     for problem in built.problems {
-                        self.warnings
-                            .push(ExportWarning::new(table.out.clone(), problem));
+                        self.warnings.push(ExportWarning::new(
+                            table.out.clone(),
+                            problem,
+                        ));
                     }
-                    set.files
-                        .extend(built.files.into_iter().map(|(path, text)| ImportedFile {
+                    set.files.extend(built.files.into_iter().map(
+                        |(path, text)| ImportedFile {
                             path: format!("{}/{path}", table.out),
                             bytes: text.into_bytes(),
                             kind: FileKind::Collection,
-                        }));
+                        },
+                    ));
                 }
                 Err(message) => {
                     // Keep the data: the table as CSV beside its row pages.
@@ -541,7 +570,9 @@ fn rewrite(
                     || format!("vellum://doc/{id}"),
                     |f| format!("vellum://doc/{id}#{f}"),
                 );
-            } else if let Some(asset) = index.asset(dir, &path).and_then(|a| assets.get(a)) {
+            } else if let Some(asset) =
+                index.asset(dir, &path).and_then(|a| assets.get(a))
+            {
                 *url = links::relative(out_dir, &asset.out);
             } else {
                 missing.push(url.clone());
@@ -549,7 +580,9 @@ fn rewrite(
         }
         Inline::Image { url, .. } if !links::is_external(url) => {
             let (path, _) = links::split(url);
-            if let Some(asset) = index.asset(dir, &path).and_then(|a| assets.get(a)) {
+            if let Some(asset) =
+                index.asset(dir, &path).and_then(|a| assets.get(a))
+            {
                 *url = links::relative(out_dir, &asset.out);
             } else {
                 missing.push(url.clone());
@@ -572,7 +605,11 @@ fn rewrite(
 
 /// Front matter with the new `id`, the title and the dialect version,
 /// keeping other fields the source had (such as `tags`).
-fn front_matter(existing: Option<FrontMatter>, id: &str, title: &str) -> FrontMatter {
+fn front_matter(
+    existing: Option<FrontMatter>,
+    id: &str,
+    title: &str,
+) -> FrontMatter {
     let mut old = match existing {
         Some(FrontMatter::Fields(map)) => map,
         _ => Map::new(),
@@ -606,7 +643,8 @@ fn front_matter(existing: Option<FrontMatter>, id: &str, title: &str) -> FrontMa
 
 /// A page's file, with its front matter settled.
 fn page_file(page: &Page, mut doc: Document, id: &str) -> ImportedFile {
-    doc.front_matter = Some(front_matter(doc.front_matter.take(), id, &page.title));
+    doc.front_matter =
+        Some(front_matter(doc.front_matter.take(), id, &page.title));
     ImportedFile {
         path: page.out.clone(),
         bytes: vellum_format::serialize(&doc).into_bytes(),
@@ -650,7 +688,9 @@ fn clean_segment(segment: &str) -> String {
     let mut out: String = segment
         .chars()
         .map(|c| {
-            if c.is_control() || matches!(c, '<' | '>' | ':' | '"' | '\\' | '|' | '?' | '*') {
+            if c.is_control()
+                || matches!(c, '<' | '>' | ':' | '"' | '\\' | '|' | '?' | '*')
+            {
                 '-'
             } else {
                 c
@@ -667,7 +707,8 @@ fn clean_segment(segment: &str) -> String {
         while !stem.is_char_boundary(end) {
             end -= 1;
         }
-        out = format!("{}{ext}", stem.get(..end).unwrap_or_default().trim_end());
+        out =
+            format!("{}{ext}", stem.get(..end).unwrap_or_default().trim_end());
     }
     if out.is_empty() || out == "." || out == ".." || out.starts_with('.') {
         out = format!("untitled{out}");

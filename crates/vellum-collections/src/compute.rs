@@ -135,7 +135,12 @@ impl<'w> Computer<'w> {
     ///
     /// Returns the cell's inline error: a formula error, an error in a
     /// value it depends on, or a circular reference.
-    pub fn value(&mut self, collection: CollectionId, row: DocId, key: &str) -> Cell {
+    pub fn value(
+        &mut self,
+        collection: CollectionId,
+        row: DocId,
+        key: &str,
+    ) -> Cell {
         let k = (collection, row, key.to_owned());
         if let Some(c) = self.memo.get(&k) {
             return c.clone();
@@ -155,7 +160,11 @@ impl<'w> Computer<'w> {
     }
 
     /// Every cell of one row.
-    pub fn row(&mut self, collection: CollectionId, row: DocId) -> Option<ComputedRow> {
+    pub fn row(
+        &mut self,
+        collection: CollectionId,
+        row: DocId,
+    ) -> Option<ComputedRow> {
         let c = self.ws.collection(collection)?;
         let _ = c.row(row)?;
         let cells = c
@@ -169,8 +178,12 @@ impl<'w> Computer<'w> {
 
     /// Recomputes the given rows (from [`Workspace::affected`]), as the
     /// save path does.
-    pub fn rows(&mut self, rows: &BTreeSet<RowRef>) -> Vec<(RowRef, ComputedRow)> {
-        let span = tracing::info_span!("collections.compute", rows = rows.len());
+    pub fn rows(
+        &mut self,
+        rows: &BTreeSet<RowRef>,
+    ) -> Vec<(RowRef, ComputedRow)> {
+        let span =
+            tracing::info_span!("collections.compute", rows = rows.len());
         let _guard = span.enter();
         let started = Instant::now();
         let out: Vec<_> = rows
@@ -181,7 +194,12 @@ impl<'w> Computer<'w> {
         out
     }
 
-    fn compute(&mut self, collection: CollectionId, row_id: DocId, key: &str) -> Cell {
+    fn compute(
+        &mut self,
+        collection: CollectionId,
+        row_id: DocId,
+        key: &str,
+    ) -> Cell {
         let ws = self.ws;
         let Some(c) = ws.collection(collection) else {
             return Err(CellError::new("collection not loaded"));
@@ -209,11 +227,15 @@ impl<'w> Computer<'w> {
                 let Some(PropertyType::Relation { to, .. }) =
                     c.schema().property(via).map(|v| &v.kind)
                 else {
-                    return Err(CellError::new(format!("{via:?} is not a relation")));
+                    return Err(CellError::new(format!(
+                        "{via:?} is not a relation"
+                    )));
                 };
                 let to = *to;
                 let Some(target) = ws.collection(to) else {
-                    return Err(CellError::new("related collection not loaded"));
+                    return Err(CellError::new(
+                        "related collection not loaded",
+                    ));
                 };
                 let prop_name = target
                     .schema()
@@ -303,8 +325,10 @@ pub fn aggregate(agg: Aggregation, values: &[Value]) -> Value {
             {
                 best = match best {
                     Some(b)
-                        if std::mem::discriminant(b) == std::mem::discriminant(*v)
-                            && ((agg == Aggregation::Min) == (v.sort_cmp(b).is_lt())) =>
+                        if std::mem::discriminant(b)
+                            == std::mem::discriminant(*v)
+                            && ((agg == Aggregation::Min)
+                                == (v.sort_cmp(b).is_lt())) =>
                     {
                         Some(v)
                     }
@@ -314,13 +338,16 @@ pub fn aggregate(agg: Aggregation, values: &[Value]) -> Value {
             }
             best.cloned().unwrap_or_default()
         }
-        Aggregation::Checked => count(values.iter().filter(|v| v.truthy()).count()),
+        Aggregation::Checked => {
+            count(values.iter().filter(|v| v.truthy()).count())
+        }
         Aggregation::Pct => {
             if values.is_empty() {
                 Value::Empty
             } else {
                 #[allow(clippy::cast_precision_loss)]
-                let pct = values.iter().filter(|v| v.truthy()).count() as f64 / values.len() as f64;
+                let pct = values.iter().filter(|v| v.truthy()).count() as f64
+                    / values.len() as f64;
                 Value::Number(pct)
             }
         }

@@ -21,7 +21,9 @@ async function setup(content = body(p("Hello world"))) {
 }
 
 const marksOnHello = (editor: Editor) =>
-  (editor.state.doc.firstChild?.firstChild?.marks ?? []).map((mark) => mark.type.name);
+  (editor.state.doc.firstChild?.firstChild?.marks ?? []).map(
+    (mark) => mark.type.name,
+  );
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -34,10 +36,14 @@ describe("Toolbar", () => {
     const tabbable = [...toolbar.querySelectorAll("button")].filter(
       (button) => button.tabIndex === 0,
     );
-    expect(tabbable.map((button) => button.getAttribute("aria-label"))).toEqual(["Bold"]);
-    expect(screen.getByRole("button", { name: "Bold" }).getAttribute("aria-keyshortcuts")).toBe(
-      "Control+B",
+    expect(tabbable.map((button) => button.getAttribute("aria-label"))).toEqual(
+      ["Bold"],
     );
+    expect(
+      screen
+        .getByRole("button", { name: "Bold" })
+        .getAttribute("aria-keyshortcuts"),
+    ).toBe("Control+B");
   });
 
   it("moves focus with the arrow keys and wraps around", async () => {
@@ -59,36 +65,56 @@ describe("Toolbar", () => {
     ["Strikethrough", "strike"],
     ["Inline code", "code"],
     ["Highlight", "highlight"],
-  ])("toggles %s on the selection and shows it as pressed", async (label, mark) => {
-    const { user, editor } = await setup();
-    const button = screen.getByRole("button", { name: label });
-    expect(button.getAttribute("aria-pressed")).toBe("false");
-    await user.click(button);
-    expect(marksOnHello(editor)).toEqual([mark]);
-    expect(button.getAttribute("aria-pressed")).toBe("true");
-    await user.click(button);
-    expect(marksOnHello(editor)).toEqual([]);
-  });
+  ])(
+    "toggles %s on the selection and shows it as pressed",
+    async (label, mark) => {
+      const { user, editor } = await setup();
+      const button = screen.getByRole("button", { name: label });
+      expect(button.getAttribute("aria-pressed")).toBe("false");
+      await user.click(button);
+      expect(marksOnHello(editor)).toEqual([mark]);
+      expect(button.getAttribute("aria-pressed")).toBe("true");
+      await user.click(button);
+      expect(marksOnHello(editor)).toEqual([]);
+    },
+  );
 
   it("links the selection to a safe address from the prompt", async () => {
     const { user, editor } = await setup();
-    const prompt = vi.spyOn(globalThis, "prompt").mockReturnValue("https://example.com");
+    const prompt = vi
+      .spyOn(globalThis, "prompt")
+      .mockReturnValue("https://example.com");
     await user.click(screen.getByRole("button", { name: "Link" }));
-    expect(prompt).toHaveBeenCalledWith("Link address (leave empty to remove the link)", "");
+    expect(prompt).toHaveBeenCalledWith(
+      "Link address (leave empty to remove the link)",
+      "",
+    );
     expect(editor.getAttributes("link")["href"]).toBe("https://example.com/");
-    expect(screen.getByRole("button", { name: "Link" }).getAttribute("aria-pressed")).toBe("true");
+    expect(
+      screen.getByRole("button", { name: "Link" }).getAttribute("aria-pressed"),
+    ).toBe("true");
   });
 
-  it("offers the current address and removes the link when it is cleared", async () => {
-    const { user, editor } = await setup(body(p(link("Hello", "https://old.example"), " world")));
-    const prompt = vi.spyOn(globalThis, "prompt").mockReturnValue("");
-    await user.click(screen.getByRole("button", { name: "Link" }));
-    expect(prompt).toHaveBeenCalledWith(expect.any(String), "https://old.example");
-    expect(marksOnHello(editor)).toEqual([]);
-  });
+  it(
+    "offers the current address and removes the link when it is " + "cleared",
+    async () => {
+      const { user, editor } = await setup(
+        body(p(link("Hello", "https://old.example"), " world")),
+      );
+      const prompt = vi.spyOn(globalThis, "prompt").mockReturnValue("");
+      await user.click(screen.getByRole("button", { name: "Link" }));
+      expect(prompt).toHaveBeenCalledWith(
+        expect.any(String),
+        "https://old.example",
+      );
+      expect(marksOnHello(editor)).toEqual([]);
+    },
+  );
 
   it("refuses an unsafe address by removing the link", async () => {
-    const { user, editor } = await setup(body(p(link("Hello", "https://old.example"))));
+    const { user, editor } = await setup(
+      body(p(link("Hello", "https://old.example"))),
+    );
     vi.spyOn(globalThis, "prompt").mockReturnValue("javascript:alert(1)");
     await user.click(screen.getByRole("button", { name: "Link" }));
     expect(marksOnHello(editor)).toEqual([]);
@@ -96,7 +122,8 @@ describe("Toolbar", () => {
 
   it("changes nothing when the prompt is cancelled", async () => {
     const { user, editor } = await setup();
-    // eslint-disable-next-line unicorn/no-null -- window.prompt returns null on cancel
+    // Window.prompt returns null on cancel.
+    // eslint-disable-next-line unicorn/no-null
     vi.spyOn(globalThis, "prompt").mockReturnValue(null);
     const before = editor.getJSON();
     await user.click(screen.getByRole("button", { name: "Link" }));
@@ -107,6 +134,31 @@ describe("Toolbar", () => {
     const { user, editor } = await setup(body(p()));
     await user.click(screen.getByRole("button", { name: "Insert" }));
     expect(editor.state.doc.textContent).toBe("/");
-    expect(await screen.findByRole("listbox", { name: "Blocks" })).toBeDefined();
+    expect(
+      await screen.findByRole("listbox", { name: "Blocks" }),
+    ).toBeDefined();
   });
+
+  it(
+    "makes a task from the selection, and only with something " + "selected",
+    async () => {
+      const user = userEvent.setup();
+      const { editor } = await renderEditor(body(p("Hello world")));
+      const onSelectionTask = vi.fn();
+      render(<Toolbar editor={editor} onSelectionTask={onSelectionTask} />);
+      const button = screen.getByRole("button", {
+        name: "Make a task from the selection",
+      });
+      expect(button.getAttribute("aria-keyshortcuts")).toBe(
+        "Control+Alt+Enter",
+      );
+      expect(button).toHaveProperty("disabled", true);
+      act(() => {
+        editor.commands.setTextSelection({ from: 1, to: 6 });
+      });
+      expect(button).toHaveProperty("disabled", false);
+      await user.click(button);
+      expect(onSelectionTask).toHaveBeenCalledOnce();
+    },
+  );
 });

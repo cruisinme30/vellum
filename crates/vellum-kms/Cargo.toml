@@ -3,7 +3,9 @@
 
 [package]
 name = "vellum-kms"
-description = "Remote key-encryption-key providers: AWS KMS, GCP Cloud KMS and HashiCorp Vault transit."
+description = """\
+    Remote key-encryption-key providers: AWS KMS, GCP Cloud KMS and HashiCorp \
+    Vault transit."""
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -28,4 +30,5 @@ vellum-crypto = { path = "../vellum-crypto" }
 zeroize = "1.9.1"
 
 [dev-dependencies]
-tokio = { version = "1.54.1", features = ["io-util", "macros", "net", "rt-multi-thread"] }
+tokio.version = "1.54.1"
+tokio.features = ["io-util", "macros", "net", "rt-multi-thread"]

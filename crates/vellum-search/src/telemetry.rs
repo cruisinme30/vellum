@@ -41,7 +41,11 @@ impl RowCount for () {
 ///
 /// # Errors
 /// Whatever `fut` returns.
-pub async fn traced<T, E, F>(engine: &'static str, operation: &'static str, fut: F) -> Result<T, E>
+pub async fn traced<T, E, F>(
+    engine: &'static str,
+    operation: &'static str,
+    fut: F,
+) -> Result<T, E>
 where
     T: RowCount,
     F: Future<Output = Result<T, E>>,

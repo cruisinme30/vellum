@@ -106,13 +106,13 @@ fn escape(text: &str) -> String {
 }
 
 fn short_hash(text: &str) -> String {
-    Sha256::digest(text.as_bytes())
-        .iter()
-        .take(8)
-        .fold(String::new(), |mut out, b| {
+    Sha256::digest(text.as_bytes()).iter().take(8).fold(
+        String::new(),
+        |mut out, b| {
             let _ = write!(out, "{b:02x}");
             out
-        })
+        },
+    )
 }
 
 fn strip_reply_prefixes(subject: &str) -> &str {
@@ -148,7 +148,8 @@ fn clip(text: &str) -> Option<String> {
 ///
 /// Returns [`CaptureError::Message`] when the message cannot be parsed.
 pub fn from_email(raw: &[u8], now: DateTime) -> Result<Capture, CaptureError> {
-    let _span = tracing::info_span!("tasks.capture.email", bytes = raw.len()).entered();
+    let _span =
+        tracing::info_span!("tasks.capture.email", bytes = raw.len()).entered();
     let Some(message) = mail_parser::MessageParser::default().parse(raw) else {
         telemetry::record_capture("email", "unreadable");
         return Err(CaptureError::Message);
@@ -163,7 +164,9 @@ pub fn from_email(raw: &[u8], now: DateTime) -> Result<Capture, CaptureError> {
     let mut notes = message.body_text(0).and_then(|b| clip(&b));
     if let Some(from) = &from {
         let line = format!("From: {from}");
-        notes = Some(notes.map_or_else(|| line.clone(), |n| format!("{line}\n\n{n}")));
+        notes = Some(
+            notes.map_or_else(|| line.clone(), |n| format!("{line}\n\n{n}")),
+        );
     }
     let id = message
         .message_id()
@@ -217,8 +220,8 @@ pub fn verify_slack(
                 .collect::<Option<Vec<u8>>>()
         })
         .ok_or(CaptureError::Signature)?;
-    let mut mac =
-        Hmac::<Sha256>::new_from_slice(signing_secret).map_err(|_| CaptureError::Signature)?;
+    let mut mac = Hmac::<Sha256>::new_from_slice(signing_secret)
+        .map_err(|_| CaptureError::Signature)?;
     mac.update(b"v0:");
     mac.update(timestamp.trim().as_bytes());
     mac.update(b":");
@@ -268,6 +271,8 @@ struct SlackPayload {
     user: SlackRef,
     #[serde(default)]
     message: SlackMessage,
+    #[serde(default)]
+    response_url: String,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -296,6 +301,9 @@ pub struct SlackCapture {
     pub team: String,
     /// The task.
     pub capture: Capture,
+    /// Where to post a reply only the user sees; kept only when it is a
+    /// Slack URL.
+    pub response_url: Option<String>,
 }
 
 /// Turns Slack's mark-up into plain text: `<@U1>` to `@U1`, `<url|label>`
@@ -335,10 +343,10 @@ fn slack_text(text: &str) -> String {
 /// Returns [`CaptureError::Payload`] for anything but a message shortcut.
 pub fn from_slack(body: &str) -> Result<SlackCapture, CaptureError> {
     let _span = tracing::info_span!("tasks.capture.slack").entered();
-    let payload =
-        form_value(body, "payload").ok_or_else(|| CaptureError::Payload("no payload".into()))?;
-    let payload: SlackPayload =
-        serde_json::from_str(&payload).map_err(|e| CaptureError::Payload(e.to_string()))?;
+    let payload = form_value(body, "payload")
+        .ok_or_else(|| CaptureError::Payload("no payload".into()))?;
+    let payload: SlackPayload = serde_json::from_str(&payload)
+        .map_err(|e| CaptureError::Payload(e.to_string()))?;
     if payload.kind != "message_action" {
         telemetry::record_capture("slack", "refused");
         return Err(CaptureError::Payload(payload.kind));
@@ -348,7 +356,8 @@ pub fn from_slack(body: &str) -> Result<SlackCapture, CaptureError> {
         .lines()
         .find(|l| !l.trim().is_empty())
         .unwrap_or_default();
-    let mut title: String = first.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut title: String =
+        first.split_whitespace().collect::<Vec<_>>().join(" ");
     if title.chars().count() > 140 {
         title = title.chars().take(139).collect::<String>() + "…";
     }
@@ -361,11 +370,15 @@ pub fn from_slack(body: &str) -> Result<SlackCapture, CaptureError> {
         payload.channel.id,
         payload.message.ts.replace('.', "")
     );
-    let notes = clip(&text).map_or_else(|| link.clone(), |t| format!("{t}\n\n{link}"));
+    let notes =
+        clip(&text).map_or_else(|| link.clone(), |t| format!("{t}\n\n{link}"));
     telemetry::record_capture("slack", "captured");
+    let response_url = Some(payload.response_url)
+        .filter(|u| u.starts_with(SLACK_RESPONSE_PREFIX) && u.len() <= 512);
     Ok(SlackCapture {
         slack_user: payload.user.id,
         team: payload.team.id.clone(),
+        response_url,
         capture: Capture {
             title,
             fields: TaskFields {
@@ -381,11 +394,109 @@ pub fn from_slack(body: &str) -> Result<SlackCapture, CaptureError> {
     })
 }
 
+/// The only place Slack replies are posted (`response_url`).
+pub const SLACK_RESPONSE_PREFIX: &str = "https://hooks.slack.com/";
+
+/// How long a Slack link code is valid.
+pub const SLACK_LINK_TTL: jiff::SignedDuration =
+    jiff::SignedDuration::from_mins(15);
+
+fn link_mac(secret: &[u8], team: &str, user: &str, expires: i64) -> Vec<u8> {
+    #[expect(clippy::expect_used, reason = "HMAC takes keys of any length")]
+    let mut mac =
+        Hmac::<Sha256>::new_from_slice(secret).expect("any key length");
+    mac.update(b"vellum-slack-link\0");
+    mac.update(team.as_bytes());
+    mac.update(b"\0");
+    mac.update(user.as_bytes());
+    mac.update(b"\0");
+    mac.update(expires.to_string().as_bytes());
+    mac.finalize().into_bytes().to_vec()
+}
+
+fn is_slack_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 32
+        && id.bytes().all(|b| b.is_ascii_alphanumeric())
+}
+
+/// A code that proves a Slack user asked to link their account (#163).
+///
+/// Slack shows it to them as a link; opening it while signed in to
+/// Vellum links that Slack user to the Vellum account. It is signed with
+/// the Slack signing secret and expires after [`SLACK_LINK_TTL`].
+#[must_use]
+pub fn slack_link_code(
+    secret: &[u8],
+    team: &str,
+    user: &str,
+    now: Timestamp,
+) -> String {
+    let expires = now.checked_add(SLACK_LINK_TTL).unwrap_or(now).as_second();
+    let mac = link_mac(secret, team, user, expires);
+    let tag: String = mac.get(..16).unwrap_or_default().iter().fold(
+        String::new(),
+        |mut out, b| {
+            let _ = write!(out, "{b:02x}");
+            out
+        },
+    );
+    format!("{team}.{user}.{expires}.{tag}")
+}
+
+/// Checks a [`slack_link_code`] and returns the Slack team and user.
+///
+/// # Errors
+///
+/// [`CaptureError::Signature`] for a forged, malformed or expired code.
+pub fn read_slack_link_code(
+    secret: &[u8],
+    code: &str,
+    now: Timestamp,
+) -> Result<(String, String), CaptureError> {
+    let bad = || CaptureError::Signature;
+    let mut parts = code.trim().split('.');
+    let (Some(team), Some(user), Some(expires), Some(tag), None) = (
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+        parts.next(),
+    ) else {
+        return Err(bad());
+    };
+    if !is_slack_id(team) || !is_slack_id(user) || tag.len() != 32 {
+        return Err(bad());
+    }
+    let expires: i64 = expires.parse().map_err(|_| bad())?;
+    if now.as_second() > expires {
+        return Err(bad());
+    }
+    let expected = slack_link_code(
+        secret,
+        team,
+        user,
+        Timestamp::from_second(expires)
+            .ok()
+            .and_then(|t| t.checked_sub(SLACK_LINK_TTL).ok())
+            .ok_or_else(bad)?,
+    );
+    let expected_tag = expected.rsplit('.').next().unwrap_or_default();
+    if bool::from(expected_tag.as_bytes().ct_eq(tag.as_bytes())) {
+        Ok((team.to_owned(), user.to_owned()))
+    } else {
+        Err(bad())
+    }
+}
+
 /// Adds a capture to the end of an Inbox file, with its notes. A capture
 /// whose `src` is already in the file (a retried delivery) is skipped and
 /// `None` is returned.
 #[must_use]
-pub fn append_to_inbox(inbox: &str, capture: &Capture) -> Option<(String, BlockId)> {
+pub fn append_to_inbox(
+    inbox: &str,
+    capture: &Capture,
+) -> Option<(String, BlockId)> {
     let list = checklist::Checklist::parse(inbox);
     if capture.fields.src.is_some()
         && list
@@ -438,6 +549,44 @@ pub fn append_to_inbox(inbox: &str, capture: &Capture) -> Option<(String, BlockI
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slack_link_codes_are_signed_bound_and_expire() {
+        let now = Timestamp::from_second(1_800_000_000)
+            .unwrap_or(Timestamp::UNIX_EPOCH);
+        let code = slack_link_code(b"secret", "T01", "U01", now);
+        assert_eq!(
+            read_slack_link_code(b"secret", &code, now),
+            Ok(("T01".to_owned(), "U01".to_owned()))
+        );
+        let forged = code.replacen("U01", "U02", 1);
+        assert!(
+            read_slack_link_code(b"secret", &forged, now).is_err(),
+            "bound to the user"
+        );
+        assert!(
+            read_slack_link_code(b"other", &code, now).is_err(),
+            "bound to the secret"
+        );
+        let later = now
+            .checked_add(SLACK_LINK_TTL + jiff::SignedDuration::from_secs(1));
+        assert!(
+            read_slack_link_code(b"secret", &code, later.unwrap_or(now))
+                .is_err(),
+            "expires"
+        );
+        for junk in [
+            "",
+            "a.b.c",
+            "T01.U01.x.y",
+            "T 1.U01.1.00000000000000000000000000000000",
+        ] {
+            assert!(
+                read_slack_link_code(b"secret", junk, now).is_err(),
+                "{junk}"
+            );
+        }
+    }
     use jiff::civil::date;
 
     fn now() -> DateTime {
@@ -449,7 +598,8 @@ mod tests {
         let token = ShareToken::generate().unwrap();
         let addr = address(&token, "northstar.dev");
         assert!(addr.starts_with("tasks+") && addr.ends_with("@northstar.dev"));
-        let back = token_from_address(&format!("\"My tasks\" <{addr}>")).unwrap();
+        let back =
+            token_from_address(&format!("\"My tasks\" <{addr}>")).unwrap();
         assert!(token.hash().verify(&back));
         assert_eq!(
             token_from_address("ann@northstar.dev"),
@@ -480,12 +630,14 @@ Hi,\r\n- line item {x=1}\r\nThanks\r\n";
         let inbox = "---\ntitle: Inbox\n---\n";
         let (out, block) = append_to_inbox(inbox, &capture).unwrap();
         assert!(out.contains(&format!(
-            "- [ ] Pay the \\<Northstar> invoice {{due=2026-11-06 p=1 src={}}} ^{block}\n",
+            "- [ ] Pay the \\<Northstar> invoice {{due=2026-11-06 p=1 src={}}} \
+                ^{block}\n",
             capture.fields.src.as_deref().unwrap()
         )));
-        assert!(
-            out.contains("\n  From: ann@northstar.dev\n  Hi,\n  \\- line item {x=1}\n  Thanks\n")
-        );
+        assert!(out.contains(
+            "\n  From: ann@northstar.dev\n  Hi,\n  \\- line item \
+                {x=1}\n  Thanks\n"
+        ));
         let list = checklist::Checklist::parse(&out);
         assert_eq!(list.items.len(), 1);
         assert_eq!(list.items[0].fields.due, capture.fields.due);
@@ -507,13 +659,13 @@ Hi,\r\n- line item {x=1}\r\nThanks\r\n";
         mac.update(body);
         let sig = format!(
             "v0={}",
-            mac.finalize()
-                .into_bytes()
-                .iter()
-                .fold(String::new(), |mut s, b| {
+            mac.finalize().into_bytes().iter().fold(
+                String::new(),
+                |mut s, b| {
                     let _ = write!(s, "{b:02x}");
                     s
-                })
+                }
+            )
         );
         assert_eq!(verify_slack(secret, &ts, &sig, body, now), Ok(()));
         assert_eq!(
@@ -524,7 +676,8 @@ Hi,\r\n- line item {x=1}\r\nThanks\r\n";
             verify_slack(secret, &ts, &sig, b"payload=x", now),
             Err(CaptureError::Signature)
         );
-        let later = now.checked_add(jiff::SignedDuration::from_mins(6)).unwrap();
+        let later =
+            now.checked_add(jiff::SignedDuration::from_mins(6)).unwrap();
         assert_eq!(
             verify_slack(secret, &ts, &sig, body, later),
             Err(CaptureError::Signature)
@@ -560,14 +713,9 @@ Hi,\r\n- line item {x=1}\r\nThanks\r\n";
             slack.capture.title,
             "@U2 can you review the PRD (https://northstar.dev/prd) & reply?"
         );
-        assert!(
-            slack
-                .capture
-                .notes
-                .as_deref()
-                .unwrap()
-                .ends_with("https://northstar.slack.com/archives/C9/p1730538000000200")
-        );
+        assert!(slack.capture.notes.as_deref().unwrap().ends_with(
+            "https://northstar.slack.com/archives/C9/p1730538000000200"
+        ));
         assert_eq!(
             slack.capture.fields.src.as_deref(),
             Some("slack:T1:C9:1730538000.000200")

@@ -117,7 +117,8 @@ pub struct ListItem {
 /// A fenced block.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Fence {
-    /// First word of the info string (`rust`, `chart`, `mermaid`); may be empty.
+    /// First word of the info string (`rust`, `chart`, `mermaid`); may be
+    /// empty.
     pub lang: String,
     /// The rest of the info string (`sortable bar=Revenue`), trimmed.
     pub args: String,
@@ -179,7 +180,8 @@ impl FenceKind {
             "board" => Self::Board,
             "table" => Self::Table,
             "architecture" => Self::Architecture,
-            "mermaid" | "d2" | "plantuml" | "graphviz" | "excalidraw" | "drawio" => Self::Diagram,
+            "mermaid" | "d2" | "plantuml" | "graphviz" | "excalidraw"
+            | "drawio" => Self::Diagram,
             "calculator" => Self::Calculator,
             "image" => Self::Image,
             "collection" => Self::Collection,
@@ -274,7 +276,8 @@ pub enum ContainerKind {
 }
 
 impl ContainerKind {
-    /// Classifies a container name. Unknown names are [`ContainerKind::Unknown`].
+    /// Classifies a container name. Unknown names are
+    /// [`ContainerKind::Unknown`].
     #[must_use]
     pub fn from_name(name: &str) -> Self {
         match name {

@@ -3,7 +3,12 @@
 
 import type { AnyExtension } from "@tiptap/core";
 import { Highlight } from "@tiptap/extension-highlight";
-import { BulletList, OrderedList, TaskItem, TaskList } from "@tiptap/extension-list";
+import {
+  BulletList,
+  OrderedList,
+  TaskItem,
+  TaskList,
+} from "@tiptap/extension-list";
 import { Subscript } from "@tiptap/extension-subscript";
 import { Superscript } from "@tiptap/extension-superscript";
 import { Placeholder } from "@tiptap/extensions";
@@ -12,6 +17,9 @@ import { StarterKit } from "@tiptap/starter-kit";
 import type { Translate } from "../i18n/i18n";
 
 import { BlockIds } from "./block-id-extension";
+import { ChipSuggest } from "./chips/chip-suggest";
+import { issueChipView } from "./chips/issue-chip";
+import type { ChipSources } from "./chips/items";
 import {
   CodeBlock,
   DataFence,
@@ -59,6 +67,10 @@ export interface ExtensionOptions {
   readonly resolvePage: ResolvePage;
   /** Off when Yjs owns undo history (always, outside tests). */
   readonly history: boolean;
+  /**
+   * People, pages and issues for the `@` and `[[` menus and live issue chips.
+   */
+  readonly chips?: ChipSources | undefined;
 }
 
 /**
@@ -66,7 +78,12 @@ export interface ExtensionOptions {
  * schema/blocks.json (checked by extensions.test.ts), plus block IDs, the
  * slash menu and placeholders. Collaboration is added by the host.
  */
-export function vellumExtensions({ t, resolvePage, history }: ExtensionOptions): AnyExtension[] {
+export function vellumExtensions({
+  t,
+  resolvePage,
+  history,
+  chips,
+}: ExtensionOptions): AnyExtension[] {
   return [
     StarterKit.configure({
       codeBlock: false,
@@ -78,11 +95,14 @@ export function vellumExtensions({ t, resolvePage, history }: ExtensionOptions):
       link: {
         openOnClick: false,
         autolink: true,
-        // http, https and mailto are linkify built-ins: registering them again as
-        // custom protocols only warns ("already initialized") from the second editor on.
+        // http, https and mailto are linkify built-ins: registering them again
+        // as custom protocols only warns ("already initialized") from the
+        // second editor on.
         isAllowedUri: (url, context) =>
-          /^(?:https?:|mailto:|\/|#)/i.test(url) && context.defaultValidate(url),
-        // Tiptap removes an attribute set to null: links never open a new window by default.
+          /^(?:https?:|mailto:|\/|#)/i.test(url) &&
+          context.defaultValidate(url),
+        // Tiptap removes an attribute set to null: links never open a new
+        // window by default.
         // eslint-disable-next-line unicorn/no-null
         HTMLAttributes: { rel: "noopener noreferrer", target: null },
       },
@@ -137,15 +157,19 @@ export function vellumExtensions({ t, resolvePage, history }: ExtensionOptions):
     DataFence,
     Mention,
     WikiLink.configure({ resolve: resolvePage }),
-    IssueKey,
+    chips?.issueStatus === undefined && chips?.openIssue === undefined
+      ? IssueKey
+      : IssueKey.extend({ addNodeView: () => issueChipView(chips, t) }),
     DateChip,
     MathInline,
     InlineImage,
     BlockIds,
     SchemaAttributes,
     SlashCommand.configure({ t }),
+    ChipSuggest.configure({ t, sources: chips }),
     Placeholder.configure({
-      placeholder: ({ node }) => (node.type.name === "paragraph" ? t("editor-placeholder") : ""),
+      placeholder: ({ node }) =>
+        node.type.name === "paragraph" ? t("editor-placeholder") : "",
     }),
   ];
 }

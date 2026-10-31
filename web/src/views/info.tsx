@@ -6,9 +6,11 @@ import { Link } from "react-router";
 
 import { useSession } from "../api/session";
 import { SLASH_ITEMS } from "../editor/slash/items";
+import { PUBLISHED_DOCS, ViewTitle } from "../help/help-link";
 import { useT } from "../i18n/i18n";
 
 import "../admin/console/console.css";
+import "../account/account.css";
 
 import { describeError } from "./sign-in";
 
@@ -24,12 +26,35 @@ const SHORTCUTS: readonly [keys: string, id: string][] = [
   ["Alt ← →", "help-key-board"],
 ];
 
-/** Help: shortcuts and every block the slash menu inserts. */
+const GUIDES = ["user", "admin", "developer"] as const;
+
+/** Help: the guides, shortcuts and every block the slash menu inserts. */
 export function HelpView() {
   const t = useT();
+  const session = useSession();
+  const base = session === undefined ? PUBLISHED_DOCS : "/guide/";
   return (
     <div className="vl-view">
-      <h1>{t("nav-help")}</h1>
+      <ViewTitle title={t("nav-help")} help="editor.first-page" />
+      <h2>{t("help-guides")}</h2>
+      <p className="vl-muted">{t("help-guides-intro")}</p>
+      <ul className="vl-guides">
+        {GUIDES.map((guide) => (
+          <li key={guide}>
+            <a
+              href={
+                session === undefined
+                  ? `${base}${guide}/index.html`
+                  : `${base}${guide}/`
+              }
+              target="_blank"
+              rel="noreferrer"
+            >
+              {t(`help-guide-${guide}`)}
+            </a>
+          </li>
+        ))}
+      </ul>
       <h2>{t("help-shortcuts")}</h2>
       <dl className="vl-shortcuts">
         {SHORTCUTS.map(([keys, id]) => (
@@ -54,7 +79,13 @@ export function HelpView() {
 }
 
 /** A destination whose workstream has not landed yet. */
-export function PendingView({ title, body }: { readonly title: string; readonly body: string }) {
+export function PendingView({
+  title,
+  body,
+}: {
+  readonly title: string;
+  readonly body: string;
+}) {
   return (
     <div className="vl-view">
       <h1>{title}</h1>
@@ -63,7 +94,21 @@ export function PendingView({ title, body }: { readonly title: string; readonly 
   );
 }
 
-const ADMIN_SCREENS = ["audit", "settings", "backups", "requests", "routes"] as const;
+const ADMIN_SCREENS = [
+  "users",
+  "sign-in",
+  "spaces",
+  "groups",
+  "tokens",
+  "usage",
+  "audit",
+  "settings",
+  "backups",
+  "webhooks",
+  "requests",
+  "routes",
+  "mcp",
+] as const;
 
 /** Admin: the console's screens, and the signed-in account. */
 export function AdminView() {
@@ -105,7 +150,24 @@ function AccountSection() {
   };
   return (
     <section className="vl-view" aria-labelledby="account-heading">
-      <h2 id="account-heading">{t("auth-signed-in-as", { name: user.name, email: user.email })}</h2>
+      <h2 id="account-heading">
+        {t("auth-signed-in-as", { name: user.name, email: user.email })}
+      </h2>
+      <nav aria-label={t("account-links")}>
+        <ul className="vl-account-links">
+          <li>
+            <Link to="/settings/security">{t("account-security-link")}</Link>
+          </li>
+          <li>
+            <Link to="/settings/api-tokens">{t("account-tokens-link")}</Link>
+          </li>
+          <li>
+            <Link to="/settings/notifications">
+              {t("account-notifications-link")}
+            </Link>
+          </li>
+        </ul>
+      </nav>
       {error === undefined ? undefined : (
         <p className="vl-field-error" role="alert">
           {error}

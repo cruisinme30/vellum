@@ -1,18 +1,22 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! Creating spaces, folders, pages and shortcuts.
+//! Creating spaces, folders, pages and shortcuts, and indexing the books
+//! and collections other services write.
 
 use bytes::Bytes;
+use futures::TryStreamExt;
 use vellum_kernel::{Actor, ObjectId, SpaceId, UserId};
-use vellum_store::Precondition;
+use vellum_store::{BlobPath, Precondition};
 
 use super::Drive;
 use crate::error::{DriveError, DriveResult};
 use crate::files::{FolderFile, ShortcutFile, SpaceFile, to_yaml};
 use crate::frontmatter;
 use crate::layout;
-use crate::model::{ActivityKind, Node, NodeKind, Space, SpaceKind, SpaceSettings};
+use crate::model::{
+    ActivityKind, Node, NodeKind, Space, SpaceKind, SpaceSettings,
+};
 use crate::ports::Permission;
 
 impl Drive {
@@ -25,7 +29,12 @@ impl Drive {
     /// # Errors
     /// `Invalid` for a bad slug or a My Drive without an owner,
     /// `AlreadyExists` if the slug is taken, `PermissionDenied`.
-    #[tracing::instrument(name = "drive.create_space", skip_all, fields(slug = slug), err)]
+    #[tracing::instrument(
+        name = "drive.create_space",
+        skip_all,
+        fields(slug = slug),
+        err
+    )]
     pub async fn create_space(
         &self,
         actor: &Actor,
@@ -38,12 +47,18 @@ impl Drive {
             let creator = Self::user_of(actor);
             match (kind, owner, actor) {
                 (SpaceKind::UserDrive, None, _) => {
-                    return Err(DriveError::Invalid("a My Drive needs an owner".into()));
+                    return Err(DriveError::Invalid(
+                        "a My Drive needs an owner".into(),
+                    ));
                 }
-                (SpaceKind::UserDrive, Some(owner), Actor::User { user }) if owner != *user => {
+                (SpaceKind::UserDrive, Some(owner), Actor::User { user })
+                    if owner != *user =>
+                {
                     return Err(DriveError::PermissionDenied);
                 }
-                (_, _, Actor::Model { .. }) => return Err(DriveError::PermissionDenied),
+                (_, _, Actor::Model { .. }) => {
+                    return Err(DriveError::PermissionDenied);
+                }
                 _ => {}
             }
             let root = layout::space_root(kind, slug)?;
@@ -94,7 +109,11 @@ impl Drive {
     /// # Errors
     /// Store or index failures.
     #[tracing::instrument(name = "drive.ensure_my_drive", skip_all, err)]
-    pub async fn ensure_my_drive(&self, user: UserId, handle: Option<&str>) -> DriveResult<Space> {
+    pub async fn ensure_my_drive(
+        &self,
+        user: UserId,
+        handle: Option<&str>,
+    ) -> DriveResult<Space> {
         if let Some(space) = self.my_drive(user).await? {
             return Ok(space);
         }
@@ -103,7 +122,8 @@ impl Drive {
         let tail = id.get(id.len().saturating_sub(8)..).unwrap_or(&id);
         let mut suffixed = base.clone();
         suffixed.truncate(48);
-        let candidates = [base.clone(), format!("{suffixed}-{tail}"), id.clone()];
+        let candidates =
+            [base.clone(), format!("{suffixed}-{tail}"), id.clone()];
         for slug in &candidates {
             match self
                 .create_space(
@@ -129,7 +149,11 @@ impl Drive {
 
     /// The My Drive at `slug` if its folder file says it belongs to
     /// `user`, indexed as it stands.
-    async fn claimed_by(&self, user: UserId, slug: &str) -> DriveResult<Option<Space>> {
+    async fn claimed_by(
+        &self,
+        user: UserId,
+        slug: &str,
+    ) -> DriveResult<Option<Space>> {
         let root = layout::space_root(SpaceKind::UserDrive, slug)?;
         let path = root.join(layout::FOLDER_FILE)?;
         let blob = match self.store.get(&path).await {
@@ -159,7 +183,12 @@ impl Drive {
     ///
     /// # Errors
     /// `SpaceNotFound`, `PermissionDenied`, or a store failure.
-    #[tracing::instrument(name = "drive.update_space", skip_all, fields(space = %space), err)]
+    #[tracing::instrument(
+        name = "drive.update_space",
+        skip_all,
+        fields(space = %space),
+        err
+    )]
     pub async fn update_space(
         &self,
         actor: &Actor,
@@ -169,8 +198,13 @@ impl Drive {
     ) -> DriveResult<Space> {
         self.observe("update_space", async {
             let mut space = self.space(space).await?;
-            self.authorize(actor, space.id, space.node_id(), Permission::Manage)
-                .await?;
+            self.authorize(
+                actor,
+                space.id,
+                space.node_id(),
+                Permission::Manage,
+            )
+            .await?;
             if let Some(name) = name {
                 space.name = name.trim().to_owned();
             }
@@ -188,7 +222,12 @@ impl Drive {
     /// # Errors
     /// `PermissionDenied` without edit rights on the parent, `Invalid` if
     /// the parent is not a folder of the space.
-    #[tracing::instrument(name = "drive.create_folder", skip_all, fields(space = %space), err)]
+    #[tracing::instrument(
+        name = "drive.create_folder",
+        skip_all,
+        fields(space = %space),
+        err
+    )]
     pub async fn create_folder(
         &self,
         actor: &Actor,
@@ -206,7 +245,8 @@ impl Drive {
             )
             .await?;
             let dir = self.dir_of(&space, parent).await?;
-            let path = self.free_path(&dir, NodeKind::Folder, name, None).await?;
+            let path =
+                self.free_path(&dir, NodeKind::Folder, name, None).await?;
             let id = ObjectId::generate();
             let file = FolderFile {
                 id,
@@ -245,7 +285,12 @@ impl Drive {
     ///
     /// # Errors
     /// `PermissionDenied`, `Invalid`, or `QuotaExceeded`.
-    #[tracing::instrument(name = "drive.create_page", skip_all, fields(space = %space), err)]
+    #[tracing::instrument(
+        name = "drive.create_page",
+        skip_all,
+        fields(space = %space),
+        err
+    )]
     pub async fn create_page(
         &self,
         actor: &Actor,
@@ -253,6 +298,25 @@ impl Drive {
         parent: Option<ObjectId>,
         title: &str,
         body: &str,
+    ) -> DriveResult<Node> {
+        self.create_page_with(actor, space, parent, title, body, &[])
+            .await
+    }
+
+    /// As [`Drive::create_page`], with extra front-matter fields written
+    /// after `id` and `title`, such as `status: draft` and the attribution
+    /// of a page a model wrote (ADR 0019, D218).
+    ///
+    /// # Errors
+    /// `PermissionDenied`, `Invalid`, or `QuotaExceeded`.
+    pub async fn create_page_with(
+        &self,
+        actor: &Actor,
+        space: SpaceId,
+        parent: Option<ObjectId>,
+        title: &str,
+        body: &str,
+        front: &[(&str, &str)],
     ) -> DriveResult<Node> {
         self.observe("create_page", async {
             let space = self.space(space).await?;
@@ -265,11 +329,22 @@ impl Drive {
             .await?;
             let dir = self.dir_of(&space, parent).await?;
             let title = title.trim();
-            let path = self.free_path(&dir, NodeKind::Page, title, None).await?;
+            let path =
+                self.free_path(&dir, NodeKind::Page, title, None).await?;
             let id = ObjectId::generate();
             let mut yaml = frontmatter::set("", "id", &id.to_string());
             yaml = frontmatter::set(&yaml, "title", title);
+            for (key, value) in front {
+                if matches!(*key, "id" | "title" | "vellum") {
+                    return Err(DriveError::Invalid(format!(
+                        "{key} is set by the drive"
+                    )));
+                }
+                yaml = frontmatter::set(&yaml, key, value);
+            }
             let text = format!("---\n{yaml}vellum: 1\n---\n\n{body}");
+            self.check_content(actor, space.id, &path, text.as_bytes())
+                .await?;
             let bytes = Bytes::from(text);
             let size = bytes.len() as u64;
             // Content plus its first version.
@@ -305,7 +380,12 @@ impl Drive {
     ///
     /// # Errors
     /// `NotFound`, `PermissionDenied`, `Invalid`.
-    #[tracing::instrument(name = "drive.create_shortcut", skip_all, fields(target = %target), err)]
+    #[tracing::instrument(
+        name = "drive.create_shortcut",
+        skip_all,
+        fields(target = %target),
+        err
+    )]
     pub async fn create_shortcut(
         &self,
         actor: &Actor,
@@ -359,8 +439,194 @@ impl Drive {
         .await
     }
 
+    /// Creates an empty book titled `title` in the drive folder `folder`
+    /// (a space's root folder or a live folder): `Title.book/` with its
+    /// `book.yaml` and `SUMMARY.md`, owned by its creator (D322).
+    ///
+    /// # Errors
+    /// `Invalid` for a blank title or a path that is not such a folder,
+    /// `PermissionDenied` without edit rights on it, `QuotaExceeded`.
+    #[tracing::instrument(name = "drive.create_book", skip_all, fields(folder = %folder), err)]
+    pub async fn create_book(
+        &self,
+        actor: &Actor,
+        folder: &BlobPath,
+        title: &str,
+    ) -> DriveResult<Node> {
+        self.observe("create_book", async {
+            let title = title.trim();
+            if title.is_empty() {
+                return Err(DriveError::Invalid("a book needs a title".into()));
+            }
+            let (space, parent) = self.editable_folder(actor, folder).await?;
+            let path =
+                self.free_path(folder, NodeKind::Book, title, None).await?;
+            let id = ObjectId::generate();
+            let book_id = vellum_books::BookId::parse(&id.to_string())
+                .map_err(|e| {
+                    DriveError::Invalid(format!("bad book id: {e}"))
+                })?;
+            let book = vellum_books::Book::new(book_id, title);
+            let manifest = book.manifest_text().map_err(|e| {
+                DriveError::Invalid(format!("cannot write book.yaml: {e}"))
+            })?;
+            let summary = book.summary_text();
+            let size = (manifest.len() + summary.len()) as u64;
+            self.ensure_quota(&space, size).await?;
+            let _ = self
+                .store
+                .put(
+                    &layout::id_file(NodeKind::Book, &path)?,
+                    Bytes::from(manifest),
+                    Precondition::IfAbsent,
+                )
+                .await?;
+            let _ = self
+                .store
+                .put(
+                    &path.join(layout::BOOK_SUMMARY_FILE)?,
+                    Bytes::from(summary),
+                    Precondition::IfAbsent,
+                )
+                .await?;
+            let node = Node {
+                id,
+                space: space.id,
+                kind: NodeKind::Book,
+                parent,
+                title: title.to_owned(),
+                path,
+                size,
+                modified: self.clock.now(),
+                created_by: Self::user_of(actor),
+                target: None,
+                trash: None,
+            };
+            self.created(actor, &node).await?;
+            Ok(node)
+        })
+        .await
+    }
+
+    /// The space and parent node of `dir`, a space's root folder or a live
+    /// folder, after checking `actor` may edit there (D305).
+    async fn editable_folder(
+        &self,
+        actor: &Actor,
+        dir: &BlobPath,
+    ) -> DriveResult<(Space, Option<ObjectId>)> {
+        let space = self
+            .index
+            .spaces()
+            .await?
+            .into_iter()
+            .find(|s| dir.starts_with(&s.root))
+            .ok_or_else(|| {
+                DriveError::Invalid(format!("{dir} is not in a space"))
+            })?;
+        let parent = if *dir == space.root {
+            None
+        } else {
+            match self.index.node_at(space.id, dir).await? {
+                Some(n) if n.kind == NodeKind::Folder && n.is_live() => {
+                    Some(n.id)
+                }
+                _ => {
+                    return Err(DriveError::Invalid(format!(
+                        "{dir} is not a folder"
+                    )));
+                }
+            }
+        };
+        self.authorize(
+            actor,
+            space.id,
+            parent.unwrap_or_else(|| space.node_id()),
+            Permission::Edit,
+        )
+        .await?;
+        Ok((space, parent))
+    }
+
+    /// Indexes a book or collection another service has just written at
+    /// `path`, as if the drive had made it: the creator owns it, and it
+    /// is in the folder tree (and so in permissions) at once (D321).
+    /// Its manifest (`book.yaml`, `schema.yaml`) carries its ID and title.
+    /// Only a space's root folder or a live folder can hold it, as for
+    /// creating a collection (D305). Indexing it again is a no-op.
+    ///
+    /// # Errors
+    /// `Invalid` for any other path or a manifest without an ID,
+    /// `PermissionDenied` without edit rights on the folder,
+    /// `AlreadyExists` if another node holds the ID.
+    #[tracing::instrument(name = "drive.add_unit", skip_all, fields(path = %path), err)]
+    pub async fn add_unit(
+        &self,
+        actor: &Actor,
+        path: &BlobPath,
+    ) -> DriveResult<Node> {
+        self.observe("add_unit", async {
+            let name = path.file_name();
+            let kind = [NodeKind::Book, NodeKind::Collection]
+                .into_iter()
+                .find(|k| {
+                    name.len() > k.suffix().len() && name.ends_with(k.suffix())
+                })
+                .ok_or_else(|| {
+                    DriveError::Invalid(format!(
+                        "{path} is not a book or collection"
+                    ))
+                })?;
+            let dir = path.parent().ok_or_else(|| {
+                DriveError::Invalid(format!("{path} is not in a space"))
+            })?;
+            let (space, parent) = self.editable_folder(actor, &dir).await?;
+            let (text, _) =
+                self.read_text(&layout::id_file(kind, path)?).await?;
+            let id: ObjectId = frontmatter::get(&text, "id")
+                .and_then(|id| id.parse().ok())
+                .ok_or_else(|| {
+                    DriveError::Invalid(format!("{path} has no id"))
+                })?;
+            if let Some(known) = self.index.node(id).await? {
+                if known.path == *path && known.is_live() {
+                    return Ok(known);
+                }
+                return Err(DriveError::AlreadyExists(id.to_string()));
+            }
+            let mut size = 0_u64;
+            let mut files = self.store.list(Some(path));
+            while let Some(entry) = files.try_next().await? {
+                size = size.saturating_add(entry.size);
+            }
+            let node = Node {
+                id,
+                space: space.id,
+                kind,
+                parent,
+                title: frontmatter::get(&text, "title")
+                    .map(|t| t.trim().to_owned())
+                    .filter(|t| !t.is_empty())
+                    .unwrap_or_else(|| layout::title_from_path(kind, path)),
+                path: path.clone(),
+                size,
+                modified: self.clock.now(),
+                created_by: Self::user_of(actor),
+                target: None,
+                trash: None,
+            };
+            self.created(actor, &node).await?;
+            Ok(node)
+        })
+        .await
+    }
+
     /// Indexes a new node, makes its creator its owner and records it.
-    pub(super) async fn created(&self, actor: &Actor, node: &Node) -> DriveResult<()> {
+    pub(super) async fn created(
+        &self,
+        actor: &Actor,
+        node: &Node,
+    ) -> DriveResult<()> {
         self.index.put_node(node).await?;
         if let Some(user) = Self::user_of(actor) {
             self.access.grant_owner(user, node.space, node.id).await?;

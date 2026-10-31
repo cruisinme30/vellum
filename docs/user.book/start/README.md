@@ -13,13 +13,22 @@ Vellum and given you an account; if you are that someone, start with the
 
 ::: steps
 
-1. **Sign in** with your organisation's single sign-on or the email and password your admin gave you.
-2. **Create a page** with **New** in the navigation rail, or press `⌘K` and type "new page".
+1. **Sign in** with your organisation's single sign-on or the email and password
+   your admin gave you.
+2. **Create a page** with **New** in the navigation rail, or press `⌘K` and type
+   "new page".
 3. **Write** a title, then press `/` on an empty line to insert any block.
-4. **Share** with the **Share** button: add people or groups, then pick view, comment or edit.
+4. **Share** with the **Share** button: add people or groups, then pick view,
+   comment or edit.
 5. **Export** with **⋯ → Export**: PDF, Word, Markdown or HTML.
 
 :::
+
+```image
+src: assets/editor.jpg
+alt: The Vellum editor showing Northstar's "Gateway 2.0 launch plan" page, with the drive on the left and the Share and Export buttons at the top right
+caption: Northstar's launch plan in the editor. The drive is on the left; Share and Export are at the top right.
+```
 
 ## Create your first page {#first-page}
 
@@ -75,5 +84,6 @@ lists how each block looks in each format.
 ## Where to go next
 
 - Learn every block in [Writing in Vellum Markdown](../writing/README.md).
-- Track work with [issues](../work/README.md) and your own tasks in [My Work](../my-work/README.md).
+- Track work with [issues](../work/README.md) and your own tasks in [My
+  Work](../my-work/README.md).
 - Try a [cookbook recipe](../cookbook/README.md) from start to finish.

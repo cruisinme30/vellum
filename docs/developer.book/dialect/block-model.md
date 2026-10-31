@@ -27,7 +27,8 @@ flowchart LR
 1. A directive pre-pass finds front matter, containers and block IDs.
 2. comrak parses the CommonMark and GFM.
 3. The Vellum pass turns special fences and inline extensions into typed nodes.
-4. The renderer turns the tree into HTML through an allow-list sanitiser, and fences into SVG.
+4. The renderer turns the tree into HTML through an allow-list sanitiser, and
+   fences into SVG.
 
 ## Block identity {#block-ids}
 

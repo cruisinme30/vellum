@@ -16,7 +16,10 @@ use crate::model::{IssueKey, WorkCommands, WorkError};
 /// Storage for the links this service owns.
 pub trait LinkStore: Send + Sync {
     /// The links of an issue (empty when none).
-    fn load(&self, key: &IssueKey) -> impl Future<Output = Result<IssueLinks, WorkError>> + Send;
+    fn load(
+        &self,
+        key: &IssueKey,
+    ) -> impl Future<Output = Result<IssueLinks, WorkError>> + Send;
     /// Saves the links of an issue.
     fn save(
         &self,
@@ -54,7 +57,9 @@ impl Settings {
     fn teams_for(&self, provider: Provider, repo: &str) -> BTreeSet<String> {
         self.repositories
             .iter()
-            .filter(|r| r.provider == provider && r.repo.eq_ignore_ascii_case(repo))
+            .filter(|r| {
+                r.provider == provider && r.repo.eq_ignore_ascii_case(repo)
+            })
             .flat_map(|r| r.teams.iter().cloned())
             .collect()
     }
@@ -83,7 +88,12 @@ pub async fn apply<W: WorkCommands, L: LinkStore>(
     event: &GitEvent,
 ) -> Result<Vec<Applied>, WorkError> {
     let (provider, repo) = event.repo();
-    let span = tracing::info_span!("integrations.git.apply", provider = ?provider, repo, references = tracing::field::Empty);
+    let span = tracing::info_span!(
+        "integrations.git.apply",
+        provider = ?provider,
+        repo,
+        references = tracing::field::Empty
+    );
     async {
         let teams = settings.teams_for(provider, repo);
         let references = event.collector().finish(&teams);
@@ -99,7 +109,9 @@ pub async fn apply<W: WorkCommands, L: LinkStore>(
         }
         let mut applied = Vec::new();
         for (key, kind) in targets {
-            if let Some(result) = apply_one(work, store, settings, event, &key, kind).await? {
+            if let Some(result) =
+                apply_one(work, store, settings, event, &key, kind).await?
+            {
                 applied.push(result);
             }
         }
@@ -184,13 +196,24 @@ async fn apply_one<W: WorkCommands, L: LinkStore>(
             },
             Some(_),
         ) => {
-            record_push(&mut links, key, repo, branch, *default_branch, commits);
+            record_push(
+                &mut links,
+                key,
+                repo,
+                branch,
+                *default_branch,
+                commits,
+            );
             format!("branch {branch} pushed to {repo}")
         }
         (GitEvent::Push { .. }, None) => return Ok(None),
     };
     store.save(&issue.key, &links).await?;
-    let moved_to = match settings.mappings.get(&issue.key.team) {
+    let own = work.git_mapping(&issue.key.team).await?;
+    let mapping = own
+        .as_ref()
+        .or_else(|| settings.mappings.get(&issue.key.team));
+    let moved_to = match mapping {
         Some(mapping) => match decide(&issue, links.stage(), mapping) {
             Some(target) => {
                 work.set_state(&issue.key, target, &reason).await?;
@@ -215,7 +238,8 @@ fn record_push(
     default_branch: bool,
     commits: &[Commit],
 ) {
-    let only_this: BTreeSet<String> = std::iter::once(key.team.clone()).collect();
+    let only_this: BTreeSet<String> =
+        std::iter::once(key.team.clone()).collect();
     let kind_in = |location: Location, text: &str| {
         let mut collector = Collector::new();
         let _ = collector.add(location, text);
@@ -229,7 +253,10 @@ fn record_push(
         let _ = links.branches.insert(format!("{repo}:{branch}"));
     }
     for commit in commits {
-        let set = match (kind_in(Location::Commit, &commit.message), default_branch) {
+        let set = match (
+            kind_in(Location::Commit, &commit.message),
+            default_branch,
+        ) {
             (Some(RefKind::Closing), true) => &mut links.closing_commits,
             (Some(RefKind::Closing), false) => &mut links.commits,
             (Some(RefKind::Linking), _) => &mut links.linked_commits,

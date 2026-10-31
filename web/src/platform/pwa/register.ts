@@ -37,21 +37,33 @@ export async function registerServiceWorker(
   options: RegisterOptions = {},
 ): Promise<WorkerHandle | undefined> {
   const container =
-    options.container ?? (globalThis.navigator as Navigator | undefined)?.serviceWorker;
+    options.container ??
+    (globalThis.navigator as Navigator | undefined)?.serviceWorker;
   if (container === undefined) return undefined;
   const reload =
     options.reload ??
     (() => {
       location.reload();
     });
-  let registration: ServiceWorkerRegistration;
+  // Typed as always a registration, but a browser that blocks service
+  // workers by policy (and Playwright's `serviceWorkers: "block"`)
+  // resolves to nothing; without this check the app crashed (D285).
+  let registered: unknown;
   try {
-    registration = await container.register("/sw.js", { scope: "/", updateViaCache: "none" });
+    registered = await container.register("/sw.js", {
+      scope: "/",
+      updateViaCache: "none",
+    });
   } catch {
+    registered = undefined;
+  }
+  if (registered === undefined || registered === null) {
     telemetry().count("vellum.client.sw.register_failed");
     return undefined;
   }
-  let updateReady = registration.waiting !== null && container.controller !== null;
+  const registration = registered as ServiceWorkerRegistration;
+  let updateReady =
+    registration.waiting !== null && container.controller !== null;
   const announce = () => {
     updateReady = true;
     options.onUpdateReady?.();
@@ -60,8 +72,20 @@ export async function registerServiceWorker(
   registration.addEventListener("updatefound", () => {
     const installing = registration.installing;
     installing?.addEventListener("statechange", () => {
-      // The first install has no controller yet: nothing to update.
-      if (installing.state === "installed" && container.controller !== null) announce();
+      // An update is a new worker next to the one that controls the page.
+      // The first install has no other controller: nothing to update. Its
+      // own controller does not count either: WebKit can deliver the
+      // "installed" event only after the worker activated and its
+      // `clients.claim()` made it the controller, and treating that as an
+      // update reloaded the page during its first load.
+      const controller = container.controller;
+      if (
+        installing.state === "installed" &&
+        controller !== null &&
+        controller !== installing
+      ) {
+        announce();
+      }
     });
   });
   setInterval(() => {

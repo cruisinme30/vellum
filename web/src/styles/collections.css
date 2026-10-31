@@ -104,6 +104,7 @@
   gap: 12px;
 }
 
+.vl-collection-head .vl-title-row h1,
 .vl-collection-head h1 {
   margin: 0;
   font-size: 2rem;
@@ -171,7 +172,10 @@
 
 .vl-grid-row {
   display: grid;
-  grid-template-columns: minmax(260px, 2fr) repeat(var(--vl-columns), minmax(150px, 1fr));
+  grid-template-columns: minmax(260px, 2fr) repeat(
+      var(--vl-columns),
+      minmax(150px, 1fr)
+    );
   border-bottom: 1px solid var(--md-outline-variant);
 }
 
@@ -674,4 +678,111 @@
 .vl-row-body {
   padding: 8px 12px;
   resize: vertical;
+}
+
+/* Collection settings: actions, side panels, CSV and embed previews (ADR 0045)
+ */
+.vl-collection-actions,
+.vl-view-actions,
+.vl-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.vl-view-actions {
+  justify-content: flex-end;
+  margin-block: 4px;
+}
+
+.vl-danger {
+  color: var(--md-error);
+}
+
+.vl-hint {
+  margin: -8px 0 0;
+  font-size: 0.8125rem;
+}
+
+.vl-side-panel select,
+.vl-side-panel textarea {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline);
+  border-radius: var(--vl-radius-s);
+  background: var(--md-surface-container-lowest);
+  color: var(--md-on-surface);
+  font: inherit;
+}
+
+.vl-side-panel textarea {
+  resize: vertical;
+}
+
+.vl-side-panel input[type="file"] {
+  min-height: 40px;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+}
+
+.vl-check-list {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--vl-radius-s);
+}
+
+.vl-check-list label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  color: var(--md-on-surface);
+}
+
+.vl-property-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vl-property-row form {
+  display: grid;
+  gap: 8px;
+  padding-block-end: 12px;
+  border-bottom: 1px solid var(--md-outline-variant);
+}
+
+.vl-add-property h3 {
+  margin: 8px 0 0;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.vl-csv-report {
+  padding: 8px 12px;
+  border-radius: var(--vl-radius-s);
+  background: var(--md-surface-container-high);
+  overflow-wrap: anywhere;
+}
+
+.vl-csv-report p,
+.vl-csv-report ul {
+  margin: 4px 0;
+}
+
+.vl-embed-preview {
+  margin: 0;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.vl-embed-preview figcaption {
+  margin-block-end: 6px;
+  color: var(--md-on-surface-variant);
+  font-size: 0.875rem;
 }

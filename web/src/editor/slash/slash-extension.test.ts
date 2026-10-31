@@ -30,16 +30,24 @@ describe("SlashCommand", () => {
     const dom = editor.view.dom;
     expect(dom.getAttribute("aria-expanded")).toBe("true");
     expect(dom.getAttribute("aria-controls")).toBe(list.id);
-    expect(dom.getAttribute("aria-activedescendant")).toBe("vl-slash-list-paragraph-0");
+    expect(dom.getAttribute("aria-activedescendant")).toBe(
+      "vl-slash-list-paragraph-0",
+    );
     expect(list.parentElement?.style.position).toBe("fixed");
   });
 
-  it("filters as the user types and moves the active option with the arrows", async () => {
-    const editor = await openMenu("call");
-    expect(await screen.findAllByRole("option")).toHaveLength(6);
-    press(editor, "ArrowDown");
-    expect(editor.view.dom.getAttribute("aria-activedescendant")).toBe("vl-slash-list-callout-1");
-  });
+  it(
+    "filters as the user types and moves the active option with the " +
+      "arrows",
+    async () => {
+      const editor = await openMenu("call");
+      expect(await screen.findAllByRole("option")).toHaveLength(6);
+      press(editor, "ArrowDown");
+      expect(editor.view.dom.getAttribute("aria-activedescendant")).toBe(
+        "vl-slash-list-callout-1",
+      );
+    },
+  );
 
   it("inserts the chosen block on Enter and closes", async () => {
     const editor = await openMenu("toc");

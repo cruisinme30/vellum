@@ -1,18 +1,43 @@
 // SPDX-FileCopyrightText: 2026 The Vellum contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { BrowserRouter, Route, Routes } from "react-router";
 
+import type { AccountApi } from "./account/api";
+import { ApiTokensPage } from "./account/api-tokens-page";
+import { SecurityPage } from "./account/security-page";
 import type { AdminConsoleApi } from "./admin/console/api";
 import { AuditPage } from "./admin/console/audit-page";
 import { BackupsPage } from "./admin/console/backups-page";
 import { AdminConsoleProvider } from "./admin/console/context";
+import { GroupsPage } from "./admin/console/groups-page";
 import { SettingsPage } from "./admin/console/settings-page";
+import { SignInPage } from "./admin/console/sign-in-page";
+import { SpacesPage } from "./admin/console/spaces-page";
+import { AdminTokensPage } from "./admin/console/tokens-page";
+import { UsagePage } from "./admin/console/usage-page";
+import { UsersPage } from "./admin/console/users-page";
+import { WebhooksPage } from "./admin/console/webhooks-page";
 import { RequestsPage } from "./admin/requests/requests-page";
 import { RoutesPage } from "./admin/routes/routes-page";
 import type { AuthApi, AuthStatus } from "./api/auth";
+import type { Http } from "./api/http";
+import type { ReauthGate } from "./api/reauth";
+import { ReauthPrompt } from "./api/reauth-prompt";
 import { RequireSession, SessionProvider, useSession } from "./api/session";
+import type { AssistApi, McpSetupApi } from "./assist/api";
+import { AskView } from "./assist/ask-view";
+import { McpSetupPage } from "./assist/mcp-setup-page";
+import { AssistantSettingsView } from "./assist/settings-view";
+import type { AttachmentsApi } from "./attachments/api";
 import type { BooksApi } from "./books/api";
 import { BookPage, BooksPage } from "./books/books-page";
 import { CollectionView } from "./collections/collection-view";
@@ -23,23 +48,64 @@ import type { PageHistory } from "./data/history";
 import { ServerApisProvider } from "./data/server-apis";
 import type { WorkspaceStore } from "./data/store";
 import { useServices, WorkspaceProvider } from "./data/workspace-context";
+import type { DriveApi } from "./drive/api";
+import {
+  MyDrivePage,
+  RecentPage,
+  SharedDrivesPage,
+  SharedWithMePage,
+  SpacePage,
+  StarredPage,
+} from "./drive/drive-page";
+import { DriveSearchPage } from "./drive/search-page";
+import { DriveSettingsPage } from "./drive/settings-page";
+import { TrashPage } from "./drive/trash-page";
 import type { CollabConnector } from "./editor/collab/provider";
 import { I18nProvider, useT } from "./i18n/i18n";
-import { KeyboardRoot } from "./keyboard/keyboard-root";
-import { NotificationsProvider, type NotificationServices } from "./notifications/context";
+import {
+  NotificationsProvider,
+  type NotificationServices,
+} from "./notifications/context";
 import { NotificationSettingsView } from "./notifications/notification-settings";
 import { createMockNotificationPreferencesStore } from "./notifications/preferences";
+import type { DirectoryApi } from "./people/directory";
+import type { PrivateSpacesApi } from "./platform/private/api";
+import { PrivateSpacesView } from "./platform/private/private-spaces-view";
+import type { RenderApi } from "./render/api";
+import type { SharingApi } from "./sharing/api";
+import { AppKeyboard } from "./shell/app-keyboard";
 import { AppShell } from "./shell/app-shell";
-import { AppearanceProvider } from "./theme/appearance-context";
+import {
+  AppearanceProvider,
+  type OrganisationAppearance,
+} from "./theme/appearance-context";
+import { AppearancePage } from "./theme/appearance-page";
+import type { TransferApi } from "./transfer/api";
+import { ImportScreen } from "./transfer/import-screen";
 import { FavoritesView, HomeView } from "./views/home";
 import { AdminView, HelpView, NotFoundView } from "./views/info";
 import { NewPageView } from "./views/new-page";
 import { InboxView, SearchView } from "./views/search";
 import { SetupView, SignInView } from "./views/sign-in";
 import type { WorkApi } from "./work/api";
+import type { ConnectionsApi } from "./work/connections-api";
+import { CyclesPage } from "./work/cycles-page";
 import { IssuePage } from "./work/issue-page";
 import { IssuesPage } from "./work/issues-page";
+import { MyIssuesPage } from "./work/my-issues-page";
+import { MyWorkConnectionsPage } from "./work/my-work-connections";
 import { MyWorkPage } from "./work/my-work-page";
+import type { PlanningApi } from "./work/planning/api";
+import { AskPage, AsksPage } from "./work/planning/asks-page";
+import { InitiativesPage } from "./work/planning/initiatives-page";
+import { InsightsPage } from "./work/planning/insights-page";
+import { NewIssuePage } from "./work/planning/new-issue-page";
+import { ProjectPage } from "./work/planning/project-page";
+import { ProjectsPage } from "./work/planning/projects-page";
+import { QuickAddProvider } from "./work/quick-add";
+import { TeamSettingsPage } from "./work/settings/team-settings-page";
+import { TemplatesPage } from "./work/templates/templates-page";
+import { TriagePage } from "./work/triage-page";
 
 // The editor is most of the bundle, so it loads with the first page opened.
 const PageView = lazy(async () => {
@@ -81,23 +147,68 @@ export function AppRoutes() {
         <Route path="search" element={<SearchView />} />
         <Route path="favorites" element={<FavoritesView />} />
         <Route path="inbox" element={<InboxView />} />
-        <Route path="settings/notifications" element={<NotificationSettingsView />} />
+        <Route
+          path="settings/notifications"
+          element={<NotificationSettingsView />}
+        />
+        <Route path="settings/appearance" element={<AppearancePage />} />
+        <Route path="settings/private-spaces" element={<PrivateSpacesView />} />
+        <Route path="settings/api-tokens" element={<ApiTokensPage />} />
+        <Route path="settings/security" element={<SecurityPage />} />
+        <Route path="settings/ai" element={<AssistantSettingsView />} />
+        <Route path="ask" element={<AskView />} />
         <Route path="new" element={<NewPageView />} />
+        <Route path="import" element={<ImportScreen />} />
         <Route path="my-work" element={<MyWorkPage />} />
+        <Route path="my-work/settings" element={<MyWorkConnectionsPage />} />
         <Route path="issues" element={<IssuesPage />} />
+        <Route path="issues/mine" element={<MyIssuesPage />} />
+        <Route path="issues/triage" element={<TriagePage />} />
+        <Route path="issues/cycles" element={<CyclesPage />} />
+        <Route path="issues/settings" element={<TeamSettingsPage />} />
+        <Route path="issues/templates" element={<TemplatesPage />} />
+        {/* Work planning (D223-D225); /issues/new before /issues/:issueKey. */}
+        <Route path="issues/new" element={<NewIssuePage />} />
+        <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:projectId" element={<ProjectPage />} />
+        <Route path="initiatives" element={<InitiativesPage />} />
+        <Route path="insights" element={<InsightsPage />} />
+        <Route path="asks" element={<AsksPage />} />
+        <Route path="asks/:team/:slug" element={<AskPage />} />
         <Route path="issues/:issueKey" element={<IssuePage />} />
         <Route path="books" element={<BooksPage />} />
         <Route path="books/:bookId" element={<BookPage />} />
         <Route path="books/:bookId/:sectionId" element={<BookPage />} />
+        <Route path="drive" element={<MyDrivePage />} />
+        <Route path="drive/shared" element={<SharedDrivesPage />} />
+        <Route path="drive/shared-with-me" element={<SharedWithMePage />} />
+        <Route path="drive/starred" element={<StarredPage />} />
+        <Route path="drive/recent" element={<RecentPage />} />
+        <Route path="drive/search" element={<DriveSearchPage />} />
+        <Route path="drive/s/:spaceId" element={<SpacePage />} />
+        <Route path="drive/s/:spaceId/f/:folderId" element={<SpacePage />} />
+        <Route path="drive/s/:spaceId/trash" element={<TrashPage />} />
+        <Route
+          path="drive/s/:spaceId/settings"
+          element={<DriveSettingsPage />}
+        />
         <Route path="data" element={<CollectionsIndexView />} />
         <Route path="data/:collectionId" element={<CollectionView />} />
         <Route path="help" element={<HelpView />} />
         <Route path="admin" element={<AdminView />} />
+        <Route path="admin/usage" element={<UsagePage />} />
         <Route path="admin/requests" element={<RequestsPage />} />
         <Route path="admin/routes" element={<RoutesPage />} />
         <Route path="admin/audit" element={<AuditPage />} />
         <Route path="admin/settings" element={<SettingsPage />} />
         <Route path="admin/backups" element={<BackupsPage />} />
+        <Route path="admin/webhooks" element={<WebhooksPage />} />
+        <Route path="admin/users" element={<UsersPage />} />
+        <Route path="admin/spaces" element={<SpacesPage />} />
+        <Route path="admin/groups" element={<GroupsPage />} />
+        <Route path="admin/tokens" element={<AdminTokensPage />} />
+        <Route path="admin/sign-in" element={<SignInPage />} />
+        <Route path="admin/mcp" element={<McpSetupPage />} />
         <Route path="*" element={<NotFoundView />} />
       </Route>
     </Routes>
@@ -118,13 +229,69 @@ export interface AppServices {
   readonly admin?: AdminConsoleApi | undefined;
   /** My Work and issues, from a Vellum server; absent in demo mode. */
   readonly work?: WorkApi | undefined;
+  /**
+   * My Work's calendar feed, CalDAV, capture and imports; absent in demo mode.
+   */
+  readonly connections?: ConnectionsApi | undefined;
   /** Books, from a Vellum server; absent in demo mode. */
   readonly books?: BooksApi | undefined;
+  /** The drive's spaces, trash, activity and settings; absent in demo mode. */
+  readonly drive?: DriveApi | undefined;
+  /** Files attached to pages; absent in demo mode. */
+  readonly attachments?: AttachmentsApi | undefined;
+  /** Private spaces' device keys, from a Vellum server; absent in demo mode. */
+  readonly privateSpaces?: PrivateSpacesApi | undefined;
+  /** The people directory, from a Vellum server; absent in demo mode. */
+  readonly directory?: DirectoryApi | undefined;
+  /** Rendered pages and blocks, from a Vellum server; absent in demo mode. */
+  readonly render?: RenderApi | undefined;
+  /** Sharing, from a Vellum server; absent in demo mode. */
+  readonly sharing?: SharingApi | undefined;
+  /** The person's API tokens and sign-in factors; absent in demo mode. */
+  readonly account?: AccountApi | undefined;
+  /** The person's own model (summarise, ask, draft); absent in demo mode. */
+  readonly assist?: AssistApi | undefined;
+  /** The admin page's MCP client setup; absent in demo mode. */
+  readonly mcpSetup?: McpSetupApi | undefined;
+  /** Work planning, from a Vellum server; absent in demo mode. */
+  readonly planning?: PlanningApi | undefined;
+  /** Export and import, from a Vellum server; absent in demo mode. */
+  readonly transfer?: TransferApi | undefined;
   readonly collections: CollectionsStore;
   /** Present when a Vellum server answered; absent in demo mode. */
-  readonly session?: { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
+  readonly session?:
+    { readonly auth: AuthApi; readonly status: AuthStatus } | undefined;
   /** Notification settings; the Northstar demo's when absent. */
   readonly notifications?: NotificationServices | undefined;
+  /** Loads the organisation's seed colour and themes; absent in demo mode. */
+  readonly appearance?: (() => Promise<OrganisationAppearance>) | undefined;
+  /**
+   * Asks the person to confirm who they are when an action needs a recent
+   * sign-in (D241); `http` is the client without the retry. Server only.
+   */
+  readonly reauth?:
+    { readonly gate: ReauthGate; readonly http: Http } | undefined;
+}
+
+/**
+ * Loads the organisation's look only once someone is signed in: the server
+ * answers `GET /api/v1/appearance` to signed-in readers, so asking before
+ * sign-in fails on every sign-in and set-up screen.
+ */
+function SessionAppearance({
+  organisation,
+  children,
+}: {
+  readonly organisation: AppServices["appearance"];
+  readonly children: ReactNode;
+}) {
+  const session = useSession();
+  const signedIn = session === undefined || Boolean(session.status.user);
+  return (
+    <AppearanceProvider organisation={signedIn ? organisation : undefined}>
+      {children}
+    </AppearanceProvider>
+  );
 }
 
 function MaybeSession({
@@ -170,32 +337,86 @@ export function AppProviders({
   admin,
   work,
   books,
+  drive,
+  attachments,
+  privateSpaces,
+  directory,
+  render,
+  sharing,
+  account,
+  assist,
+  mcpSetup,
+  planning,
+  connections,
+  transfer,
   collections,
   session,
   notifications,
+  appearance,
+  reauth,
   children,
 }: AppServices & { readonly children: ReactNode }) {
-  const serverApis = useMemo(() => ({ work, books }), [work, books]);
+  const serverApis = useMemo(
+    () => ({
+      work,
+      books,
+      drive,
+      attachments,
+      privateSpaces,
+      directory,
+      render,
+      sharing,
+      account,
+      assist,
+      mcpSetup,
+      planning,
+      connections,
+      transfer,
+    }),
+    [
+      work,
+      books,
+      drive,
+      attachments,
+      privateSpaces,
+      directory,
+      render,
+      sharing,
+      account,
+      assist,
+      mcpSetup,
+      planning,
+      connections,
+      transfer,
+    ],
+  );
   const [demoNotifications] = useState<NotificationServices>(() => ({
     store: createMockNotificationPreferencesStore(),
   }));
   return (
     <I18nProvider>
-      <AppearanceProvider>
-        <MaybeSession session={session}>
+      <MaybeSession session={session}>
+        <SessionAppearance organisation={appearance}>
           <WorkspaceProvider store={store} collab={collab} history={history}>
             <SignedInUser>
               <CollectionsProvider store={collections}>
-                <NotificationsProvider services={notifications ?? demoNotifications}>
+                <NotificationsProvider
+                  services={notifications ?? demoNotifications}
+                >
                   <AdminConsoleProvider api={admin}>
-                    <ServerApisProvider apis={serverApis}>{children}</ServerApisProvider>
+                    <ServerApisProvider apis={serverApis}>
+                      {children}
+                      {reauth !== undefined && (
+                        <ReauthPrompt gate={reauth.gate} http={reauth.http} />
+                      )}
+                    </ServerApisProvider>
                   </AdminConsoleProvider>
                 </NotificationsProvider>
               </CollectionsProvider>
             </SignedInUser>
           </WorkspaceProvider>
-        </MaybeSession>
-      </AppearanceProvider>
+        </SessionAppearance>
+      </MaybeSession>
     </I18nProvider>
   );
 }
@@ -204,11 +425,13 @@ export function AppProviders({
 export function App(services: AppServices) {
   return (
     <AppProviders {...services}>
-      <KeyboardRoot>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </KeyboardRoot>
+      <BrowserRouter>
+        <QuickAddProvider>
+          <AppKeyboard>
+            <AppRoutes />
+          </AppKeyboard>
+        </QuickAddProvider>
+      </BrowserRouter>
     </AppProviders>
   );
 }

@@ -38,7 +38,9 @@ impl PathCache {
         }
     }
 
-    fn lock(&self) -> std::sync::MutexGuard<'_, HashMap<String, (String, Instant)>> {
+    fn lock(
+        &self,
+    ) -> std::sync::MutexGuard<'_, HashMap<String, (String, Instant)>> {
         self.entries.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
@@ -96,10 +98,14 @@ pub(super) struct Found {
 /// Picks deterministically among same-named siblings: the oldest
 /// `createdTime`, then the smallest id. Drive allows duplicates; every
 /// Vellum process makes the same pick, and the others are ignored.
-pub(super) fn pick(mut candidates: Vec<DriveFile>, path: &str) -> Option<DriveFile> {
+pub(super) fn pick(
+    mut candidates: Vec<DriveFile>,
+    path: &str,
+) -> Option<DriveFile> {
     candidates.sort_by(|a, b| a.age_key().cmp(&b.age_key()));
     if candidates.len() > 1 {
-        let ignored: Vec<&str> = candidates.iter().skip(1).map(|f| f.id.as_str()).collect();
+        let ignored: Vec<&str> =
+            candidates.iter().skip(1).map(|f| f.id.as_str()).collect();
         tracing::warn!(
             backend = BACKEND,
             path,
@@ -137,7 +143,8 @@ impl Resolver {
         let mut used_cache = false;
         if !fresh {
             for depth in (1..=segments.len()).rev() {
-                let prefix = segments.get(..depth).unwrap_or_default().join("/");
+                let prefix =
+                    segments.get(..depth).unwrap_or_default().join("/");
                 if let Some(id) = self.cache.get(&prefix) {
                     (start, current, used_cache) = (depth, id, true);
                     break;
@@ -169,7 +176,8 @@ impl Resolver {
         let parent_path = path.parent();
         let name = path.file_name();
         for fresh in [false, true] {
-            let (parent, mut used_cache) = self.folder(client, parent_path.as_ref(), fresh).await?;
+            let (parent, mut used_cache) =
+                self.folder(client, parent_path.as_ref(), fresh).await?;
             let Some(parent) = parent else {
                 if used_cache {
                     self.cache.invalidate_chain(path);
@@ -189,7 +197,8 @@ impl Resolver {
                         return Ok(Some(Found { file, parent }));
                     }
                     Ok(_) | Err(StoreError::NotFound(_)) => {
-                        tracing::debug!(backend = BACKEND, %path, "cached id is stale");
+                        tracing::debug!(backend = BACKEND, %path, "cached id \
+                            is stale");
                         self.cache.invalidate(path.as_str());
                     }
                     Err(e) => return Err(e),
@@ -226,9 +235,9 @@ impl Resolver {
             return Ok(true); // The root is configured, not resolved.
         };
         match client.get_meta(id, Some(dir)).await {
-            Ok(folder) => {
-                Ok(!folder.trashed && folder.is_folder() && folder.name == dir.file_name())
-            }
+            Ok(folder) => Ok(!folder.trashed
+                && folder.is_folder()
+                && folder.name == dir.file_name()),
             Err(StoreError::NotFound(_)) => Ok(false),
             Err(e) => Err(e),
         }
@@ -263,7 +272,9 @@ mod tests {
     #[test]
     fn invalidation_covers_descendants_and_ancestors() -> StoreResult<()> {
         let cache = PathCache::new(Duration::from_mins(1));
-        for (path, id) in [("a", "1"), ("a/b", "2"), ("a/b/c", "3"), ("ab", "4")] {
+        for (path, id) in
+            [("a", "1"), ("a/b", "2"), ("a/b/c", "3"), ("ab", "4")]
+        {
             cache.insert(path, id);
         }
         cache.invalidate("a/b");

@@ -30,7 +30,11 @@ export interface PushEnvironment {
    * write without the token. Absent, writes go through `fetch` (tests,
    * token-authenticated callers).
    */
-  readonly send?: (method: "POST" | "DELETE", path: string, body?: unknown) => Promise<unknown>;
+  readonly send?: (
+    method: "POST" | "DELETE",
+    path: string,
+    body?: unknown,
+  ) => Promise<unknown>;
 }
 
 /**
@@ -38,7 +42,11 @@ export interface PushEnvironment {
  * app is added to the Home Screen (iOS 16.4 and later).
  */
 export function pushSupported(scope: object = globalThis): boolean {
-  return "PushManager" in scope && "Notification" in scope && "serviceWorker" in navigator;
+  return (
+    "PushManager" in scope &&
+    "Notification" in scope &&
+    "serviceWorker" in navigator
+  );
 }
 
 /** Decodes the base64url VAPID key into the bytes `subscribe` wants. */
@@ -67,7 +75,8 @@ async function call(
     headers,
     credentials: "include",
   });
-  if (!response.ok) throw new Error(`Vellum: ${path} answered HTTP ${String(response.status)}`);
+  if (!response.ok)
+    throw new Error(`Vellum: ${path} answered HTTP ${String(response.status)}`);
   return response;
 }
 
@@ -76,7 +85,9 @@ async function call(
  * subscription with the server. Safe to call again: it reuses an existing
  * subscription.
  */
-export async function enablePush(environment: PushEnvironment): Promise<PushState> {
+export async function enablePush(
+  environment: PushEnvironment,
+): Promise<PushState> {
   const permission = await environment.requestPermission();
   if (permission !== "granted") return "denied";
   const { pushManager } = environment.registration;
@@ -84,7 +95,8 @@ export async function enablePush(environment: PushEnvironment): Promise<PushStat
   if (subscription === null) {
     const response = await call(environment, "/api/v1/push/vapid-key");
     const { publicKey } = (await response.json()) as { publicKey?: unknown };
-    if (typeof publicKey !== "string") throw new Error("Vellum: the server sent no VAPID key");
+    if (typeof publicKey !== "string")
+      throw new Error("Vellum: the server sent no VAPID key");
     subscription = await pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: decodeBase64Url(publicKey),
@@ -96,14 +108,19 @@ export async function enablePush(environment: PushEnvironment): Promise<PushStat
         headers: { "content-type": "application/json" },
         body: JSON.stringify(subscription.toJSON()),
       })
-    : environment.send("POST", "/api/v1/push/subscriptions", subscription.toJSON()));
+    : environment.send(
+        "POST",
+        "/api/v1/push/subscriptions",
+        subscription.toJSON(),
+      ));
   telemetry().count("vellum.client.push.enabled");
   return "enabled";
 }
 
 /** Unsubscribes this browser and tells the server to forget it. */
 export async function disablePush(environment: PushEnvironment): Promise<void> {
-  const subscription = await environment.registration.pushManager.getSubscription();
+  const subscription =
+    await environment.registration.pushManager.getSubscription();
   if (subscription === null) return;
   const { endpoint } = subscription;
   await subscription.unsubscribe();

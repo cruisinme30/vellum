@@ -32,7 +32,16 @@ use color::{palette, tone, tone_for_contrast};
 pub const DEFAULT_SEED: Color = Color::from_u32(0x4F_5B92);
 
 /// Light or dark: decides `color-scheme` and how tokens are derived.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 #[serde(rename_all = "snake_case")]
 pub enum Mode {
     /// Dark text on light surfaces.
@@ -76,6 +85,19 @@ impl BuiltinTheme {
             Self::Sepia => "sepia",
             Self::Dim => "dim",
         }
+    }
+
+    /// The built-in theme with this [`id`](Self::id), if any.
+    #[must_use]
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|t| t.id() == id)
+    }
+
+    /// Whether the theme puts dark text on light surfaces, so it can be
+    /// printed on white paper (export themes, R-TH-4).
+    #[must_use]
+    pub const fn is_light(self) -> bool {
+        matches!(self.mode(), Mode::Light)
     }
 
     const fn mode(self) -> Mode {
@@ -311,7 +333,10 @@ impl Theme {
     pub fn from_seed(which: BuiltinTheme, seed: Color) -> Self {
         let seed = if which == BuiltinTheme::Sepia {
             // Sepia keeps the seed's hue for accents but sits on paper.
-            Color::from(harmonize(Color::from_u32(0x8B_5E34).into(), seed.into()))
+            Color::from(harmonize(
+                Color::from_u32(0x8B_5E34).into(),
+                seed.into(),
+            ))
         } else {
             seed
         };
@@ -321,8 +346,12 @@ impl Theme {
         } else {
             0.0
         };
-        let dynamic =
-            DynamicScheme::by_variant(seed.into(), &Variant::TonalSpot, dark, Some(contrast));
+        let dynamic = DynamicScheme::by_variant(
+            seed.into(),
+            &Variant::TonalSpot,
+            dark,
+            Some(contrast),
+        );
         let neutral = dynamic.neutral_palette;
         let neutral_variant = dynamic.neutral_variant_palette;
         let primary_palette = dynamic.primary_palette;
@@ -330,7 +359,9 @@ impl Theme {
         let mut tokens = m3_tokens(&scheme);
         match which {
             BuiltinTheme::Sepia => sepia_surfaces(&mut tokens, seed),
-            BuiltinTheme::Dim => dim_surfaces(&mut tokens, &neutral, &neutral_variant),
+            BuiltinTheme::Dim => {
+                dim_surfaces(&mut tokens, &neutral, &neutral_variant);
+            }
             _ => {}
         }
         let mut builder = Derive {
@@ -361,10 +392,14 @@ impl Theme {
         if theme.name.trim().is_empty() || theme.name.chars().count() > 64 {
             return Err(ThemeError::BadName);
         }
-        if let Some(unknown) = theme.tokens.keys().find(|k| !TOKENS.contains(&k.as_str())) {
+        if let Some(unknown) =
+            theme.tokens.keys().find(|k| !TOKENS.contains(&k.as_str()))
+        {
             return Err(ThemeError::UnknownToken(unknown.clone()));
         }
-        if let Some(missing) = TOKENS.iter().find(|t| !theme.tokens.contains_key(**t)) {
+        if let Some(missing) =
+            TOKENS.iter().find(|t| !theme.tokens.contains_key(**t))
+        {
             return Err(ThemeError::MissingToken((*missing).to_owned()));
         }
         let issues = theme.validate();
@@ -581,10 +616,16 @@ impl Derive {
     fn derive(&mut self, primary: &TonalPalette) {
         let surface = self.get("surface");
         let text = self.text_ratio;
-        let (accent_start, text_start) = if self.dark { (75, 85) } else { (45, 30) };
+        let (accent_start, text_start) =
+            if self.dark { (75, 85) } else { (45, 30) };
 
         // Links are primary-coloured but must read as text on the surface.
-        let link = tone_for_contrast(primary, if self.dark { 80 } else { 40 }, surface, text);
+        let link = tone_for_contrast(
+            primary,
+            if self.dark { 80 } else { 40 },
+            surface,
+            text,
+        );
         set(&mut self.tokens, "link", link);
 
         // Callouts and chips.
@@ -654,9 +695,19 @@ impl Derive {
             let c = tone_for_contrast(&p, start, code_bg, text);
             set(&mut self.tokens, &format!("syntax-{name}"), c);
         }
-        let variable = tone_for_contrast(&neutral, if self.dark { 90 } else { 15 }, code_bg, text);
+        let variable = tone_for_contrast(
+            &neutral,
+            if self.dark { 90 } else { 15 },
+            code_bg,
+            text,
+        );
         set(&mut self.tokens, "syntax-variable", variable);
-        let punct = tone_for_contrast(&neutral, if self.dark { 75 } else { 35 }, code_bg, text);
+        let punct = tone_for_contrast(
+            &neutral,
+            if self.dark { 75 } else { 35 },
+            code_bg,
+            text,
+        );
         set(&mut self.tokens, "syntax-punctuation", punct);
 
         // Make the M3 text roles meet the theme's ratio on every surface
@@ -691,7 +742,12 @@ impl Derive {
             }
         }
         if self.get("outline").contrast(surface) < 3.0 {
-            let fixed = tone_for_contrast(&neutral, if self.dark { 60 } else { 50 }, surface, 3.0);
+            let fixed = tone_for_contrast(
+                &neutral,
+                if self.dark { 60 } else { 50 },
+                surface,
+                3.0,
+            );
             set(&mut self.tokens, "outline", fixed);
         }
     }
@@ -703,16 +759,64 @@ impl Derive {
 /// `data-vl-theme` attribute picks a theme (R-TH-1).
 #[must_use]
 pub fn stylesheet() -> String {
-    let mut out = String::from("/* Vellum themes: generated by vellum-render. */\n");
+    let mut out =
+        String::from("/* Vellum themes: generated by vellum-render. */\n");
     out.push_str(&Theme::builtin(BuiltinTheme::Light).css(":root"));
     out.push_str("@media (prefers-color-scheme: dark) {\n");
-    out.push_str(&Theme::builtin(BuiltinTheme::Dark).css(":root:not([data-vl-theme])"));
+    out.push_str(
+        &Theme::builtin(BuiltinTheme::Dark).css(":root:not([data-vl-theme])"),
+    );
     out.push_str("}\n");
     for which in BuiltinTheme::ALL {
         let selector = format!("[data-vl-theme=\"{}\"]", which.id());
         out.push_str(&Theme::builtin(which).css(&selector));
     }
     out.push_str(COMPONENT_CSS);
+    out
+}
+
+/// The stylesheet for an app that shows rendered pages inside its own
+/// interface (ADR 0068, D287).
+///
+/// Every token and component rule applies only inside `scope` (a selector
+/// such as `.vl-render`), so the renderer's class names cannot restyle the
+/// app around it. The theme follows the `theme_attr` attribute that the app
+/// keeps on an ancestor, normally `<html data-theme="dark">`, so switching
+/// the app's theme re-themes figures without fetching them again. Component
+/// rules are nested in `scope` (CSS nesting).
+#[must_use]
+pub fn scoped_stylesheet(scope: &str, theme_attr: &str) -> String {
+    scoped_stylesheet_from_seed(scope, theme_attr, DEFAULT_SEED)
+}
+
+/// [`scoped_stylesheet`] recoloured from an accent colour (D302).
+///
+/// `seed` is the accent the app's user or organisation picked. The
+/// themes come from [`Theme::from_seed`], so figures keep the renderer's
+/// contrast-checked pairs while their primary, chart and callout colours
+/// lean towards the accent, as the app around them does.
+#[must_use]
+pub fn scoped_stylesheet_from_seed(
+    scope: &str,
+    theme_attr: &str,
+    seed: Color,
+) -> String {
+    let mut out = String::from(
+        "/* Vellum themes for the app: generated by vellum-render. */\n",
+    );
+    out.push_str(&Theme::from_seed(BuiltinTheme::Light, seed).css(scope));
+    for which in BuiltinTheme::ALL {
+        let selector = format!("[{theme_attr}=\"{}\"] {scope}", which.id());
+        out.push_str(&Theme::from_seed(which, seed).css(&selector));
+    }
+    // Kroki draws in fixed colours: invert them on dark themes, as the
+    // page stylesheet does for `data-vl-theme`.
+    let _ = writeln!(
+        out,
+        "[{theme_attr}=\"dark\"] {scope} .vl-kroki svg, [{theme_attr}=\"dim\"] \
+         {scope} .vl-kroki svg {{ filter: invert(0.9) hue-rotate(180deg); }}"
+    );
+    let _ = writeln!(out, "{scope} {{\n{COMPONENT_CSS}}}");
     out
 }
 
@@ -741,13 +845,89 @@ mod tests {
     }
 
     #[test]
+    fn scoped_stylesheet_follows_the_app_theme_inside_its_scope() {
+        let css = scoped_stylesheet(".vl-render", "data-theme");
+        assert!(css.starts_with("/* Vellum themes for the app"));
+        assert!(css.contains(".vl-render {\n  color-scheme: light;"));
+        for which in BuiltinTheme::ALL {
+            let selector =
+                format!("[data-theme=\"{}\"] .vl-render {{", which.id());
+            assert!(css.contains(&selector), "{selector}");
+        }
+        assert!(css.contains("[data-theme=\"dim\"] .vl-render .vl-kroki svg"));
+        // Component rules are nested in the scope, never global.
+        let nested = css
+            .rfind(".vl-render {\n/* SPDX")
+            .expect("nested components");
+        assert!(css[nested..].contains(".vl-chip"));
+        assert!(!css[..nested].contains(".vl-chip"));
+        assert!(css.trim_end().ends_with('}'));
+        assert!(!css.contains("data-vl-theme=\"dark\"] .vl-render"));
+    }
+
+    #[test]
+    fn a_seeded_app_stylesheet_tints_figures_in_every_theme() {
+        let plain = scoped_stylesheet(".vl-render", "data-theme");
+        assert_eq!(
+            scoped_stylesheet_from_seed(
+                ".vl-render",
+                "data-theme",
+                DEFAULT_SEED
+            ),
+            plain
+        );
+        let seed = Color::from_u32(0xC2_185B);
+        let tinted =
+            scoped_stylesheet_from_seed(".vl-render", "data-theme", seed);
+        assert_ne!(tinted, plain);
+        for which in BuiltinTheme::ALL {
+            let theme = Theme::from_seed(which, seed);
+            assert_eq!(theme.validate(), vec![], "{}", which.id());
+            let rule = theme
+                .css(&format!("[data-theme=\"{}\"] .vl-render", which.id()));
+            assert!(tinted.contains(&rule), "{} is not seeded", which.id());
+            // Colours move with the accent. Sepia only leans its brown up
+            // to 15° towards the seed, which Vellum's blue and this pink
+            // both do the same way, so it is checked with a green below.
+            if which != BuiltinTheme::Sepia {
+                assert_ne!(
+                    theme.tokens,
+                    Theme::builtin(which).tokens,
+                    "{}",
+                    which.id()
+                );
+            }
+        }
+        let green =
+            Theme::from_seed(BuiltinTheme::Sepia, Color::from_u32(0x2E_7D32));
+        assert_ne!(green.tokens, Theme::builtin(BuiltinTheme::Sepia).tokens);
+    }
+
+    #[test]
+    fn ids_round_trip() {
+        for which in BuiltinTheme::ALL {
+            assert_eq!(BuiltinTheme::from_id(which.id()), Some(which));
+        }
+        assert_eq!(BuiltinTheme::from_id("Light"), None);
+        assert_eq!(BuiltinTheme::from_id(""), None);
+        assert!(BuiltinTheme::Sepia.is_light());
+        assert!(!BuiltinTheme::Dim.is_light());
+    }
+
+    #[test]
     fn any_seed_produces_valid_themes() {
         for seed in [
-            0xFF_0000, 0x00_8000, 0xFF_D700, 0x00_00FF, 0x80_8080, 0x00_0000, 0xFF_FFFF,
+            0xFF_0000, 0x00_8000, 0xFF_D700, 0x00_00FF, 0x80_8080, 0x00_0000,
+            0xFF_FFFF,
         ] {
             for which in BuiltinTheme::ALL {
                 let theme = Theme::from_seed(which, Color::from_u32(seed));
-                assert_eq!(theme.validate(), vec![], "{} from {seed:06x}", which.id());
+                assert_eq!(
+                    theme.validate(),
+                    vec![],
+                    "{} from {seed:06x}",
+                    which.id()
+                );
             }
         }
     }
@@ -792,7 +972,9 @@ mod tests {
     fn high_contrast_reaches_seven_to_one() {
         let theme = Theme::builtin(BuiltinTheme::HighContrast);
         assert!(theme.get("on-surface").contrast(theme.get("surface")) >= 7.0);
-        assert!(theme.get("syntax-comment").contrast(theme.get("code-bg")) >= 7.0);
+        assert!(
+            theme.get("syntax-comment").contrast(theme.get("code-bg")) >= 7.0
+        );
     }
 
     #[test]
@@ -806,7 +988,8 @@ mod tests {
     #[test]
     fn resolve_vars_bakes_colours_in() {
         let theme = Theme::builtin(BuiltinTheme::Light);
-        let out = theme.resolve_vars("fill:var(--vl-chart-1);stroke:var(--vl-nope)");
+        let out =
+            theme.resolve_vars("fill:var(--vl-chart-1);stroke:var(--vl-nope)");
         assert_eq!(
             out,
             format!("fill:{};stroke:var(--vl-nope)", theme.get("chart-1"))
@@ -817,7 +1000,9 @@ mod tests {
     fn stylesheet_has_every_theme_and_components() {
         let css = stylesheet();
         for which in BuiltinTheme::ALL {
-            assert!(css.contains(&format!("[data-vl-theme=\"{}\"]", which.id())));
+            assert!(
+                css.contains(&format!("[data-vl-theme=\"{}\"]", which.id()))
+            );
         }
         assert!(css.contains("prefers-color-scheme: dark"));
         assert!(css.contains(".vl-callout"));

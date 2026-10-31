@@ -11,9 +11,11 @@ vellum: 1
 
 - Date: 2026-10-29
 - Status: accepted
-- Decisions: D49, D50, D51
-- Issue: #73, #75, #76, #77, #81, #408, #427 (and the server side of #79)
-- Pull request: #241 (and the live issue views that follow it)
+- Decisions: D49, D50, D51, D244, D245, D246
+- Issue: #73, #75, #76, #77, #80, #81, #82, #83, #96, #408, #427 (and the server
+  side of #79)
+- Pull request: #241 (and the live issue views that follow it); themes and
+  accessibility land in the integration batch that closes #80, #82, #83, #96
 
 :::
 
@@ -78,6 +80,37 @@ flowchart LR
 - A `drawio` fence holds draw.io's editable SVG export, so it renders with
   no service at all.
 
+### D244: Custom themes are JSON token files over a built-in start
+
+- A file is `{"format": "vellum.theme/1", name, base, seed, tokens}`:
+  a built-in theme and seed to start from, and the tokens it changes.
+  Tokens left out come from the start, so old files load after new tokens.
+- Import refuses files over 64 KB, unknown tokens, colours that are not
+  `#rrggbb`, and any failed contrast rule, and says which rule failed.
+- Settings → Appearance has the editor: start, seed, every token, a live
+  preview and the full contrast table. Only a passing theme can be used.
+- The custom theme lives in the browser and is checked on every load.
+  Render themes keep their full-token format (`Theme::from_json`).
+
+### D245: The organisation sets the seed, the export theme and the site theme
+
+- `appearance` in the admin settings holds `seed`, `export_theme` (Light,
+  High contrast or Sepia, since paper is white) and `site_theme` (`auto`
+  or any built-in). Readers get it from `GET /v1/appearance`.
+- People follow the organisation's seed until they pick their own; a
+  stored Vellum seed from before this counts as not picked.
+- `PrintTheme::from_builtin` turns the export theme into print colours;
+  a dark theme falls back to Light.
+
+### D246: Reading settings are per person and apply through `<html>`
+
+- Text size (87.5 to 175 % of the browser's size), font (Roboto, Atkinson
+  Hyperlegible, OpenDyslexic), density (compact, comfortable, spacious)
+  and motion (system, reduce, allow) set `data-*` attributes on `<html>`.
+- The two reading fonts ship in the bundle (OFL) but load only when chosen.
+- Stylesheets name colours only through tokens; a unit test refuses
+  literal colours unless the line says why with `fixed:`.
+
 ## Alternatives
 
 - **Mermaid in a headless browser or Node sidecar**: exact upstream
@@ -89,6 +122,9 @@ flowchart LR
   revision and a re-render on every theme switch. Rejected for D50.
 - **Client-side rendering of charts and diagrams**: no server cost, but no
   output for exports, search previews or readers without JavaScript.
+- **Themes stored on the server per person**: they would follow people
+  across devices, but need a new table and API; browser storage was enough
+  for 1.0. Rejected for D244 and D246.
 
 ## Consequences
 

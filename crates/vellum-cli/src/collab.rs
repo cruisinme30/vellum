@@ -17,6 +17,10 @@
 //!
 //! The change log is [`vellum_collab::sql::SqlUpdateStore`], sealed with a
 //! key kept in the data folder.
+//!
+//! With several replicas, [`cluster`] puts this one in the live-editing
+//! cluster: each page's room lives on one replica, and a connection that
+//! lands on another is forwarded there (ADR 0037, D151 and D278).
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -30,18 +34,24 @@ use axum::response::IntoResponse as _;
 use bytes::Bytes;
 use vellum_api::auth::{Authenticator, RequestMeta};
 use vellum_api::error::ErrorResponse;
+use vellum_collab::cluster::{Cluster, ClusterConfig, Node};
 use vellum_collab::sql::{Envelope, SqlUpdateStore};
 use vellum_collab::ws::Authorizer;
 use vellum_collab::{
-    Access, CollabConfig, DocumentFiles, FormatCodec, Hub, MarkdownVersion, RoomKey,
+    Access, CollabConfig, DocumentFiles, FormatCodec, Hub, MarkdownVersion,
+    RoomKey,
 };
 use vellum_contracts::{CredentialKind, Principal, Scope};
 use vellum_crypto::{KekId, LocalKeyring, SecretKey};
 use vellum_db::Index;
 use vellum_drive::{
-    Access as DriveAccess, Drive, DriveError, NodeKind, PageWrites, Permission, Saved,
+    Access as DriveAccess, Drive, DriveError, NodeKind, PageWrites, Permission,
+    Saved,
 };
-use vellum_kernel::{Actor, DocId, Error, ErrorKind, ObjectId, RequestId, Result, SpaceId, UserId};
+use vellum_kernel::{
+    Actor, DocId, Error, ErrorKind, ObjectId, RequestId, Result, SpaceId,
+    UserId,
+};
 use vellum_store::Base;
 
 /// Name of the key, in the data folder, that seals the change log.
@@ -53,18 +63,69 @@ pub struct Collab {
     hub: Hub,
     files: Arc<DriveFiles>,
     authorizer: Arc<dyn Authorizer>,
+    /// This replica's place among several, and the task that keeps it
+    /// fresh; `None` on a single replica.
+    cluster: Option<(Arc<Cluster>, tokio::task::AbortHandle)>,
 }
 
 impl std::fmt::Debug for Collab {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Collab")
             .field("open_rooms", &self.hub.open_rooms())
+            .field("clustered", &self.cluster.is_some())
             .finish_non_exhaustive()
     }
 }
 
+/// Puts this replica, named `me`, in the live-editing cluster when
+/// `VELLUM_CLUSTER_KEY` and `VELLUM_NODE_ADDRESS` are both set (D278).
+/// Without the key it serves every room itself, as a single server does.
+///
+/// # Errors
+///
+/// `invalid_input` when the key is shorter than 32 bytes: replicas that
+/// cannot forward would each keep their own copy of a room, so editors on
+/// different replicas would not see each other live.
+pub fn cluster(
+    index: &Index,
+    me: &str,
+    var: impl Fn(&str) -> Option<String>,
+) -> Result<Option<Arc<Cluster>>> {
+    let set = |name: &str| var(name).filter(|v| !v.trim().is_empty());
+    let Some(key) = set(crate::limits::CLUSTER_KEY_VAR) else {
+        return Ok(None);
+    };
+    let Some(address) = set(crate::cluster::ADDRESS_VAR) else {
+        tracing::warn!(
+            "{} is set but {} is not; other replicas cannot reach this one, \
+             so it serves every page's live editing itself",
+            crate::limits::CLUSTER_KEY_VAR,
+            crate::cluster::ADDRESS_VAR,
+        );
+        return Ok(None);
+    };
+    let me = Node {
+        name: me.to_owned(),
+        address: address.trim().to_owned(),
+    };
+    let config = ClusterConfig::new(me, key.into_bytes()).map_err(|e| {
+        Error::new(
+            ErrorKind::InvalidInput,
+            format!("{}: {}", crate::limits::CLUSTER_KEY_VAR, e.message()),
+        )
+    })?;
+    tracing::info!(address = %config.me.address, "live editing runs across \
+        replicas");
+    Ok(Some(Arc::new(Cluster::new(
+        config,
+        Arc::new(vellum_db::cluster::Nodes::new(index.clone())),
+    ))))
+}
+
 impl Collab {
-    /// Builds the hub over `drive` and the `index` database.
+    /// Builds the hub over `drive` and the `index` database. With a
+    /// `cluster` (see [`cluster`]), rooms live on their owner replica and
+    /// the cluster's list of replicas is kept fresh until [`Self::shutdown`].
     ///
     /// # Errors
     ///
@@ -76,6 +137,7 @@ impl Collab {
         data_dir: &Path,
         app_origin: &str,
         authenticator: Arc<dyn Authenticator>,
+        cluster: Option<Arc<Cluster>>,
     ) -> Result<Self> {
         let keyring = log_keyring(data_dir)?;
         let files = Arc::new(DriveFiles::new(Arc::clone(&drive)));
@@ -91,20 +153,46 @@ impl Collab {
             origin: app_origin.trim_end_matches('/').to_owned(),
             authenticator: Some(authenticator),
         });
+        let cluster = cluster.map(|cluster| {
+            let task = Arc::clone(&cluster).spawn(hub.clone()).abort_handle();
+            (cluster, task)
+        });
         Ok(Self {
             hub,
             files,
             authorizer,
+            cluster,
         })
     }
 
-    /// The router to mount at `/collab`.
+    /// The router to mount at `/collab`: with a cluster, a connection for a
+    /// room another replica owns is forwarded there.
     pub fn router(&self) -> Router {
-        vellum_collab::ws::router(self.hub.clone(), Arc::clone(&self.authorizer))
+        let authorizer = Arc::clone(&self.authorizer);
+        match &self.cluster {
+            Some((cluster, _)) => vellum_collab::ws::clustered_router(
+                self.hub.clone(),
+                authorizer,
+                Arc::clone(cluster),
+            ),
+            None => vellum_collab::ws::router(self.hub.clone(), authorizer),
+        }
     }
 
-    /// Saves every open page and closes its connections.
+    /// Stops beating in the cluster's list and leaves it, so the other
+    /// replicas take over this one's rooms at once. Does nothing on a
+    /// single replica, and nothing more the second time.
+    pub async fn leave_cluster(&self) {
+        if let Some((cluster, task)) = &self.cluster {
+            task.abort();
+            cluster.leave().await;
+        }
+    }
+
+    /// Leaves the cluster, then saves every open page and closes its
+    /// connections.
     pub async fn shutdown(&self) {
+        self.leave_cluster().await;
         self.hub.shutdown().await;
     }
 }
@@ -132,9 +220,11 @@ fn log_keyring(data_dir: &Path) -> Result<LocalKeyring> {
     let array: [u8; 32] = bytes
         .get(..32)
         .and_then(|b| b.try_into().ok())
-        .ok_or_else(|| Error::new(ErrorKind::Internal, "the change-log key is too short"))?;
-    let kek =
-        KekId::new("collab-log-1").map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
+        .ok_or_else(|| {
+            Error::new(ErrorKind::Internal, "the change-log key is too short")
+        })?;
+    let kek = KekId::new("collab-log-1")
+        .map_err(|e| Error::new(ErrorKind::Internal, e.to_string()))?;
     Ok(LocalKeyring::new(kek, SecretKey::from_bytes(array)))
 }
 
@@ -175,7 +265,8 @@ impl PageWrites for LivePages {
         };
         drop(tokio::spawn(async move {
             if let Err(error) = merge_written(&hub, &files, room).await {
-                tracing::warn!(%room, %error, "a written page did not reach its live-editing room");
+                tracing::warn!(%room, %error, "a written page did not reach \
+                    its live-editing room");
             }
         }));
     }
@@ -183,7 +274,11 @@ impl PageWrites for LivePages {
 
 /// Merges the page file's text into its room and makes it the base of the
 /// room's next save.
-async fn merge_written(hub: &Hub, files: &DriveFiles, room: RoomKey) -> Result<()> {
+async fn merge_written(
+    hub: &Hub,
+    files: &DriveFiles,
+    room: RoomKey,
+) -> Result<()> {
     let Some(base) = files.current(room).await? else {
         return Ok(());
     };
@@ -237,7 +332,9 @@ impl DriveFiles {
             .read(&Actor::System, ObjectId::from(room.doc))
             .await
         {
-            Ok((node, blob)) if node.space == room.space && node.kind == NodeKind::Page => {
+            Ok((node, blob))
+                if node.space == room.space && node.kind == NodeKind::Page =>
+            {
                 Ok(Some(Base {
                     bytes: blob.bytes,
                     etag: Some(blob.meta.etag),
@@ -260,15 +357,18 @@ impl DocumentFiles for DriveFiles {
         Ok(Some(text))
     }
 
-    async fn write_version(&self, room: RoomKey, version: MarkdownVersion) -> Result<()> {
+    async fn write_version(
+        &self,
+        room: RoomKey,
+        version: MarkdownVersion,
+    ) -> Result<()> {
         // A room rebuilt from the change log never read the file: start the
         // merge from the file as it is now.
         let base = match self.recall(room) {
             Some(base) => base,
-            None => self
-                .current(room)
-                .await?
-                .ok_or_else(|| Error::new(ErrorKind::NotFound, "the page no longer exists"))?,
+            None => self.current(room).await?.ok_or_else(|| {
+                Error::new(ErrorKind::NotFound, "the page no longer exists")
+            })?,
         };
         let content = Bytes::from(version.markdown.into_bytes());
         let actor = version
@@ -285,7 +385,8 @@ impl DocumentFiles for DriveFiles {
             // were accepted under the rights held at the time, so they are
             // saved as Vellum's own write.
             Err(DriveError::PermissionDenied) if actor != Actor::System => {
-                tracing::warn!(%room, "editor lost edit access; saving the version as Vellum");
+                tracing::warn!(%room, "editor lost edit access; saving the \
+                    version as Vellum");
                 self.drive
                     .save(&Actor::System, id, base.clone(), content.clone())
                     .await
@@ -312,7 +413,8 @@ impl DocumentFiles for DriveFiles {
             // The room's text went to a conflict copy and the page kept
             // the other change. Carry on from the page as stored.
             Saved::Conflicted { copy } => {
-                tracing::warn!(%room, copy = %copy.id, "live edit conflicted; saved as a copy");
+                tracing::warn!(%room, copy = %copy.id, "live edit conflicted; \
+                    saved as a copy");
                 self.current(room).await?.unwrap_or(base)
             }
         };
@@ -343,7 +445,11 @@ impl std::fmt::Debug for DriveAuthorizer {
 impl DriveAuthorizer {
     /// Browsers send cookies with cross-site WebSocket handshakes that
     /// carry no CSRF token, so a cookie session must come from the app.
-    fn check_origin(&self, request: &Parts, principal: &Principal) -> Result<()> {
+    fn check_origin(
+        &self,
+        request: &Parts,
+        principal: &Principal,
+    ) -> Result<()> {
         if principal.kind() != CredentialKind::Session {
             return Ok(());
         }
@@ -368,7 +474,11 @@ impl DriveAuthorizer {
 
 #[async_trait]
 impl Authorizer for DriveAuthorizer {
-    async fn authorize(&self, request: &Parts, room: RoomKey) -> Result<(UserId, Access)> {
+    async fn authorize(
+        &self,
+        request: &Parts,
+        room: RoomKey,
+    ) -> Result<(UserId, Access)> {
         let principal = request
             .extensions
             .get::<Principal>()
@@ -377,7 +487,11 @@ impl Authorizer for DriveAuthorizer {
         self.admit(request, &principal, room).await
     }
 
-    async fn recheck(&self, request: &Parts, room: RoomKey) -> Result<(UserId, Access)> {
+    async fn recheck(
+        &self,
+        request: &Parts,
+        room: RoomKey,
+    ) -> Result<(UserId, Access)> {
         let principal = match &self.authenticator {
             Some(authenticator) => {
                 let meta = RequestMeta {
@@ -421,7 +535,10 @@ impl DriveAuthorizer {
             .await
             .map_err(Error::from)?;
         // A trashed page is not edited live; it comes back with restore.
-        if node.space != room.space || node.kind != NodeKind::Page || !node.is_live() {
+        if node.space != room.space
+            || node.kind != NodeKind::Page
+            || !node.is_live()
+        {
             return Err(Error::new(ErrorKind::NotFound, "page not found"));
         }
         let may_edit = principal.scopes().allows(Scope::WriteDirect)
@@ -467,19 +584,33 @@ mod tests {
     }
 
     impl World {
-        async fn new() -> std::result::Result<Self, Box<dyn std::error::Error>> {
+        async fn new() -> std::result::Result<Self, Box<dyn std::error::Error>>
+        {
             let dir = tempfile::tempdir()?;
             let store = Arc::new(LocalStore::open(dir.path()).await?);
             let index = Arc::new(MemoryIndex::new());
             let access = Arc::new(MemoryAccess::new(index.clone()));
-            let drive = Arc::new(Drive::new(store.clone(), index, access.clone()));
+            let drive =
+                Arc::new(Drive::new(store.clone(), index, access.clone()));
             let owner = UserId::generate();
             let actor = Actor::User { user: owner };
             let space = drive
-                .create_space(&actor, SpaceKind::SharedDrive, "launch", "Launch", None)
+                .create_space(
+                    &actor,
+                    SpaceKind::SharedDrive,
+                    "launch",
+                    "Launch",
+                    None,
+                )
                 .await?;
             let page = drive
-                .create_page(&actor, space.id, None, "Launch plan", "Ship it.\n")
+                .create_page(
+                    &actor,
+                    space.id,
+                    None,
+                    "Launch plan",
+                    "Ship it.\n",
+                )
                 .await?;
             Ok(Self {
                 _dir: dir,
@@ -507,8 +638,11 @@ mod tests {
             }
         }
 
-        async fn file(&self) -> std::result::Result<String, Box<dyn std::error::Error>> {
-            let (_, blob) = self.drive.read(&Actor::System, self.page.id).await?;
+        async fn file(
+            &self,
+        ) -> std::result::Result<String, Box<dyn std::error::Error>> {
+            let (_, blob) =
+                self.drive.read(&Actor::System, self.page.id).await?;
             Ok(String::from_utf8(blob.bytes.to_vec())?)
         }
     }
@@ -546,7 +680,8 @@ mod tests {
     async fn a_room_reads_and_saves_the_page_file() -> TestResult {
         let world = World::new().await?;
         let files = DriveFiles::new(Arc::clone(&world.drive));
-        let opened = files.read_markdown(world.room()).await?.ok_or("no file")?;
+        let opened =
+            files.read_markdown(world.room()).await?.ok_or("no file")?;
         assert!(opened.contains("Ship it."), "{opened}");
 
         let edited = opened.replace("Ship it.", "Ship it on Monday.");
@@ -565,10 +700,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn edits_made_outside_the_room_are_merged_not_overwritten() -> TestResult {
+    async fn edits_made_outside_the_room_are_merged_not_overwritten()
+    -> TestResult {
         let world = World::new().await?;
         let files = DriveFiles::new(Arc::clone(&world.drive));
-        let opened = files.read_markdown(world.room()).await?.ok_or("no file")?;
+        let opened =
+            files.read_markdown(world.room()).await?.ok_or("no file")?;
 
         // Someone edits the file directly while the room is open.
         let outside = format!("{opened}\nAdded in a text editor.\n");
@@ -609,7 +746,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn editors_write_viewers_read_and_strangers_are_refused() -> TestResult {
+    async fn editors_write_viewers_read_strangers_refused() -> TestResult {
         let world = World::new().await?;
         let auth = world.authorizer();
         let room = world.room();
@@ -632,7 +769,8 @@ mod tests {
             .await;
         assert!(refused.is_err());
 
-        let anonymous = auth.authorize(&upgrade(None, Some(ORIGIN)), room).await;
+        let anonymous =
+            auth.authorize(&upgrade(None, Some(ORIGIN)), room).await;
         assert_eq!(
             anonymous.map(|_| ()).map_err(|e| e.kind()),
             Err(ErrorKind::Unauthenticated)
@@ -646,7 +784,10 @@ mod tests {
         let auth = world.authorizer();
         for origin in [Some("https://evil.example"), None] {
             let refused = auth
-                .authorize(&upgrade(Some(session(world.owner)), origin), world.room())
+                .authorize(
+                    &upgrade(Some(session(world.owner)), origin),
+                    world.room(),
+                )
                 .await;
             assert_eq!(
                 refused.map(|_| ()).map_err(|e| e.kind()),
@@ -698,14 +839,18 @@ mod tests {
     /// RT-028 (#459): an open connection is checked again, so a revoked
     /// grant or a trashed page ends it and a downgrade stops its edits.
     #[tokio::test]
-    async fn a_recheck_follows_revoked_grants_and_trashed_pages() -> TestResult {
+    async fn a_recheck_follows_revoked_grants_and_trashed_pages() -> TestResult
+    {
         let world = World::new().await?;
         let auth = world.authorizer();
         let room = world.room();
         let editor = UserId::generate();
         world.access.grant(editor, world.page.space, Role::Editor);
         let request = upgrade(Some(session(editor)), Some(ORIGIN));
-        assert_eq!(auth.recheck(&request, room).await?, (editor, Access::Write));
+        assert_eq!(
+            auth.recheck(&request, room).await?,
+            (editor, Access::Write)
+        );
 
         world.access.revoke(editor, world.page.space);
         world.access.grant(editor, world.page.space, Role::Viewer);
@@ -720,6 +865,56 @@ mod tests {
             .trash(&Actor::User { user: world.owner }, world.page.id)
             .await?;
         assert!(auth.recheck(&owner, room).await.is_err());
+        Ok(())
+    }
+
+    /// D278: the cluster key and this replica's address turn on room
+    /// forwarding; a short key stops startup.
+    #[tokio::test]
+    async fn the_cluster_key_and_address_turn_on_forwarding() -> TestResult {
+        let dir = tempfile::tempdir()?;
+        let index = Index::open(&vellum_db::IndexConfig::sqlite(
+            dir.path().join("index.sqlite"),
+            None,
+        ))
+        .await?;
+        let key = "k".repeat(32);
+        let env = |pairs: &'static [(&'static str, &'static str)]| {
+            move |name: &str| {
+                pairs
+                    .iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| (*v).to_owned())
+            }
+        };
+        let with = |key: String, address: Option<&'static str>| {
+            move |name: &str| match name {
+                crate::limits::CLUSTER_KEY_VAR => Some(key.clone()),
+                crate::cluster::ADDRESS_VAR => address.map(str::to_owned),
+                _ => None,
+            }
+        };
+
+        assert!(cluster(&index, "pod-a:1:1", env(&[]))?.is_none());
+        let only_address = env(&[("VELLUM_NODE_ADDRESS", "10.0.0.7:7700")]);
+        assert!(cluster(&index, "pod-a:1:1", only_address)?.is_none());
+        assert!(
+            cluster(&index, "pod-a:1:1", with(key.clone(), None))?.is_none()
+        );
+
+        let on =
+            cluster(&index, "pod-a:1:1", with(key, Some(" 10.0.0.7:7700 ")))?
+                .ok_or("no cluster")?;
+        assert_eq!(on.config().me.name, "pod-a:1:1");
+        assert_eq!(on.config().me.address, "10.0.0.7:7700");
+
+        let short =
+            cluster(&index, "pod-a:1:1", with("short".to_owned(), Some("a:1")));
+        assert_eq!(
+            short.map(|_| ()).map_err(|e| e.kind()),
+            Err(ErrorKind::InvalidInput)
+        );
+        index.close().await;
         Ok(())
     }
 

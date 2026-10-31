@@ -11,26 +11,37 @@ import { Sidebar } from "./sidebar";
 
 function renderMenu() {
   const rendered = renderWithProviders(
-    <Sidebar currentId={undefined} compact={false} onNavigate={vi.fn<() => void>()} />,
+    <Sidebar
+      currentId={undefined}
+      compact={false}
+      onNavigate={vi.fn<() => void>()}
+    />,
     "/help",
   );
   const tree = screen.getByRole("tree", { name: "Engineering pages" });
   const openMenu = async (title: string) => {
-    await rendered.user.click(within(tree).getByRole("button", { name: `Actions for ${title}` }));
+    await rendered.user.click(
+      within(tree).getByRole("button", { name: `Actions for ${title}` }),
+    );
     return screen.getByRole("menu");
   };
   const choose = async (title: string, action: string) => {
     const menu = await openMenu(title);
-    await rendered.user.click(within(menu).getByRole("menuitem", { name: action }));
+    await rendered.user.click(
+      within(menu).getByRole("menuitem", { name: action }),
+    );
   };
-  const page = (id: string) => rendered.store.getSnapshot().pages.find((p) => p.id === id);
+  const page = (id: string) =>
+    rendered.store.getSnapshot().pages.find((p) => p.id === id);
   return { ...rendered, tree, openMenu, choose, page };
 }
 
 describe("PageMenu", () => {
   it("is a menu button that focuses its first item", async () => {
     const { user, openMenu } = renderMenu();
-    const button = screen.getByRole("button", { name: "Actions for On-call handbook" });
+    const button = screen.getByRole("button", {
+      name: "Actions for On-call handbook",
+    });
     expect(button.getAttribute("aria-haspopup")).toBe("menu");
     expect(button.getAttribute("aria-expanded")).toBe("false");
     const menu = await openMenu("On-call handbook");
@@ -55,30 +66,39 @@ describe("PageMenu", () => {
     expect(screen.queryByRole("menu")).toBeNull();
   });
 
-  it("moves through its items with the arrows, Home and End, wrapping around", async () => {
-    const { user, openMenu } = renderMenu();
-    await openMenu("On-call handbook");
-    await user.keyboard("{ArrowUp}");
-    expect(document.activeElement?.textContent).toBe("Move to trash");
-    await user.keyboard("{ArrowDown}");
-    expect(document.activeElement?.textContent).toBe("Add subpage");
-    await user.keyboard("{ArrowDown}");
-    expect(document.activeElement?.textContent).toBe("Rename");
-    await user.keyboard("{End}");
-    expect(document.activeElement?.textContent).toBe("Move to trash");
-    await user.keyboard("{Home}");
-    expect(document.activeElement?.textContent).toBe("Add subpage");
-    await user.keyboard("x");
-    expect(screen.getByRole("menu")).toBeDefined();
-  });
+  it(
+    "moves through its items with the arrows, Home and End, wrapping " +
+      "around",
+    async () => {
+      const { user, openMenu } = renderMenu();
+      await openMenu("On-call handbook");
+      await user.keyboard("{ArrowUp}");
+      expect(document.activeElement?.textContent).toBe("Move to trash");
+      await user.keyboard("{ArrowDown}");
+      expect(document.activeElement?.textContent).toBe("Add subpage");
+      await user.keyboard("{ArrowDown}");
+      expect(document.activeElement?.textContent).toBe("Rename");
+      await user.keyboard("{End}");
+      expect(document.activeElement?.textContent).toBe("Move to trash");
+      await user.keyboard("{Home}");
+      expect(document.activeElement?.textContent).toBe("Add subpage");
+      await user.keyboard("x");
+      expect(screen.getByRole("menu")).toBeDefined();
+    },
+  );
 
-  it.each(["{Escape}", "{Tab}"])("closes on %s and focuses the row", async (key) => {
-    const { user, openMenu } = renderMenu();
-    await openMenu("On-call handbook");
-    await user.keyboard(key);
-    expect(screen.queryByRole("menu")).toBeNull();
-    expect(document.activeElement).toBe(screen.getByRole("treeitem", { name: "On-call handbook" }));
-  });
+  it.each(["{Escape}", "{Tab}"])(
+    "closes on %s and focuses the row",
+    async (key) => {
+      const { user, openMenu } = renderMenu();
+      await openMenu("On-call handbook");
+      await user.keyboard(key);
+      expect(screen.queryByRole("menu")).toBeNull();
+      expect(document.activeElement).toBe(
+        screen.getByRole("treeitem", { name: "On-call handbook" }),
+      );
+    },
+  );
 
   it("stars and unstars a page with Enter and Space", async () => {
     const { user, openMenu, page } = renderMenu();
@@ -87,7 +107,9 @@ describe("PageMenu", () => {
     expect(page(PAGE.onCall)?.starred).toBe(true);
     expect(screen.queryByRole("menu")).toBeNull();
     const menu = await openMenu("On-call handbook");
-    const unstar = within(menu).getByRole("menuitem", { name: "Remove from favorites" });
+    const unstar = within(menu).getByRole("menuitem", {
+      name: "Remove from favorites",
+    });
     unstar.focus();
     await user.keyboard(" ");
     expect(page(PAGE.onCall)?.starred).toBe(false);
@@ -110,7 +132,9 @@ describe("PageMenu", () => {
     expect(page(PAGE.onCall)?.position).toBe(2);
     await choose("On-call handbook", "Nest under the page above");
     expect(page(PAGE.onCall)?.parentId).toBe(PAGE.gateway);
-    expect(screen.getByRole("treeitem", { name: "On-call handbook" })).toBeDefined();
+    expect(
+      screen.getByRole("treeitem", { name: "On-call handbook" }),
+    ).toBeDefined();
     await choose("On-call handbook", "Move out one level");
     expect(page(PAGE.onCall)?.parentId).toBe(PAGE.engHome);
   });
@@ -118,16 +142,19 @@ describe("PageMenu", () => {
   it("adds a subpage and opens it", async () => {
     const { choose, store, location } = renderMenu();
     await choose("Platform roadmap 2027", "Add subpage");
-    const child = store.getSnapshot().pages.find((p) => p.parentId === PAGE.roadmap);
+    const child = store
+      .getSnapshot()
+      .pages.find((p) => p.parentId === PAGE.roadmap);
     expect(child).toBeDefined();
     await waitFor(() => {
       expect(location()).toBe(`/p/${child?.id ?? ""}`);
     });
-    expect(screen.getByRole("treeitem", { name: "Platform roadmap 2027" })).toHaveProperty(
-      "ariaExpanded",
-      "true",
-    );
-    expect(screen.getByRole("button", { name: "Actions for Untitled" })).toBeDefined();
+    expect(
+      screen.getByRole("treeitem", { name: "Platform roadmap 2027" }),
+    ).toHaveProperty("ariaExpanded", "true");
+    expect(
+      screen.getByRole("button", { name: "Actions for Untitled" }),
+    ).toBeDefined();
   });
 
   it("moves the page and its subpages to the trash and goes home", async () => {
