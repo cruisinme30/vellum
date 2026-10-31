@@ -66,6 +66,15 @@ inherits = "release"
 lto = false
 codegen-units = 16
 
+# A release build that fits a laptop: fat LTO with one codegen unit needs
+# more memory for the final link than Docker Desktop gives by default.
+# `docker build --build-arg CARGO_PROFILE=laptop` uses it; CI and releases
+# keep `release`.
+[profile.laptop]
+inherits = "release"
+lto = false
+codegen-units = 16
+
 [profile.release.package.merman]
 opt-level = "s"
 [profile.release.package.merman-core]

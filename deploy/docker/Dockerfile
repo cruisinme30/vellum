@@ -7,6 +7,12 @@
 #
 #   docker build -f deploy/docker/Dockerfile -t vellum .
 #
+# On a laptop, the release profile's final link can run out of memory.
+# Build with the lighter `laptop` profile and fewer parallel jobs instead:
+#
+#   docker build -f deploy/docker/Dockerfile -t vellum:local \
+#     --build-arg CARGO_PROFILE=laptop --build-arg CARGO_BUILD_JOBS=4 .
+#
 # Every base image is pinned by digest and the build is reproducible: two
 # builds of the same commit produce byte-identical binaries (D96). The
 # release workflow builds the binaries once per architecture and passes them
@@ -77,13 +83,18 @@ COPY --from=web /src/web/dist web/dist
 # The check after the build fails it if the binary has an ELF interpreter
 # or a shared-library dependency: the runtime image has no loader and no
 # libraries, so such a binary cannot start ("no such file or directory").
+# CARGO_PROFILE picks the Cargo profile: `release` (CI and releases) or
+# `laptop` (no LTO, for machines with little memory). CARGO_BUILD_JOBS, when
+# set, limits parallel compile jobs; Cargo reads it from the environment.
+ARG CARGO_PROFILE=release
+ARG CARGO_BUILD_JOBS
 RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
     triple="$(cat /target)" \
     && export "CC_$(echo "${triple}" | tr - _)=musl-gcc" \
-    && cargo build --release --locked --package vellum-cli \
-        --target "${triple}" \
+    && cargo build --profile "${CARGO_PROFILE}" --locked \
+        --package vellum-cli --target "${triple}" \
     && mkdir -p /out \
-    && cp "target/${triple}/release/vellum" /out/vellum \
+    && cp "target/${triple}/${CARGO_PROFILE}/vellum" /out/vellum \
     && headers="$(readelf --program-headers --dynamic --wide /out/vellum)" \
     && if grep -E 'INTERP|\(NEEDED\)' <<<"${headers}" >&2; then \
          echo "error: the vellum binary is dynamically linked;" \
