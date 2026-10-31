@@ -212,3 +212,45 @@ fn math_with_a_fence_line_keeps_it_literal() {
         assert_eq!(serialize(&again), canonical, "{src:?} is not idempotent");
     }
 }
+
+#[test]
+fn fuzzer_findings_of_2026_10_30_round_trip() {
+    // Local format_roundtrip runs: blank control characters at a cell's or
+    // paragraph's edge, autolinks the extension does not read bare, and
+    // `>` runs after text.
+    for src in [
+        "\u{b}\n\u{b}-\n",
+        "\u{c}\n\u{c}-\n",
+        "\u{b}\n:-\n",
+        "n||\n-|-\n\u{c}\n",
+        "\u{b}\n^blk-a0000004\n",
+        ".\n\u{b}^blk-a0000003\n",
+        "<t@F>\n",
+        "<http://>\n",
+        "<http://#s>\n",
+        "t>>>>>>>>>\\>>>>>>>>>>>>>>>>>>>>>>>>\n",
+        "$$\n```\n$$\n#>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n",
+    ] {
+        let doc = parse(src).document;
+        let canonical = serialize(&doc);
+        let again = parse(&canonical).document;
+        assert_eq!(again, doc, "{src:?} as {canonical:?}");
+        assert_eq!(serialize(&again), canonical, "{src:?} is not idempotent");
+    }
+}
+
+#[test]
+fn a_long_gt_run_after_text_is_kept_whole() {
+    let src = format!("t{}\n", ">".repeat(40));
+    let doc = parse(&src).document;
+    let whole = vec![Inline::Text {
+        text: src.trim_end().to_owned(),
+    }];
+    assert!(
+        matches!(
+            &doc.blocks[..],
+            [Block::Paragraph { content, .. }] if *content == whole
+        ),
+        "{doc:?}"
+    );
+}

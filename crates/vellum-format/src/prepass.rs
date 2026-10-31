@@ -219,23 +219,30 @@ impl Scanner<'_, '_, '_> {
 /// Longest run of `>` handed to comrak unchanged.
 const MAX_QUOTE_RUN: usize = 32;
 
-/// Breaks runs of more than [`MAX_QUOTE_RUN`] `>` with a space.
+/// Breaks runs of more than [`MAX_QUOTE_RUN`] `>` with a space in a
+/// line's leading quote markers.
 ///
 /// comrak's alert check rescans the rest of a `>` run at every quote
 /// level, so one line of 100 000 `>` takes seconds. A space between quote
 /// markers changes nothing in Markdown, and content that deep is shown
-/// as plain text anyway. Code lines never reach this function.
+/// as plain text anyway. Only the markers are touched: a `>` run after the
+/// first other character is text, and a space there would change it.
+/// Code lines never reach this function.
 fn space_quote_runs(line: &str) -> std::borrow::Cow<'_, str> {
-    let too_long = line
+    let markers = line
+        .find(|c| !matches!(c, '>' | ' ' | '\t'))
+        .unwrap_or(line.len());
+    let (prefix, rest) = line.split_at(markers);
+    let too_long = prefix
         .split(|c| c != '>')
         .any(|run| run.len() > MAX_QUOTE_RUN);
     if !too_long {
         return std::borrow::Cow::Borrowed(line);
     }
     let mut out =
-        String::with_capacity(line.len() + line.len() / MAX_QUOTE_RUN);
+        String::with_capacity(line.len() + prefix.len() / MAX_QUOTE_RUN);
     let mut run = 0;
-    for c in line.chars() {
+    for c in prefix.chars() {
         if c == '>' {
             if run == MAX_QUOTE_RUN {
                 out.push(' ');
@@ -247,6 +254,7 @@ fn space_quote_runs(line: &str) -> std::borrow::Cow<'_, str> {
         }
         out.push(c);
     }
+    out.push_str(rest);
     std::borrow::Cow::Owned(out)
 }
 

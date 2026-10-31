@@ -530,7 +530,29 @@ fn bare_autolink<'a>(
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || "/:._~%+-?=&#@".contains(c))
         && text.ends_with(|c: char| c.is_ascii_alphanumeric() || c == '/');
-    (title.is_empty() && shape && safe).then_some(text.as_str())
+    (title.is_empty() && shape && safe && links_alone(text, url))
+        .then_some(text.as_str())
+}
+
+/// Whether the autolink extension reads `text` on its own as one link to
+/// `url`. Its rules (a domain needs a dot, a scheme needs a host) are its
+/// own, so the parser is asked instead of copied.
+fn links_alone(text: &str, url: &str) -> bool {
+    let blocks = crate::parse_unsettled(&format!("{text}\n")).document.blocks;
+    matches!(
+        &blocks[..],
+        [crate::Block::Paragraph { content, .. }]
+            if matches!(
+                &content[..],
+                [Inline::Link { url: u, title, content: c }]
+                    if u == url
+                        && title.is_empty()
+                        && matches!(
+                            &c[..],
+                            [Inline::Text { text: t }] if t == text
+                        )
+            )
+    )
 }
 
 /// The parser reads code spans with fences of at most this many backticks.

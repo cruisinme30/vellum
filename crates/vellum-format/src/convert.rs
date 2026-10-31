@@ -179,6 +179,7 @@ impl Cx<'_> {
             NodeValue::Paragraph => {
                 let mut content = self.inlines(node);
                 let id = extras::take_block_id(&mut content);
+                let content = trim_blank_ends(content);
                 Block::Paragraph {
                     content: extras::recognize(content),
                     id,
@@ -341,7 +342,9 @@ impl Cx<'_> {
     ) -> Block {
         let mut rows = node.children().map(|row| {
             row.children()
-                .map(|cell| extras::recognize(self.inlines(cell)))
+                .map(|cell| {
+                    extras::recognize(trim_blank_ends(self.inlines(cell)))
+                })
                 .collect::<Vec<_>>()
         });
         let header = rows.next().unwrap_or_default();
@@ -495,6 +498,38 @@ fn trim_ends(mut content: Vec<Inline>) -> Vec<Inline> {
         *text = text.trim_end().to_owned();
     }
     extras::merge_text(content)
+}
+
+/// Drops spaces, tabs, vertical tabs and form feeds from both ends of a
+/// paragraph's or cell's content. The parser keeps a vertical tab or form
+/// feed where a line starts or ends, but drops it once the canonical text
+/// puts the content after `| ` or before a block ID, so the document keeps
+/// only what reads back.
+fn trim_blank_ends(mut content: Vec<Inline>) -> Vec<Inline> {
+    const BLANK: [char; 4] = [' ', '\t', '\u{b}', '\u{c}'];
+    loop {
+        let before = content.len();
+        if let Some(Inline::Text { text }) = content.first_mut() {
+            *text = text.trim_start_matches(BLANK).to_owned();
+        }
+        if let Some(Inline::Text { text }) = content.last_mut() {
+            *text = text.trim_end_matches(BLANK).to_owned();
+        }
+        // A line that held only a vertical tab leaves its line break.
+        let blank = |i: Option<&Inline>| {
+            matches!(i, Some(Inline::SoftBreak))
+                || matches!(i, Some(Inline::Text { text }) if text.is_empty())
+        };
+        while blank(content.last()) {
+            let _ = content.pop();
+        }
+        while blank(content.first()) {
+            let _ = content.remove(0);
+        }
+        if content.len() == before {
+            return content;
+        }
+    }
 }
 
 /// Drops trailing whitespace and line breaks from inline content.
