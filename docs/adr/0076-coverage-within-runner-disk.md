@@ -22,7 +22,7 @@ vellum: 1
 
 The Rust coverage job of the full suite crashed on release pull
 request #544 (run 41133469810): `ld` died with a bus error while linking the
-`vellum-format` test programs. Cargo builds one test program per file in
+`vellum-format` test programs. `cargo` builds one test program per file in
 a crate's `tests/` folder, and each one links the crate's whole
 dependency graph again, with coverage instrumentation. The workspace had
 165 test programs (35 libraries, 1 binary and 129 test files), about
@@ -59,7 +59,7 @@ dependency graph again, with coverage instrumentation. The workspace had
 - **A larger runner**: costs money on every release and leaves 165
   programs that the fast suite and local builds still pay for.
 - **`autotests = false` with one `[[test]]` entry per crate**: the same
-  result with more manifest lines; `tests/it/main.rs` is found by Cargo.
+  result with more manifest lines; `tests/it/main.rs` is found by `cargo`.
 
 ## Consequences
 
