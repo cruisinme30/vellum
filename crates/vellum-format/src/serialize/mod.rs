@@ -153,8 +153,12 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
         }
         Block::List(list) => self::list(list, alternate),
         Block::Fence(fence) => self::fence(fence),
+        // The container pass does not skip `$$` blocks, so a literal line
+        // that opens a code fence or a container would swallow or split
+        // the blocks after it when read back. The code fence form keeps
+        // such lines literal.
         Block::Math { literal, id }
-            if !pos.nested && !literal.lines().any(|l| l == "$$") =>
+            if !pos.nested && !literal.lines().any(fence_like) =>
         {
             let mut open = "$$".to_owned();
             push_block_id(&mut open, id.as_ref());
@@ -175,6 +179,13 @@ fn block(block: &Block, pos: Pos, alternate: bool) -> String {
         Block::Container(container) if pos.nested => alert(container),
         Block::Container(container) => self::container(container),
     }
+}
+
+/// Whether a math line would read as `$$`, a code fence or a container
+/// fence outside a code fence.
+fn fence_like(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    line == "$$" || ["```", "~~~", ":::"].iter().any(|f| trimmed.starts_with(f))
 }
 
 /// Writes a table's or quote's block ID on its own line after a blank one.

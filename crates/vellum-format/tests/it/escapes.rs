@@ -191,3 +191,24 @@ fn a_wiki_link_across_setext_heading_lines_round_trips() {
         assert_eq!(serialize(&again), canonical, "{src:?} is not idempotent");
     }
 }
+
+#[test]
+fn math_with_a_fence_line_keeps_it_literal() {
+    // Fuzzer finding (`format_roundtrip`): math whose text holds a code
+    // or container fence line was written as a `$$` block, which the
+    // container pass does not skip, so the line opened a code fence or
+    // closed a container around it when read back.
+    for src in [
+        "```math\na\n```x\n```\n\n> [!WARNING] T\n> b\n",
+        "````math\na\n~~~\n````\n\n> [!NOTE] T\n> b\n",
+        "```math\na\n::::\nb\n```\n",
+        "::: info\n\n```math\na\n:::\nb\n```\n\n:::\n",
+        ":::: columns\n\n::: stats\n\n```math\n::::\n```\n\n:::\n\n::::\n",
+    ] {
+        let doc = parse(src).document;
+        let canonical = serialize(&doc);
+        let again = parse(&canonical).document;
+        assert_eq!(again, doc, "{src:?} as {canonical:?}");
+        assert_eq!(serialize(&again), canonical, "{src:?} is not idempotent");
+    }
+}
