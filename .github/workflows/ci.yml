@@ -159,6 +159,14 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install
+      # The runner has 14 GB free; the workspace's cached build for lints
+      # and docs restores to more than that once the cache archive sits
+      # next to it. The preinstalled Android SDK, .NET and GHC (about
+      # 15 GB) are unused here.
+      - name: Free runner disk for the Rust cache
+        run: >-
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          /usr/local/.ghcup && df -h /
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           # Only develop saves the cache (ADR 0035, D138). Pull requests
@@ -208,6 +216,14 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install
+      # The runner has 14 GB free; the workspace's cached build for lints
+      # and docs restores to more than that once the cache archive sits
+      # next to it. The preinstalled Android SDK, .NET and GHC (about
+      # 15 GB) are unused here.
+      - name: Free runner disk for the Rust cache
+        run: >-
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+          /usr/local/.ghcup && df -h /
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           # The cache key includes the job, so tests keep their own
