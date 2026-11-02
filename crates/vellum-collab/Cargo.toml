@@ -32,7 +32,7 @@ sha2 = "0.11.1"
 subtle = "2.6.1"
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["rt", "sync", "time", "macros"] }
-tokio-tungstenite = "0.29"
+tokio-tungstenite = "0.30"
 tracing = "0.1.44"
 tracing-opentelemetry = "0.34.0"
 vellum-contracts = { path = "../vellum-contracts" }
@@ -54,4 +54,4 @@ axum.features = ["ws", "tokio", "http1"]
 proptest = ">=1.11.0, <1.13"
 tokio.version = "1.54.1"
 tokio.features = ["rt-multi-thread", "net", "test-util"]
-tokio-tungstenite = "0.29"
+tokio-tungstenite = "0.30"
