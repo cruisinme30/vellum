@@ -46,7 +46,7 @@ vellum-format = { path = "../vellum-format" }
 vellum-kernel.workspace = true
 
 [dev-dependencies]
-imagesize = "0.14.0"
+imagesize = "0.15.0"
 proptest = "1.11.0"
 tokio.version = "1.54.1"
 tokio.features = ["macros", "rt-multi-thread", "net", "io-util"]
