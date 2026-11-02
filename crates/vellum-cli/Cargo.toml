@@ -43,7 +43,7 @@ lettre.features = [
     "aws-lc-rs",
     "rustls-platform-verifier",
 ]
-lru = "0.18.5"
+lru = "0.19.0"
 schemars.version = "1.2.3"
 schemars.default-features = false
 schemars.features = ["std", "derive"]
