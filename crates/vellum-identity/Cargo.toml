@@ -54,7 +54,7 @@ vellum-security = { path = "../vellum-security" }
 x509-parser = "0.18.1"
 
 [dev-dependencies]
-rcgen.version = "0.13.2"
+rcgen.version = "0.14.10"
 rcgen.default-features = false
 rcgen.features = ["aws_lc_rs", "pem"]
 tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread"] }
