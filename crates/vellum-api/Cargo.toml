@@ -83,7 +83,7 @@ rustix.features = ["process", "std"]
 [dev-dependencies]
 jsonschema = { version = "0.60.2", default-features = false }
 oas3 = { version = "0.22.0", default-features = false }
-rcgen.version = "0.13.2"
+rcgen.version = "0.14.10"
 rcgen.default-features = false
 rcgen.features = ["aws_lc_rs", "pem"]
 tower = { version = "0.5.3", features = ["util"] }
