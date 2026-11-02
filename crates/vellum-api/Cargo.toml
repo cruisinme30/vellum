@@ -61,7 +61,7 @@ tokio-rustls.default-features = false
 tokio-rustls.features = ["aws_lc_rs"]
 tokio-stream = { version = "0.1", features = ["net"] }
 tower = { version = "0.5.3", features = ["util"] }
-tower-http.version = "0.6.11"
+tower-http.version = "0.7.1"
 tower-http.features = [
     "catch-panic",
     "compression-br",
