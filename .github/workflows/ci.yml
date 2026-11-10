@@ -173,7 +173,7 @@ jobs:
           # restore it; their own caches would fill the 10 GB limit and
           # evict develop's.
           save-if: ${{ github.ref == 'refs/heads/develop' }}
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
         with:
           tool: cargo-deny,cargo-audit,mdbook
       - name: Format
@@ -229,7 +229,7 @@ jobs:
           # The cache key includes the job, so tests keep their own
           # build artefacts apart from clippy's. Only develop saves.
           save-if: ${{ github.ref == 'refs/heads/develop' }}
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@682ce6c3c696a4cd5168a05f98e51aa02b877941 # v2.89.1
         with:
           # The books tests build a published tree with mdBook.
           tool: cargo-nextest,mdbook
