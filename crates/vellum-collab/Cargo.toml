@@ -42,7 +42,7 @@ vellum-format = { path = "../vellum-format" }
 vellum-kernel.workspace = true
 # Exact: protocol::UpdateGuard relies on the order in which yrs reads a v1
 # update; re-check its table of counts before moving this.
-yrs = { version = "=0.28.0", features = ["sync"] }
+yrs = { version = "=0.28.1", features = ["sync"] }
 
 [dev-dependencies]
 tempfile = "3"
