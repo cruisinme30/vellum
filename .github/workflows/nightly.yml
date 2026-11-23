@@ -111,7 +111,7 @@ jobs:
         env:
           REPLICAS: "2"
         run: deploy/compose/stack.sh up vellum:ci nightly 7700
-      - uses: grafana/setup-k6-action@43b9fc21641a76002687994433dd586f56e791b1 # v1.2.2
+      - uses: grafana/setup-k6-action@c47136d33d365efbeb9ae7266908b5dcf98cdece # v1.3.0
         if: steps.serve.outcome == 'success'
         with:
           k6-version: ${{ env.K6_VERSION }}
@@ -311,7 +311,7 @@ jobs:
         with:
           workspaces: fuzz
           key: ${{ matrix.target }}
-      - uses: taiki-e/install-action@86f7a0ffb25f40114606501a311ebcfaf882ea32 # v2.88.0
+      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
         with:
           tool: cargo-fuzz
       - name: Keep the corpus between nights
@@ -360,11 +360,11 @@ jobs:
       - name: The image runs
         id: serve
         run: docker run --rm vellum:ci serve --help >/dev/null
-      - uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # v1.15.1
+      - uses: helm/kind-action@ea822c7bf1874f08e5a491df991c228edffc3376 # v1.15.2
         if: steps.serve.outcome == 'success'
         with:
           cluster_name: chaos
-      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+      - uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
         if: steps.serve.outcome == 'success'
         with:
           version: v3.19.0
